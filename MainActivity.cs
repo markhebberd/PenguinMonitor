@@ -46,7 +46,7 @@ namespace BluePenguinMonitoring
 
         // UI Components
         private TextView? _statusText;
-        private TextView? _boxNumberText;
+        private Button? _selectBoxButton;
         private LinearLayout? _scannedIdsContainer;
         private EditText? _adultsEditText;
         private EditText? _eggsEditText;
@@ -78,7 +78,6 @@ namespace BluePenguinMonitoring
         private Dictionary<string, PenguinData> _remotePenguinData = new Dictionary<string, PenguinData>();
 
         private int _currentBox = 1;
-        private bool _currentBoxIsLocked = true; // Boxes start locked by default
 
         // High value confirmation tracking - reset on each entry
         private bool _isProcessingConfirmation = false;
@@ -91,11 +90,13 @@ namespace BluePenguinMonitoring
         private TextView? _dataCardTitle;
         private LinearLayout _boxTitleLayout;
         private ImageView _lockIconView;
+        private bool _isBoxLocked;
+
         public void OnSwipePrevious()
         {
             if (_currentBox > 1)
             {
-                if (!_currentBoxIsLocked)
+                if (!_isBoxLocked)
                 {
                     Toast.MakeText(this, "Please lock the current box before navigating", ToastLength.Short)?.Show();
                     return;
@@ -112,7 +113,7 @@ namespace BluePenguinMonitoring
         {
             if (_currentBox < 150)
             {
-                if (!_currentBoxIsLocked)
+                if (!_isBoxLocked)
                 {
                     Toast.MakeText(this, "Please lock the current box before navigating", ToastLength.Short)?.Show();
                     return;
@@ -315,7 +316,7 @@ namespace BluePenguinMonitoring
                     
                     if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.R) // Android 11+
                     {
-                        Toast.MakeText(this, "⚠️ Android 11+ detected!\n\nFor file access, please:\n1. Go to Settings > Apps > BluePenguinMonitoring\n2. Enable 'All files access'\n\nOr try using the app's save/export feature instead.", ToastLength.Long)?.Show();
+                        Toast.MakeText(this, "⚠️ Android 11+ detected!\n\nFor file access, please:\n1. Go to Settings > Apps > BluePenguinMonitoring\n2. Enable 'All files access'", ToastLength.Long)?.Show();
                         
                         // Try to open the manage storage settings
                         try
@@ -684,6 +685,7 @@ namespace BluePenguinMonitoring
         }
         private void CreateDataRecordingUI()
         {
+            _isBoxLocked = true;
             var scrollView = new ScrollView(this);
             scrollView.SetBackgroundColor(UIFactory.BACKGROUND_COLOR);
 
@@ -845,21 +847,21 @@ namespace BluePenguinMonitoring
             var prevParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             _prevBoxButton.LayoutParameters = prevParams;
 
-            _boxNumberText = new TextView(this)
+            _selectBoxButton = new Button(this)
             {
                 Text = "Select Box",
                 Gravity = GravityFlags.Center,
                 Clickable = true,
                 Focusable = true
             };
-            _boxNumberText.SetTextColor(Color.White);
-            _boxNumberText.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
-            _boxNumberText.SetPadding(16, 24, 16, 24);
-            _boxNumberText.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_COLOR, 8);
-            _boxNumberText.Click += OnBoxNumberClick;
+            _selectBoxButton.SetTextColor(Color.White);
+            _selectBoxButton.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
+            _selectBoxButton.SetPadding(16, 24, 16, 24);
+            _selectBoxButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_COLOR, 8);
+            _selectBoxButton.Click += OnBoxNumberClick;
             var boxParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             boxParams.SetMargins(8, 0, 8, 0);
-            _boxNumberText.LayoutParameters = boxParams;
+            _selectBoxButton.LayoutParameters = boxParams;
 
             _nextBoxButton = _uiFactory.CreateStyledButton("Next box →", UIFactory.PRIMARY_COLOR);
             _nextBoxButton.Click += OnNextBoxClick;
@@ -867,20 +869,142 @@ namespace BluePenguinMonitoring
             _nextBoxButton.LayoutParameters = nextParams;
 
             layout.AddView(_prevBoxButton);
-            layout.AddView(_boxNumberText);
+            layout.AddView(_selectBoxButton);
             layout.AddView(_nextBoxButton);
 
             return layout;
         }
+        private void DrawBoxLayout()
+        {
+            // Update lock icon
+            if (_lockIconView != null)
+            {
+                _lockIconView.SetImageResource(_isBoxLocked
+                    ? Android.Resource.Drawable.IcLockLock
+                    : Resource.Drawable.LockUnlocked);
+            }
 
+            // Enable/Disable navigation and data buttons when locked/unlocked
+            List<Button> buttonsToToggle = new List<Button> { _prevBoxButton, _nextBoxButton, _selectBoxButton };
+            foreach (var button in buttonsToToggle)
+            {
+                button.Enabled = _isBoxLocked;
+                button.Alpha = _isBoxLocked ? 1.0f : 0.5f; // Grey out when unlocked
+            }
+
+            // title "Box n" is item 0, which we don't want to disable!
+            for (int i = 1; i < _dataCard.ChildCount; i++)
+            {
+                var child = _dataCard.GetChildAt(i);
+                SetEnabledRecursive(child, !_isBoxLocked, _isBoxLocked ? 0.8f : 1.0f);
+            }
+
+            // Find and disable the "Data" button
+            var parentLayout = _prevBoxButton?.Parent as LinearLayout;
+            var headerLayout = parentLayout?.Parent as LinearLayout;
+            if (headerLayout != null)
+            {
+                for (int i = 0; i < headerLayout.ChildCount; i++)
+                {
+                    var child = headerLayout.GetChildAt(i);
+                    if (child is LinearLayout buttonRow)
+                    {
+                        for (int j = 0; j < buttonRow.ChildCount; j++)
+                        {
+                            var btn = buttonRow.GetChildAt(j) as Button;
+                            if (btn != null && btn.Text == "Data")
+                            {
+                                btn.Enabled = _isBoxLocked;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // visually indicate locked state (e.g., change background)
+            if (_isBoxLocked)
+            {
+                _dataCardTitle.SetTextColor(Color.Gray);
+                SaveCurrentBoxData();
+            }
+            else
+            {
+                _dataCardTitle.SetTextColor(UIFactory.TEXT_PRIMARY);
+            }
+        }
         private void CreateBoxDataCard(LinearLayout layout)
         {
             // Horizontal layout for lock icon + box title
             _boxTitleLayout = new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Horizontal,
+                Clickable = true,
+                Focusable = true
             };
             _boxTitleLayout.SetGravity(GravityFlags.CenterHorizontal);
+            _boxTitleLayout.Click += (sender, e) =>
+
+            {
+                _isBoxLocked = !_isBoxLocked;
+                DrawBoxLayout();
+            };
+
+            // Update lock icon
+            if (_lockIconView != null)
+            {
+                _lockIconView.SetImageResource(_isBoxLocked
+                    ? Android.Resource.Drawable.IcLockLock
+                    : Resource.Drawable.LockUnlocked);
+            }
+
+            // Enable/Disable navigation and data buttons when locked/unlocked
+            List<Button> buttonsToToggle = new List<Button> { _prevBoxButton, _nextBoxButton, _selectBoxButton };
+            foreach (var button in buttonsToToggle)
+            {
+                button.Enabled = _isBoxLocked;
+                button.Alpha = _isBoxLocked ? 1.0f : 0.5f; // Grey out when unlocked
+            }
+
+            // title "Box n" is item 0, which we don't want to disable!
+            for (int i = 1; i < _dataCard.ChildCount; i++)
+            {
+                var child = _dataCard.GetChildAt(i);
+                SetEnabledRecursive(child, !_isBoxLocked, _isBoxLocked ? 0.8f : 1.0f);
+            }
+
+            // Find and disable the "Data" button
+            var parentLayout = _prevBoxButton?.Parent as LinearLayout;
+            var headerLayout = parentLayout?.Parent as LinearLayout;
+            if (headerLayout != null)
+            {
+                for (int i = 0; i < headerLayout.ChildCount; i++)
+                {
+                    var child = headerLayout.GetChildAt(i);
+                    if (child is LinearLayout buttonRow)
+                    {
+                        for (int j = 0; j < buttonRow.ChildCount; j++)
+                        {
+                            var btn = buttonRow.GetChildAt(j) as Button;
+                            if (btn != null && btn.Text == "Data")
+                            {
+                                btn.Enabled = _isBoxLocked;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // visually indicate locked state
+            if (_isBoxLocked)
+            {
+                _dataCardTitle.SetTextColor(Color.Gray);
+                SaveCurrentBoxData();
+            }
+            else
+            {
+                _dataCardTitle.SetTextColor(UIFactory.TEXT_PRIMARY);
+            }
+
             var boxTitleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             boxTitleParams.SetMargins(0, 0, 0, 16);
             _boxTitleLayout.LayoutParameters = boxTitleParams;
@@ -963,17 +1087,17 @@ namespace BluePenguinMonitoring
             _adultsEditText.TextChanged += OnDataChanged;
             _adultsEditText.Click += OnNumberFieldClick;
             _adultsEditText.FocusChange += OnNumberFieldFocus;
-            
+
             _eggsEditText.TextChanged += OnDataChanged;
             _eggsEditText.Click += OnNumberFieldClick;
             _eggsEditText.FocusChange += OnNumberFieldFocus;
-            
+
             _chicksEditText.TextChanged += OnDataChanged;
             _chicksEditText.Click += OnNumberFieldClick;
             _chicksEditText.FocusChange += OnNumberFieldFocus;
 
             _gateStatusSpinner.ItemSelected += OnGateStatusChanged;
-            
+
             inputFieldsLayout.AddView(_adultsEditText);
             inputFieldsLayout.AddView(_eggsEditText);
             inputFieldsLayout.AddView(_chicksEditText);
@@ -1008,6 +1132,19 @@ namespace BluePenguinMonitoring
             _notesEditText.LayoutParameters = notesEditParams;
             _notesEditText.TextChanged += OnDataChanged;
             layout.AddView(_notesEditText);
+        }
+
+        private void SetEnabledRecursive(View view, bool enabled, float alpha)
+        {
+            view.Enabled = enabled;
+            view.Alpha = alpha;
+            if (view is ViewGroup group)
+            {
+                for (int i = 0; i < group.ChildCount; i++)
+                {
+                    SetEnabledRecursive(group.GetChildAt(i), enabled, alpha);
+                }
+            }
         }
 
         private void OnNumberFieldClick(object? sender, EventArgs e)
@@ -1055,7 +1192,6 @@ namespace BluePenguinMonitoring
             {
                 ShowEmptyBoxDialog(() =>
                 {
-                    SaveCurrentBoxData();
                     _currentBox = targetBox;
                     CompleteNavigation();
                 }, () =>
@@ -1066,7 +1202,6 @@ namespace BluePenguinMonitoring
             }
             else
             {
-                SaveCurrentBoxData();
                 _currentBox = targetBox;
                 CompleteNavigation();
             }
@@ -1622,8 +1757,7 @@ namespace BluePenguinMonitoring
                             // Check if bird already exists in target box
                             if (!targetBoxData.ScannedIds.Any(s => s.BirdId == scanToMove.BirdId))
                             {
-                                targetBoxData.ScannedIds.Add(scanToMove);
-                                
+                                targetBoxData.ScannedIds.Add(scanToMove);                                
 
                                 SaveDataToInternalStorage();
                                 UpdateScannedIdsDisplay(currentBoxData.ScannedIds);
@@ -1651,28 +1785,26 @@ namespace BluePenguinMonitoring
                 if (string.IsNullOrEmpty(internalPath))
                     return;
 
-                // Load main app data
-                var appState = _dataStorageService.LoadDataFromInternalStorage(internalPath);
-                if (appState != null)
-                {
-                    _currentBox = appState.CurrentBox;
-                    _currentBoxIsLocked = appState.BoxesAreLocked;
-                    _boxDataStorage = appState.BoxData ?? new Dictionary<int, BoxData>();
-                    Toast.MakeText(this, $"📱 Data restored...", ToastLength.Short)?.Show();
-                }
-
-                // Load remote penguin data
+                // Load remote penguin data.
                 var remotePenguinData = _dataStorageService.LoadRemotePenguinDataFromInternalStorage(internalPath);
                 if (remotePenguinData != null)
                 {
                     _remotePenguinData = remotePenguinData;
                     Toast.MakeText(this, $"🐧 {_remotePenguinData.Count} bird records loaded", ToastLength.Short)?.Show();
                 }
+
+                // Load main app data
+                var appState = _dataStorageService.LoadDataFromInternalStorage(internalPath);
+                if (appState != null)
+                {
+                    _currentBox = appState.CurrentBox;
+                    _boxDataStorage = appState.BoxData ?? new Dictionary<int, BoxData>();
+                    Toast.MakeText(this, $"📱 Data restored...", ToastLength.Short)?.Show();
+                }
             }
             catch (Exception ex)
             {
                 _currentBox = 1;
-                _currentBoxIsLocked = true;
                 _boxDataStorage = new Dictionary<int, BoxData>();
                 _remotePenguinData = new Dictionary<string, PenguinData>();
                 System.Diagnostics.Debug.WriteLine($"Failed to load data: {ex.Message}");
