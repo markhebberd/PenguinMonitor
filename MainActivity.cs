@@ -45,19 +45,19 @@ namespace BluePenguinMonitoring
         private float _gpsAccuracy = -1;
 
         // UI Components
-        private TextView? _statusText;
+        private TextView? _statusText; // scanner and GPS status
+
+        private Button? _prevBoxButton;
         private Button? _selectBoxButton;
+        private Button? _nextBoxButton;
+
         private LinearLayout? _scannedIdsContainer;
         private EditText? _adultsEditText;
         private EditText? _eggsEditText;
         private EditText? _chicksEditText;
         private Spinner? _gateStatusSpinner;
         private EditText? _notesEditText;
-        private Button? _prevBoxButton;
-        private Button? _nextBoxButton;
-        private Button? _clearBoxButton;
         private EditText? _manualScanEditText;
-        private Button? _lockUnlockButton;
 
         // Add gesture detection components
         private GestureDetector? _gestureDetector;
@@ -88,43 +88,10 @@ namespace BluePenguinMonitoring
 
         // Add a field for the data card title so it can be updated dynamically
         private TextView? _dataCardTitle;
-        private LinearLayout _boxTitleLayout;
+        private LinearLayout _dataCardTitleLayout;
         private ImageView _lockIconView;
         private bool _isBoxLocked;
 
-        public void OnSwipePrevious()
-        {
-            if (_currentBox > 1)
-            {
-                if (!_isBoxLocked)
-                {
-                    Toast.MakeText(this, "Please lock the current box before navigating", ToastLength.Short)?.Show();
-                    return;
-                }
-                NavigateToBox(_currentBox - 1, () => _currentBox > 1);
-            }
-            else
-            {
-                Toast.MakeText(this, "Already at first box", ToastLength.Short)?.Show();
-            }
-        }
-
-        public void OnSwipeNext()
-        {
-            if (_currentBox < 150)
-            {
-                if (!_isBoxLocked)
-                {
-                    Toast.MakeText(this, "Please lock the current box before navigating", ToastLength.Short)?.Show();
-                    return;
-                }
-                NavigateToBox(_currentBox + 1, () => _currentBox < 150);
-            }
-            else
-            {
-                Toast.MakeText(this, "Already at last box", ToastLength.Short)?.Show();
-            }
-        }
         protected override void OnCreate(Bundle? savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
@@ -242,7 +209,15 @@ namespace BluePenguinMonitoring
                 _locationManager?.RequestLocationUpdates(LocationManager.NetworkProvider, 1000, 1, this);
             }
         }
-
+        public void OnLocationChanged(Location location) // required by ILocationListener
+        {
+            _currentLocation = location;
+            _gpsAccuracy = location.Accuracy;
+            UpdateStatusText();
+        }
+        public void OnStatusChanged(string? provider, Availability status, Bundle? extras) { } // required by ILocationListener
+        public void OnProviderDisabled(string provider) { } // required by ILocationListener
+        public void OnProviderEnabled(string provider) { } // required by ILocationListener
         private void InitializeBluetooth()
         {
             _bluetoothManager = new BluetoothManager();
@@ -250,40 +225,46 @@ namespace BluePenguinMonitoring
             _bluetoothManager.EidDataReceived += OnEidDataReceived;
             _ = _bluetoothManager.StartConnectionAsync();
         }
-
         private void OnBluetoothStatusChanged(string status)
         {
             RunOnUiThread(() => UpdateStatusText(status));
         }
-
+        public void OnSwipePrevious()
+        {
+            if (!_isBoxLocked)
+            {
+                Toast.MakeText(this, "Please lock the current box before navigating", ToastLength.Short)?.Show();
+                return;
+            }
+            if (_currentBox > 1)
+            {
+                NavigateToBox(_currentBox - 1, () => _currentBox > 1);
+            }
+            else
+            {
+                Toast.MakeText(this, "Already at first box", ToastLength.Short)?.Show();
+            }
+        }
+        public void OnSwipeNext()
+        {
+            if (!_isBoxLocked)
+            {
+                Toast.MakeText(this, "Please lock the current box before navigating", ToastLength.Short)?.Show();
+                return;
+            }
+            if (_currentBox < 150)
+            {
+                NavigateToBox(_currentBox + 1, () => _currentBox < 150);
+            }
+            else
+            {
+                Toast.MakeText(this, "Already at last box", ToastLength.Short)?.Show();
+            }
+        }
         private void OnEidDataReceived(string eidData)
         {
             AddScannedId(eidData);
         }
-
-        // ILocationListener implementation
-        public void OnLocationChanged(Location location)
-        {
-            _currentLocation = location;
-            _gpsAccuracy = location.Accuracy;
-            UpdateStatusText();
-        }
-
-        public void OnProviderDisabled(string provider)
-        {
-            // Handle provider disabled
-        }
-
-        public void OnProviderEnabled(string provider)
-        {
-            // Handle provider enabled
-        }
-
-        public void OnStatusChanged(string? provider, Availability status, Bundle? extras)
-        {
-            // Handle status change
-        }
-
         private void UpdateStatusText(string? bluetoothStatus = null)
         {
             var btStatus = bluetoothStatus ?? (_bluetoothManager?.IsConnected == true ? "HR5 Connected" : "Connecting to HR5...");
@@ -428,7 +409,6 @@ namespace BluePenguinMonitoring
                 System.Diagnostics.Debug.WriteLine($"LoadJsonDataFromFile error: {ex}");
             }
         }
-
         private void ShowFileSelectionDialog(string[] files)
         {
             var fileNames = files.Select(f => 
@@ -549,7 +529,6 @@ namespace BluePenguinMonitoring
                 Toast.MakeText(this, $"❌ Failed to load JSON: {ex.Message}", ToastLength.Long)?.Show();
             }
         }
-
         private void ShowBoxDataSummary()
         {
             if (_boxDataStorage.Count == 0)
@@ -582,15 +561,11 @@ namespace BluePenguinMonitoring
                 ("Load JSON", LoadJsonDataFromFile)
             );
         }
-        private string ConvertToGoogleSheetsCsvUrl(string shareUrl)
-        {
-            return _csvDataService.ConvertToGoogleSheetsCsvUrl(shareUrl);
-        }
         private async Task DownloadCsvDataAsync()
         {
             try
             {
-                var csvUrl = ConvertToGoogleSheetsCsvUrl(GOOGLE_SHEETS_URL);
+                var csvUrl = _csvDataService.ConvertToGoogleSheetsCsvUrl(GOOGLE_SHEETS_URL);
 
                 RunOnUiThread(() =>
                 {
@@ -645,6 +620,7 @@ namespace BluePenguinMonitoring
 
                 RunOnUiThread(() =>
                 {
+                    DrawBoxLayout();
                     Toast.MakeText(this, $"✅ Downloaded {parsedData.Count} rows, {_remotePenguinData.Count} penguin records", ToastLength.Short)?.Show();
                 });
             }
@@ -738,9 +714,10 @@ namespace BluePenguinMonitoring
             boxNavLayout.LayoutParameters = statusParams;
             headerCard.AddView(boxNavLayout);
 
-            // Data card (remove gesture detection from here)
+            // Data card
             _dataCard = _uiFactory.CreateCard();
             CreateBoxDataCard(_dataCard);
+            DrawBoxLayout();
 
             layout.AddView(_dataCard);
             scrollView.AddView(layout);
@@ -827,9 +804,6 @@ namespace BluePenguinMonitoring
                 button.LayoutParameters = buttonParams;
 
                 layout.AddView(button);
-
-                if (text.Contains("Clear"))
-                    _clearBoxButton = button;
             }
 
             return layout;
@@ -920,32 +894,29 @@ namespace BluePenguinMonitoring
                     }
                 }
             }
-
-            // visually indicate locked state (e.g., change background)
-            if (_isBoxLocked)
-            {
-                _dataCardTitle.SetTextColor(Color.Gray);
-                SaveCurrentBoxData();
-            }
-            else
-            {
-                _dataCardTitle.SetTextColor(UIFactory.TEXT_PRIMARY);
-            }
         }
         private void CreateBoxDataCard(LinearLayout layout)
         {
             // Horizontal layout for lock icon + box title
-            _boxTitleLayout = new LinearLayout(this)
+            _dataCardTitleLayout = new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Horizontal,
                 Clickable = true,
                 Focusable = true
             };
-            _boxTitleLayout.SetGravity(GravityFlags.CenterHorizontal);
-            _boxTitleLayout.Click += (sender, e) =>
-
+            _dataCardTitleLayout.SetGravity(GravityFlags.CenterHorizontal);
+            _dataCardTitleLayout.Click += (sender, e) =>
             {
                 _isBoxLocked = !_isBoxLocked;
+                if (!_isBoxLocked)
+                {
+                    Toast.MakeText(this, "🔓 Box unlocked for editing\n\nPlease lock the box when done to prevent data loss.", ToastLength.Long)?.Show();
+                }
+                else
+                {
+                    SaveCurrentBoxData();
+                    Toast.MakeText(this, "🔒 Box locked", ToastLength.Short)?.Show();
+                }
                 DrawBoxLayout();
             };
 
@@ -994,6 +965,19 @@ namespace BluePenguinMonitoring
                 }
             }
 
+            // Box title text
+            _dataCardTitle = new TextView(this)
+            {
+                Text = $"Box {_currentBox}",
+                TextSize = 30,
+                Gravity = GravityFlags.CenterHorizontal
+            };
+            _dataCardTitle.SetTextColor(UIFactory.TEXT_PRIMARY);
+            _dataCardTitle.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
+            var dataTitleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
+            _dataCardTitle.LayoutParameters = dataTitleParams;
+            _dataCardTitleLayout.AddView(_dataCardTitle);
+
             // visually indicate locked state
             if (_isBoxLocked)
             {
@@ -1007,7 +991,7 @@ namespace BluePenguinMonitoring
 
             var boxTitleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             boxTitleParams.SetMargins(0, 0, 0, 16);
-            _boxTitleLayout.LayoutParameters = boxTitleParams;
+            _dataCardTitleLayout.LayoutParameters = boxTitleParams;
 
             // Lock icon
             _lockIconView = new ImageView(this);
@@ -1015,22 +999,11 @@ namespace BluePenguinMonitoring
             var iconParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
             iconParams.SetMargins(0, 0, 12, 0); // Space between icon and text
             _lockIconView.LayoutParameters = iconParams;
-            _boxTitleLayout.AddView(_lockIconView);
+            _dataCardTitleLayout.AddView(_lockIconView);
 
-            // Box title text
-            _dataCardTitle = new TextView(this)
-            {
-                Text = $"Box {_currentBox}",
-                TextSize = 30,
-                Gravity = GravityFlags.CenterHorizontal
-            };
-            _dataCardTitle.SetTextColor(UIFactory.TEXT_PRIMARY);
-            _dataCardTitle.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
-            var dataTitleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
-            _dataCardTitle.LayoutParameters = dataTitleParams;
-            _boxTitleLayout.AddView(_dataCardTitle);
+            
 
-            layout.AddView(_boxTitleLayout);
+            layout.AddView(_dataCardTitleLayout);
 
             // Scanned birds container
             _scannedIdsContainer = new LinearLayout(this)
@@ -1321,7 +1294,6 @@ namespace BluePenguinMonitoring
         {
             if (_isProcessingConfirmation)
                 return;
-
             CheckForHighValueConfirmation();
         }
 
@@ -1334,9 +1306,9 @@ namespace BluePenguinMonitoring
 
             // Check if any values are 3 or greater - no state tracking, ask every time
             var highValues = new List<(string type, int count)>();
-            if (adults >= 3) highValues.Add(("adults", adults));
-            if (eggs >= 3) highValues.Add(("eggs", eggs));
-            if (chicks >= 3) highValues.Add(("chicks", chicks));
+            if (adults > 2) highValues.Add(("adults", adults));
+            if (eggs > 2) highValues.Add(("eggs", eggs));
+            if (chicks > 2) highValues.Add(("chicks", chicks));
 
             if (highValues.Count > 0)
             {
