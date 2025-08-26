@@ -35,7 +35,6 @@ namespace BluePenguinMonitoring.UI.Factories
         {
             _context = context;
         }
-
         public LinearLayout CreateCard()
         {
             var card = new LinearLayout(_context)
@@ -52,7 +51,6 @@ namespace BluePenguinMonitoring.UI.Factories
 
             return card;
         }
-
         public GradientDrawable CreateCardBackground()
         {
             var drawable = new GradientDrawable();
@@ -61,7 +59,6 @@ namespace BluePenguinMonitoring.UI.Factories
             drawable.SetStroke(1, Color.ParseColor("#E0E0E0"));
             return drawable;
         }
-
         public GradientDrawable CreateRoundedBackground(Color color, int radiusDp)
         {
             var drawable = new GradientDrawable();
@@ -69,7 +66,6 @@ namespace BluePenguinMonitoring.UI.Factories
             drawable.SetCornerRadius(radiusDp * _context.Resources?.DisplayMetrics?.Density ?? 8);
             return drawable;
         }
-
         public Button CreateStyledButton(string text, Color backgroundColor)
         {
             var button = new Button(_context)
@@ -86,7 +82,6 @@ namespace BluePenguinMonitoring.UI.Factories
 
             return button;
         }
-
         public TextView CreateDataLabel(string text)
         {
             var label = new TextView(_context)
@@ -100,7 +95,6 @@ namespace BluePenguinMonitoring.UI.Factories
             label.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
             return label;
         }
-
         public EditText CreateStyledNumberField()
         {
             var editText = new EditText(_context)
@@ -121,7 +115,6 @@ namespace BluePenguinMonitoring.UI.Factories
 
             return editText;
         }
-
         public Spinner CreateGateStatusSpinner()
         {
             var spinner = new Spinner(_context);
