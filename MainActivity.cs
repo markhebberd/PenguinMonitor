@@ -1137,26 +1137,7 @@ namespace BluePenguinMonitoring
 
         private void OnSaveDataClick(object? sender, EventArgs e)
         {
-            if (!_boxDataStorage.ContainsKey(_currentBox))
-            {
-                ShowConfirmationDialog(
-                    "Empty Box Confirmation",
-                    "Confirm this box has been inspected, and is empty",
-                    ("Confirm Empty", () =>
-                    {
-                        SaveCurrentBoxData();
-                        ShowSaveConfirmation();
-                    }
-                ),
-                    ("Skip", () => { }
-                )
-                );
-            }
-            else
-            {
-                SaveCurrentBoxData();
-                ShowSaveConfirmation();
-            }
+            ShowSaveConfirmation();
         }
 
         private void ShowSaveConfirmation()
@@ -1265,10 +1246,14 @@ namespace BluePenguinMonitoring
         private void SaveCurrentBoxData()
         {
             if (!_boxDataStorage.ContainsKey(_currentBox))
+            {
                 _boxDataStorage[_currentBox] = new BoxData();
+                _boxDataStorage[_currentBox].whenDataCollectedUtc = DateTime.UtcNow;
+            }
 
             var boxData = _boxDataStorage[_currentBox];
-
+            string boxDataString = boxData.ToString();
+            
             int adults, eggs, chicks;
             int.TryParse(_adultsEditText?.Text ?? "0", out adults);
             int.TryParse(_eggsEditText?.Text ?? "0", out eggs);
@@ -1280,6 +1265,10 @@ namespace BluePenguinMonitoring
             boxData.GateStatus = GetSelectedGateStatus();
             boxData.Notes = _notesEditText?.Text ?? "";
 
+            if (boxData.ToString() != boxDataString)
+            {
+                boxData.whenDataCollectedUtc = DateTime.UtcNow; // Update timestamp if data changed
+            }
             SaveDataToInternalStorage();
         }
         private void UpdateScannedIdsDisplay(List<ScanRecord> scans)
