@@ -1,16 +1,18 @@
-CSV file output
+TODO
+
+CSV file output unless britta gives me a schema!
 flag if detect chick scanned, alarm
 option to disable bluetooth connection
 clicking on a scan entry should 
 	show all know data about the bird 
-	prompt to enter optional information connected with the scan result, Sex
+	prompt to enter optional information connected with the scan result, i.e. Sex
 GOTO box, improving somehow. keyboard non popping currently. 
 
-Done
+DONE
 
 locked boxes by default
 when bird stats are downloaded the currect box should be redrawn 
 
-Fixed by design. 
+FIXED BY DESIGN
 
 move should adjust the box count of the source and destination boxes
