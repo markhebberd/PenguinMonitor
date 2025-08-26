@@ -1,12 +1,16 @@
 CSV file output
 flag if detect chick scanned, alarm
 option to disable bluetooth connection
-locked boxes by default
-keyboard pop in change box prompt
 clicking on a scan entry should 
 	show all know data about the bird 
 	prompt to enter optional information connected with the scan result, Sex
-move should adjust the box count of the source and destination boxes
+GOTO box, improving somehow. keyboard non popping currently. 
+
+Done
+
+locked boxes by default
 when bird stats are downloaded the currect box should be redrawn 
-GOTO box, needs improving somehow. 
-Bluetooth move to services?
+
+Fixed by design. 
+
+move should adjust the box count of the source and destination boxes
