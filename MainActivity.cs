@@ -554,9 +554,7 @@ namespace BluePenguinMonitoring
             ShowConfirmationDialog(
                 "Box Data Summary",
                 summary,
-                ("OK", () => { }
-            ),
-                ("Load JSON", LoadJsonDataFromFile)
+                ("OK", () => { } )
             );
         }
         private async Task DownloadCsvDataAsync()
@@ -731,40 +729,6 @@ namespace BluePenguinMonitoring
             }
             e.Handled = false; // Allow scrolling to continue
         }
-        //private class ViewInsetsListener : Java.Lang.Object, View.IOnApplyWindowInsetsListener
-        //{
-        //    public WindowInsets OnApplyWindowInsets(View v, WindowInsets insets)
-        //    {
-        //        int topInset = insets.SystemWindowInsetTop;
-        //        int bottomInset = insets.SystemWindowInsetBottom;
-                
-        //        if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.P && insets.DisplayCutout != null)
-        //        {
-        //            topInset = Math.Max(topInset, insets.DisplayCutout.SafeInsetTop);
-        //        }
-
-        //        // Apply padding to avoid content being hidden behind system UI
-        //        v.SetPadding(20, topInset + 20, 20, bottomInset + 20);
-
-        //        return insets;
-        //    }
-        //}
-        //private GradientDrawable CreateCardBackground()
-        //{
-        //    var drawable = new GradientDrawable();
-        //    drawable.SetColor(UIFactory.CARD_COLOR);
-        //    drawable.SetCornerRadius(12 * Resources?.DisplayMetrics?.Density ?? 12);
-        //    drawable.SetStroke(1, Color.ParseColor("#E0E0E0"));
-        //    return drawable;
-        //}
-
-        //private GradientDrawable CreateRoundedBackground(Color color, int radiusDp)
-        //{
-        //    var drawable = new GradientDrawable();
-        //    drawable.SetColor(color);
-        //    drawable.SetCornerRadius(radiusDp * Resources?.DisplayMetrics?.Density ?? 8);
-        //    return drawable;
-        //}
         private LinearLayout CreateStyledButtonLayout(params (string text, EventHandler handler, Color color)[] buttons)
         {
             var layout = new LinearLayout(this)
@@ -1211,11 +1175,21 @@ namespace BluePenguinMonitoring
                 "Save All Data",
                 $"Save data to Downloads folder?\n\n📦 {totalBoxes} boxes\n🐧 {totalBirds} bird scans\n👥 {totalAdults} adults\n🥚 {totalEggs} eggs\n🐣 {totalChicks} chicks\n🚪 Gate: {gateUpCount} up, {regateCount} regate",
                 ("Save", SaveAllData),
-                ("Cancel", () => { }
-            )
+                ("Cancel", () => { } )
             );
         }
 
+        private void ShowConfirmationDialog(string title, string message, (string text, Action action) positiveButton)
+        {
+            var alertDialog = new AlertDialog.Builder(this)
+                .SetTitle(title)
+                .SetMessage(message)
+                .SetPositiveButton(positiveButton.text, (s, e) => positiveButton.action())
+                .SetCancelable(true)
+                .Create();
+
+            alertDialog?.Show();
+        }
         private void ShowConfirmationDialog(string title, string message, (string text, Action action) positiveButton, (string text, Action action) negativeButton)
         {
             var alertDialog = new AlertDialog.Builder(this)
@@ -1784,7 +1758,6 @@ namespace BluePenguinMonitoring
                             TriggerChickAlert();
                         }
                     }
-                    
                     Toast.MakeText(this, toastMessage, ToastLength.Short)?.Show();
                 });
             }
@@ -2124,18 +2097,7 @@ namespace BluePenguinMonitoring
             // Check if this penguin should auto-increment Adults count
             if (_remotePenguinData.TryGetValue(cleanInput, out var penguinData))
             {
-                if (penguinData.LastKnownLifeStage == LifeStage.Adult || 
-                    penguinData.LastKnownLifeStage == LifeStage.Returnee)
-                {
-                    boxData.unchippedAdults++;
-                    
-                    // Update the Adults field in the UI
-                    if (_adultsEditText != null)
-                    {
-                        _adultsEditText.Text = boxData.unchippedAdults.ToString();
-                    }
-                }
-                else if (penguinData.LastKnownLifeStage == LifeStage.Chick)
+                if (penguinData.LastKnownLifeStage == LifeStage.Chick)
                 {
                     // Trigger chick alert for manual entries as well
                     TriggerChickAlert();
@@ -2162,7 +2124,6 @@ namespace BluePenguinMonitoring
                     toastMessage += $" (Chick)";
                 }
             }
-            
             Toast.MakeText(this, toastMessage, ToastLength.Short)?.Show();
         }
 
@@ -2170,7 +2131,6 @@ namespace BluePenguinMonitoring
         {
             ShowDataOptionsDialog();
         }
-
         private void ShowDataOptionsDialog()
         {
             var options = new string[] 
