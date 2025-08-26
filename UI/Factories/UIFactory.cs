@@ -126,6 +126,12 @@ namespace BluePenguinMonitoring.UI.Factories
             var adapter = new ArrayAdapter<string>(_context, Android.Resource.Layout.SimpleSpinnerItem, gateStatusOptions);
             adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
             spinner.Adapter = adapter;
+
+            
+            // Set the spinner to have the same layout weight as the input fields
+            var spinnerParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
+            spinnerParams.SetMargins(4, 0, 4, 0);
+            spinner.LayoutParameters = spinnerParams;
             
             return spinner;
         }

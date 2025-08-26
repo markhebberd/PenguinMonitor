@@ -731,59 +731,40 @@ namespace BluePenguinMonitoring
             }
             e.Handled = false; // Allow scrolling to continue
         }
-        private class ViewInsetsListener : Java.Lang.Object, View.IOnApplyWindowInsetsListener
-        {
-            public WindowInsets OnApplyWindowInsets(View v, WindowInsets insets)
-            {
-                int topInset = insets.SystemWindowInsetTop;
-                int bottomInset = insets.SystemWindowInsetBottom;
+        //private class ViewInsetsListener : Java.Lang.Object, View.IOnApplyWindowInsetsListener
+        //{
+        //    public WindowInsets OnApplyWindowInsets(View v, WindowInsets insets)
+        //    {
+        //        int topInset = insets.SystemWindowInsetTop;
+        //        int bottomInset = insets.SystemWindowInsetBottom;
                 
-                if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.P && insets.DisplayCutout != null)
-                {
-                    topInset = Math.Max(topInset, insets.DisplayCutout.SafeInsetTop);
-                }
+        //        if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.P && insets.DisplayCutout != null)
+        //        {
+        //            topInset = Math.Max(topInset, insets.DisplayCutout.SafeInsetTop);
+        //        }
 
-                // Apply padding to avoid content being hidden behind system UI
-                v.SetPadding(20, topInset + 20, 20, bottomInset + 20);
+        //        // Apply padding to avoid content being hidden behind system UI
+        //        v.SetPadding(20, topInset + 20, 20, bottomInset + 20);
 
-                return insets;
-            }
-        }
+        //        return insets;
+        //    }
+        //}
+        //private GradientDrawable CreateCardBackground()
+        //{
+        //    var drawable = new GradientDrawable();
+        //    drawable.SetColor(UIFactory.CARD_COLOR);
+        //    drawable.SetCornerRadius(12 * Resources?.DisplayMetrics?.Density ?? 12);
+        //    drawable.SetStroke(1, Color.ParseColor("#E0E0E0"));
+        //    return drawable;
+        //}
 
-        private LinearLayout CreateCard()
-        {
-            var card = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Vertical
-            };
-
-            card.SetPadding(20, 16, 20, 16);
-            card.Background = CreateCardBackground();
-
-            var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
-            cardParams.SetMargins(0, 0, 0, 16);
-            card.LayoutParameters = cardParams;
-
-            return card;
-        }
-
-        private GradientDrawable CreateCardBackground()
-        {
-            var drawable = new GradientDrawable();
-            drawable.SetColor(UIFactory.CARD_COLOR);
-            drawable.SetCornerRadius(12 * Resources?.DisplayMetrics?.Density ?? 12);
-            drawable.SetStroke(1, Color.ParseColor("#E0E0E0"));
-            return drawable;
-        }
-
-        private GradientDrawable CreateRoundedBackground(Color color, int radiusDp)
-        {
-            var drawable = new GradientDrawable();
-            drawable.SetColor(color);
-            drawable.SetCornerRadius(radiusDp * Resources?.DisplayMetrics?.Density ?? 8);
-            return drawable;
-        }
-
+        //private GradientDrawable CreateRoundedBackground(Color color, int radiusDp)
+        //{
+        //    var drawable = new GradientDrawable();
+        //    drawable.SetColor(color);
+        //    drawable.SetCornerRadius(radiusDp * Resources?.DisplayMetrics?.Density ?? 8);
+        //    return drawable;
+        //}
         private LinearLayout CreateStyledButtonLayout(params (string text, EventHandler handler, Color color)[] buttons)
         {
             var layout = new LinearLayout(this)
@@ -861,35 +842,12 @@ namespace BluePenguinMonitoring
                 _dataCardTitle.Text = $"Box {_currentBox} " + (_boxDataStorage.ContainsKey(_currentBox) ? "" : "(No Data)");
             }
 
-            // disable top buttons (clear, bird stats, save...) on unlocked box
-            for (int i = 0; i < _topButtonLayout.ChildCount; i++)
-            {
-                var child = _topButtonLayout.GetChildAt(i);
-                SetEnabledRecursive(child, _isBoxLocked, _isBoxLocked ? 1.0f : 0.5f);
-            }
-
-            // Enable/Disable navigation and data buttons when locked/unlocked
-            List<Button> buttonsToToggle = new List<Button> { _prevBoxButton, _nextBoxButton, _selectBoxButton };
-            foreach (var button in buttonsToToggle)
-            {
-                button.Enabled = _isBoxLocked;
-                button.Alpha = _isBoxLocked ? 1.0f : 0.5f; // Grey out when unlocked
-            }
-
-            // title Layout "Box n" is item 0, which we don't want to disable!
-            for (int i = 1; i < _dataCard.ChildCount; i++)
-            {
-                var child = _dataCard.GetChildAt(i);
-                SetEnabledRecursive(child, !_isBoxLocked, _isBoxLocked ? 0.8f : 1.0f);
-            }
             var editTexts = new[] { _adultsEditText, _eggsEditText, _chicksEditText, _notesEditText };
 
             foreach (var editText in editTexts)
             {
                 if (editText != null) editText.TextChanged -= OnDataChanged;
             }
-
-            //_gateStatusSpinner.ItemSelected -= OnGateStatusChanged;
 
             if (_boxDataStorage.ContainsKey(_currentBox))
             {
@@ -915,14 +873,43 @@ namespace BluePenguinMonitoring
             {
                 if (editText != null) editText.TextChanged += OnDataChanged;
             }
-            //_gateStatusSpinner.ItemSelected += OnGateStatusChanged;
+
+            //disable/enable UI elememts according to _isBoxLocked
+
+            // disable top buttons (clear, bird stats, save...) on unlocked box
+            for (int i = 0; i < _topButtonLayout.ChildCount; i++)
+            {
+                var child = _topButtonLayout.GetChildAt(i);
+                SetEnabledRecursive(child, _isBoxLocked, _isBoxLocked ? 1.0f : 0.5f);
+            }
+
+            // Enable/Disable navigation and data buttons when locked/unlocked
+            List<Button> buttonsToToggle = new List<Button> { _prevBoxButton, _nextBoxButton, _selectBoxButton };
+            foreach (var button in buttonsToToggle)
+            {
+                button.Enabled = _isBoxLocked;
+                button.Alpha = _isBoxLocked ? 1.0f : 0.5f; // Grey out when unlocked
+            }
+
+            // title Layout "Box n" is item 0, which we don't want to disable!
+            for (int i = 1; i < _dataCard.ChildCount; i++)
+            {
+                var child = _dataCard.GetChildAt(i);
+                SetEnabledRecursive(child, !_isBoxLocked, _isBoxLocked ? 0.8f : 1.0f);
+            }
+
         }
         private bool dataCardHasZeroData()
         {
             int.TryParse(_adultsEditText?.Text ?? "0", out int adults);
             int.TryParse(_eggsEditText?.Text ?? "0", out int eggs);
             int.TryParse(_chicksEditText?.Text ?? "0", out int chicks);
-            return adults == 0 && eggs == 0 && chicks == 0 && (_gateStatusSpinner?.SelectedItem == null || string.IsNullOrEmpty(_gateStatusSpinner.SelectedItem.ToString())) && string.IsNullOrWhiteSpace(_notesEditText?.Text);
+
+            string? gate = GetSelectedGateStatus(); // returns null for blank
+            bool noGate = string.IsNullOrEmpty(gate);
+            bool noNotes = string.IsNullOrWhiteSpace(_notesEditText?.Text);
+
+            return adults == 0 && eggs == 0 && chicks == 0 && noGate && noNotes;
         }
         private void CreateBoxDataCard(LinearLayout layout)
         {
@@ -937,10 +924,10 @@ namespace BluePenguinMonitoring
             _dataCardTitleLayout.Click += (sender, e) =>
             {
                 _isBoxLocked = !_isBoxLocked;
-                DrawBoxLayout();
-                if (!_isBoxLocked)
+                if (!_isBoxLocked) 
                 {
                     Toast.MakeText(this, "🔓 Box unlocked for editing\nLock the box when done.", ToastLength.Long)?.Show();
+                    DrawBoxLayout();
                 }
                 else 
                 {
@@ -999,8 +986,6 @@ namespace BluePenguinMonitoring
             _lockIconView.LayoutParameters = iconParams;
             _dataCardTitleLayout.AddView(_lockIconView);
 
-            
-
             layout.AddView(_dataCardTitleLayout);
 
             // Scanned birds container
@@ -1049,11 +1034,6 @@ namespace BluePenguinMonitoring
             _chicksEditText = _uiFactory.CreateStyledNumberField();
             _gateStatusSpinner = _uiFactory.CreateGateStatusSpinner();
 
-            // Set the spinner to have the same layout weight as the input fields
-            var spinnerParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
-            spinnerParams.SetMargins(4, 0, 4, 0);
-            _gateStatusSpinner.LayoutParameters = spinnerParams;
-
             // Add event handlers
             _adultsEditText.TextChanged += OnDataChanged;
             _adultsEditText.Click += OnNumberFieldClick;
@@ -1066,8 +1046,6 @@ namespace BluePenguinMonitoring
             _chicksEditText.TextChanged += OnDataChanged;
             _chicksEditText.Click += OnNumberFieldClick;
             _chicksEditText.FocusChange += OnNumberFieldFocus;
-
-            //_gateStatusSpinner.ItemSelected += OnGateStatusChanged;
 
             inputFieldsLayout.AddView(_adultsEditText);
             inputFieldsLayout.AddView(_eggsEditText);
@@ -1133,17 +1111,6 @@ namespace BluePenguinMonitoring
                 editText.Post(() => editText.SelectAll());
             }
         }
-
-        //private void OnGateStatusChanged(object? sender, AdapterView.ItemSelectedEventArgs e)
-        //{
-        //    // Only save if a real gate status is selected (not the blank option)
-        //    var selectedItem = _gateStatusSpinner?.SelectedItem?.ToString() ?? "";
-        //    if (!string.IsNullOrEmpty(selectedItem))
-        //    {
-        //        SaveCurrentBoxData();
-        //    }
-        //}
-
         private void OnPrevBoxClick(object? sender, EventArgs e)
         {
             NavigateToBox(_currentBox - 1, () => _currentBox > 1);
@@ -1310,7 +1277,6 @@ namespace BluePenguinMonitoring
                 ("Yes, Correct", () =>
                 {
                     _isProcessingConfirmation = false;
-                    SaveCurrentBoxData();
                 }
             ),
                 ("No, Let me fix", () =>
@@ -1342,45 +1308,6 @@ namespace BluePenguinMonitoring
 
             SaveDataToInternalStorage();
         }
-
-        //private void LoadBoxData()
-        //{
-        //    var editTexts = new[] { _adultsEditText, _eggsEditText, _chicksEditText, _notesEditText };
-
-        //    foreach (var editText in editTexts)
-        //    {
-        //        if (editText != null) editText.TextChanged -= OnDataChanged;
-        //    }
-
-        //    //_gateStatusSpinner.ItemSelected -= OnGateStatusChanged;
-
-        //    if (_boxDataStorage.ContainsKey(_currentBox))
-        //    {
-        //        var boxData = _boxDataStorage[_currentBox];
-        //        if (_adultsEditText != null) _adultsEditText.Text = boxData.unchippedAdults.ToString();
-        //        if (_eggsEditText != null) _eggsEditText.Text = boxData.Eggs.ToString();
-        //        if (_chicksEditText != null) _chicksEditText.Text = boxData.unchippedChicks.ToString();
-        //        SetSelectedGateStatus(boxData.GateStatus);
-        //        if (_notesEditText != null) _notesEditText.Text = boxData.Notes;
-        //        UpdateScannedIdsDisplay(boxData.ScannedIds);
-        //    }
-        //    else
-        //    {
-        //        if (_adultsEditText != null) _adultsEditText.Text = "0";
-        //        if (_eggsEditText != null) _eggsEditText.Text = "0";
-        //        if (_chicksEditText != null) _chicksEditText.Text = "0";
-        //        SetSelectedGateStatus(null);
-        //        if (_notesEditText != null) _notesEditText.Text = "";
-        //        UpdateScannedIdsDisplay(new List<ScanRecord>());
-        //    }
-
-        //    foreach (var editText in editTexts)
-        //    {
-        //        if (editText != null) editText.TextChanged += OnDataChanged;
-        //    }
-        //    //_gateStatusSpinner.ItemSelected += OnGateStatusChanged;
-        //}
-
         private void UpdateScannedIdsDisplay(List<ScanRecord> scans)
         {
             if (_scannedIdsContainer == null) return;
@@ -1836,25 +1763,6 @@ namespace BluePenguinMonitoring
 
                 boxData.ScannedIds.Add(scanRecord);
 
-                // Check if this penguin should auto-increment Adults count
-                if (_remotePenguinData.TryGetValue(shortId, out var penguinData))
-                {
-                    if (penguinData.LastKnownLifeStage == LifeStage.Adult || 
-                        penguinData.LastKnownLifeStage == LifeStage.Returnee)
-                    {
-                        boxData.unchippedAdults++;
-                        
-                        RunOnUiThread(() =>
-                        {
-                            // Update the Adults field in the UI
-                            if (_adultsEditText != null)
-                            {
-                                _adultsEditText.Text = boxData.unchippedAdults.ToString();
-                            }
-                        });
-                    }
-                }
-
                 SaveDataToInternalStorage();
 
                 RunOnUiThread(() =>
@@ -1881,12 +1789,10 @@ namespace BluePenguinMonitoring
                 });
             }
         }
-
         private void SaveAllData()
         {
             ShowSaveFilenameDialog();
         }
-
         private void ShowSaveFilenameDialog()
         {
             var now = DateTime.Now;
