@@ -12,6 +12,18 @@ DONE
 
 locked boxes by default
 when bird stats are downloaded the currect box should be redrawn 
+box monitoring date stamp
+fix spinner save bug
+disable manual entry on locked box
+save to file
+load from file
+swipe to navigate
+move scan to another box
+delete scan from box
+save gate statu
+bluetooth connect infinitely
+better penguin icon
+
 
 FIXED BY DESIGN
 
