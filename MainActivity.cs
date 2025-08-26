@@ -1653,13 +1653,6 @@ namespace BluePenguinMonitoring
                         var vibrationEffect = VibrationEffect.CreateOneShot(500, VibrationEffect.DefaultAmplitude);
                         _vibrator.Vibrate(vibrationEffect);
                     }
-                    else
-                    {
-                        // Use deprecated method for older APIs
-#pragma warning disable CS0618 // Type or member is obsolete
-                        _vibrator.Vibrate(500);
-#pragma warning restore CS0618 // Type or member is obsolete
-                    }
                 }
 
                 // Play alert sound
@@ -1667,12 +1660,17 @@ namespace BluePenguinMonitoring
                 {
                     try
                     {
-                        if (_alertMediaPlayer.IsPlaying)
+                        int replayCount = 3;
+                        while (replayCount-- > 0)
                         {
-                            _alertMediaPlayer.Stop();
-                            _alertMediaPlayer.Prepare();
+                            if (_alertMediaPlayer.IsPlaying)
+                            {
+                                _alertMediaPlayer.Stop();
+                                _alertMediaPlayer.Prepare();
+                            }
+                            _alertMediaPlayer.Start();
+                            Thread.Sleep(1000);
                         }
-                        _alertMediaPlayer.Start();
                     }
                     catch (Exception ex)
                     {
@@ -2069,62 +2067,7 @@ namespace BluePenguinMonitoring
                 return;
             }
 
-            // Check if bird already exists in current box
-            if (!_boxDataStorage.ContainsKey(_currentBox))
-                _boxDataStorage[_currentBox] = new BoxData();
-
-            var boxData = _boxDataStorage[_currentBox];
-
-            if (boxData.ScannedIds.Any(s => s.BirdId == cleanInput))
-            {
-                Toast.MakeText(this, $"Bird {cleanInput} already scanned in this box", ToastLength.Short)?.Show();
-                _manualScanEditText.Text = "";
-                return;
-            }
-
-            // Add the scan record
-            var scanRecord = new ScanRecord
-            {
-                BirdId = cleanInput,
-                Timestamp = DateTime.Now,
-                Latitude = _currentLocation?.Latitude ?? 0,
-                Longitude = _currentLocation?.Longitude ?? 0,
-                Accuracy = _currentLocation?.Accuracy ?? -1
-            };
-
-            boxData.ScannedIds.Add(scanRecord);
-
-            // Check if this penguin should auto-increment Adults count
-            if (_remotePenguinData.TryGetValue(cleanInput, out var penguinData))
-            {
-                if (penguinData.LastKnownLifeStage == LifeStage.Chick)
-                {
-                    // Trigger chick alert for manual entries as well
-                    TriggerChickAlert();
-                }
-            }
-
-            SaveDataToInternalStorage();
-
-            // Clear input and update display
-            _manualScanEditText.Text = "";
-            UpdateScannedIdsDisplay(boxData.ScannedIds);
-
-            // Enhanced toast message with life stage info
-            string toastMessage = $"🐧 Bird {cleanInput} manually added to Box {_currentBox}";
-            if (_remotePenguinData.TryGetValue(cleanInput, out var penguin))
-            {
-                if (penguin.LastKnownLifeStage == LifeStage.Adult || 
-                    penguin.LastKnownLifeStage == LifeStage.Returnee)
-                {
-                    toastMessage += $" (+1 Adult)";
-                }
-                else if (penguin.LastKnownLifeStage == LifeStage.Chick)
-                {
-                    toastMessage += $" (Chick)";
-                }
-            }
-            Toast.MakeText(this, toastMessage, ToastLength.Short)?.Show();
+            AddScannedId(cleanInput);
         }
 
         private void OnDataClick(object? sender, EventArgs e)
