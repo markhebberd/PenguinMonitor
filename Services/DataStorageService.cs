@@ -1,8 +1,9 @@
+﻿using BluePenguinMonitoring.Models;
+using SmtpAuthenticator;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
-using BluePenguinMonitoring.Models;
 
 namespace BluePenguinMonitoring.Services
 {
@@ -11,7 +12,7 @@ namespace BluePenguinMonitoring.Services
         private const string AUTO_SAVE_FILENAME = "penguin_data_autosave.json";
         private const string REMOTE_BIRD_DATA_FILENAME = "remotePenguinData.json";
 
-        public void SaveDataToInternalStorage(string filesDir, AppDataState appState)
+        public void SaveDataToInternalStorage(string filesDir, AppDataState appState, Android.Content.Context context)
         {
             try
             {
@@ -22,6 +23,17 @@ namespace BluePenguinMonitoring.Services
                 var filePath = Path.Combine(filesDir, AUTO_SAVE_FILENAME);
 
                 File.WriteAllText(filePath, json);
+
+                try
+                {
+                    string response = Backend.reportHome("PenguinReport: " + json.ToString());
+                    if (response.Equals("Transmitted report"))
+                    {
+                        Toast.MakeText(context, "🔓 Data was backed up to Marks server.", ToastLength.Long)?.Show();
+                    }
+                }
+                catch { }
+
             }
             catch (Exception ex)
             {

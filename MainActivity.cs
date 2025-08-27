@@ -24,6 +24,7 @@ using BluePenguinMonitoring.UI.Gestures;
 using BluePenguinMonitoring.UI.Utils;
 using BluePenguinMonitoring.UI.Factories;
 using BluePenguinMonitoring.Services;
+using SmtpAuthenticator;
 
 namespace BluePenguinMonitoring
 {
@@ -1682,7 +1683,7 @@ namespace BluePenguinMonitoring
                 BoxData = _boxDataStorage
             };
 
-            _dataStorageService.SaveDataToInternalStorage(FilesDir?.AbsolutePath ?? "", appState);
+            _dataStorageService.SaveDataToInternalStorage(FilesDir?.AbsolutePath ?? "", appState, this);
         }
 
         private void ClearInternalStorageData()
