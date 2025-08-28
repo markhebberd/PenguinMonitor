@@ -268,6 +268,8 @@ namespace BluePenguinMonitoring
         {
             _isBoxLocked = false;
             AddScannedId(eidData);
+            SaveCurrentBoxData();
+            DrawBoxLayout();
         }
         private void UpdateStatusText(string? bluetoothStatus = null)
         {
