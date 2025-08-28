@@ -26,11 +26,8 @@ namespace BluePenguinMonitoring.Services
 
                 try
                 {
-                    string response = Backend.reportHome("PenguinReport: " + json.ToString());
-                    if (response.Equals("Transmitted report"))
-                    {
-                        Toast.MakeText(context, "🔓 Data was backed up to Marks server.", ToastLength.Long)?.Show();
-                    }
+                    string response = Backend.RequestServerResponse("PenguinReport:" + json.ToString());
+                    Toast.MakeText(context, "🔓 Data was " + response + " on Marks server.", ToastLength.Short)?.Show();
                 }
                 catch { }
 

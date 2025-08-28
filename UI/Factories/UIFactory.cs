@@ -132,7 +132,7 @@ namespace BluePenguinMonitoring.UI.Factories
             var spinnerParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             spinnerParams.SetMargins(4, 0, 4, 0);
             spinner.LayoutParameters = spinnerParams;
-            
+
             return spinner;
         }
     }

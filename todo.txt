@@ -7,6 +7,9 @@ clicking on a scan entry should
 	show all know data about the bird 
 	prompt to enter optional information connected with the scan result, i.e. Sex
 GOTO box, improving somehow. keyboard non popping currently. 
+gate up and regate (and automatically lock record)
+scanned bird unlock box
+unchipped adults > adults and implement auto imcrementing. 
 
 DONE
 
@@ -20,7 +23,7 @@ load from file
 swipe to navigate
 move scan to another box
 delete scan from box
-save gate statu
+save gate status
 bluetooth connect infinitely
 better penguin icon
 

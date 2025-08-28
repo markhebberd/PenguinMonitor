@@ -100,7 +100,7 @@ namespace BluePenguinMonitoring
 
             _uiFactory = new UIFactory(this);
             RequestPermissions();
-            LoadDataFromInternalStorage();
+            LoadFromAppDataDir();
             CreateDataRecordingUI();
             InitializeVibrationAndSound();
         }
@@ -200,7 +200,7 @@ namespace BluePenguinMonitoring
             if (_locationManager?.IsProviderEnabled(LocationManager.GpsProvider) != true &&
                 _locationManager?.IsProviderEnabled(LocationManager.NetworkProvider) != true)
             {
-                Toast.MakeText(this, "Please enable location services for accurate positioning", ToastLength.Long)?.Show();
+                Toast.MakeText(this, "Please enable location services for accurate positioning", ToastLength.Short)?.Show();
                 return;
             }
 
@@ -518,7 +518,7 @@ namespace BluePenguinMonitoring
 
                 // Refresh UI
                 DrawBoxLayout();
-                SaveDataToInternalStorage(); // Auto-save the loaded data
+                SaveToAppDataDir(); // Auto-save the loaded data
 
                 var fileName = System.IO.Path.GetFileName(filePath);
                 Toast.MakeText(this, $"✅ Loaded {boxCount} boxes, {birdCount} birds\nFrom: {fileName}", ToastLength.Long)?.Show();
@@ -891,7 +891,7 @@ namespace BluePenguinMonitoring
                 _isBoxLocked = !_isBoxLocked;
                 if (!_isBoxLocked) 
                 {
-                    Toast.MakeText(this, "🔓 Box unlocked for editing\nLock the box when done.", ToastLength.Long)?.Show();
+                    //Toast.MakeText(this, "🔓 Box unlocked for editing\nLock the box when done.", ToastLength.Short)?.Show();
                     DrawBoxLayout();
                 }
                 else 
@@ -912,7 +912,7 @@ namespace BluePenguinMonitoring
                         SaveCurrentBoxData();
                         DrawBoxLayout();
                     }
-                    Toast.MakeText(this, "🔒 Box locked", ToastLength.Short)?.Show();
+                    //Toast.MakeText(this, "🔒 Box locked", ToastLength.Short)?.Show();
                 }
             };
 
@@ -998,6 +998,21 @@ namespace BluePenguinMonitoring
             _eggsEditText = _uiFactory.CreateStyledNumberField();
             _chicksEditText = _uiFactory.CreateStyledNumberField();
             _gateStatusSpinner = _uiFactory.CreateGateStatusSpinner();
+            _gateStatusSpinner.ItemSelected += (sender, e) =>
+            {
+                string status = _gateStatusSpinner.SelectedItem.ToString();
+                if (status.Equals("gate up") || status.Equals("regate"))
+                {
+                    if (!_boxDataStorage.ContainsKey(_currentBox))
+                    {
+                        _boxDataStorage.Add(_currentBox, new BoxData());
+                        _boxDataStorage[_currentBox].GateStatus = status;
+                        SaveToAppDataDir();
+                        _isBoxLocked = true;
+                        DrawBoxLayout();
+                    }
+                }
+            };
 
             // Add event handlers
             _adultsEditText.TextChanged += OnDataChanged;
@@ -1129,7 +1144,7 @@ namespace BluePenguinMonitoring
                     _boxDataStorage.Clear();
                     _currentBox = 1;
                     ClearInternalStorageData();
-                    SaveDataToInternalStorage();
+                    SaveToAppDataDir();
                     DrawBoxLayout();
                 })),
                 ("Cancel", new Action(() => { }))
@@ -1270,7 +1285,7 @@ namespace BluePenguinMonitoring
             {
                 boxData.whenDataCollectedUtc = DateTime.UtcNow; // Update timestamp if data changed
             }
-            SaveDataToInternalStorage();
+            SaveToAppDataDir();
         }
         private void UpdateScannedIdsDisplay(List<ScanRecord> scans)
         {
@@ -1481,7 +1496,7 @@ namespace BluePenguinMonitoring
                         if (scanToRemove != null)
                         {
                             boxData.ScannedIds.Remove(scanToRemove);
-                            SaveDataToInternalStorage();
+                            SaveToAppDataDir();
                             UpdateScannedIdsDisplay(boxData.ScannedIds);
 
                             Toast.MakeText(this, $"🗑️ Bird {scanToDelete.BirdId} deleted from Box {_currentBox}", ToastLength.Short)?.Show();
@@ -1577,7 +1592,7 @@ namespace BluePenguinMonitoring
                             {
                                 targetBoxData.ScannedIds.Add(scanToMove);                                
 
-                                SaveDataToInternalStorage();
+                                SaveToAppDataDir();
                                 UpdateScannedIdsDisplay(currentBoxData.ScannedIds);
 
                                 Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} moved from Box {_currentBox} to Box {targetBox}", ToastLength.Long)?.Show();
@@ -1595,7 +1610,7 @@ namespace BluePenguinMonitoring
             );
         }
 
-        private void LoadDataFromInternalStorage()
+        private void LoadFromAppDataDir()
         {
             try
             {
@@ -1629,6 +1644,16 @@ namespace BluePenguinMonitoring
                 _remotePenguinData = new Dictionary<string, PenguinData>();
                 System.Diagnostics.Debug.WriteLine($"Failed to load data: {ex.Message}");
             }
+        }
+        private void SaveToAppDataDir()
+        {
+            var appState = new AppDataState
+            {
+                CurrentBox = _currentBox,
+                LastSaved = DateTime.Now,
+                BoxData = _boxDataStorage
+            };
+            _dataStorageService.SaveDataToInternalStorage(FilesDir?.AbsolutePath ?? "", appState, this);
         }
         private void TriggerChickAlert()
         {
@@ -1673,19 +1698,6 @@ namespace BluePenguinMonitoring
                 System.Diagnostics.Debug.WriteLine($"Failed to trigger chick alert: {ex.Message}");
             }
         }
-
-        private void SaveDataToInternalStorage()
-        {
-            var appState = new AppDataState
-            {
-                CurrentBox = _currentBox,
-                LastSaved = DateTime.Now,
-                BoxData = _boxDataStorage
-            };
-
-            _dataStorageService.SaveDataToInternalStorage(FilesDir?.AbsolutePath ?? "", appState, this);
-        }
-
         private void ClearInternalStorageData()
         {
             try
@@ -1725,7 +1737,7 @@ namespace BluePenguinMonitoring
 
                 boxData.ScannedIds.Add(scanRecord);
 
-                SaveDataToInternalStorage();
+                SaveToAppDataDir();
 
                 RunOnUiThread(() =>
                 {
@@ -1831,7 +1843,7 @@ namespace BluePenguinMonitoring
 
                 if (string.IsNullOrEmpty(downloadsPath))
                 {
-                    Toast.MakeText(this, "Downloads directory not accessible", ToastLength.Long)?.Show();
+                    Toast.MakeText(this, "Downloads directory not accessible", ToastLength.Short)?.Show();
                     return;
                 }
 
@@ -1854,7 +1866,7 @@ namespace BluePenguinMonitoring
             }
             catch (Exception ex)
             {
-                Toast.MakeText(this, $"❌ Export failed: {ex.Message}", ToastLength.Long)?.Show();
+                Toast.MakeText(this, $"❌ Export failed: {ex.Message}", ToastLength.Short)?.Show();
             }
         }
 
@@ -1867,7 +1879,7 @@ namespace BluePenguinMonitoring
                 var totalBoxes = _boxDataStorage.Count;
                 var totalBirds = _boxDataStorage.Values.Sum(box => box.ScannedIds.Count);
 
-                Toast.MakeText(this, $"💾 Data saved!\n📂 {fileName}\n📦 {totalBoxes} boxes, 🐧 {totalBirds} birds", ToastLength.Long)?.Show();
+                Toast.MakeText(this, $"💾 Data saved!\n📂 {fileName}\n📦 {totalBoxes} boxes, 🐧 {totalBirds} birds", ToastLength.Short)?.Show();
             }
             catch (Exception ex)
             {
@@ -1907,7 +1919,7 @@ namespace BluePenguinMonitoring
                 }
                 else
                 {
-                    Toast.MakeText(this, "❌ Storage permission denied. Cannot access Downloads folder.", ToastLength.Long)?.Show();
+                    Toast.MakeText(this, "❌ Storage permission denied. Cannot access Downloads folder.", ToastLength.Short)?.Show();
                 }
             }
         }
