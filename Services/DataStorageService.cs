@@ -1,9 +1,12 @@
 ﻿using BluePenguinMonitoring.Models;
+using Newtonsoft.Json;
 using SmtpAuthenticator;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace BluePenguinMonitoring.Services
 {
@@ -19,15 +22,24 @@ namespace BluePenguinMonitoring.Services
                 if (string.IsNullOrEmpty(filesDir))
                     return;
 
-                var json = JsonSerializer.Serialize(appState, new JsonSerializerOptions { WriteIndented = true });
+                var json = JsonConvert.SerializeObject(appState, Formatting.Indented);
                 var filePath = Path.Combine(filesDir, AUTO_SAVE_FILENAME);
 
                 File.WriteAllText(filePath, json);
 
                 try
                 {
-                    string response = Backend.RequestServerResponse("PenguinReport:" + json.ToString());
-                    Toast.MakeText(context, "🔓 Data was " + response + " on Marks server.", ToastLength.Short)?.Show();
+                    string response = "No Response";
+                    BackgroundWorker bw = new BackgroundWorker();
+                    bw.DoWork += (sender, e) =>
+                    {
+                        response = Backend.RequestServerResponse("PenguinReport:" + json.ToString());
+                    };
+                    bw.RunWorkerCompleted += (sender, e) =>
+                    {
+                        Toast.MakeText(context, "🔓 Data was " + response + " on Marks server.", ToastLength.Short)?.Show();
+                    };
+                    bw.RunWorkerAsync();
                 }
                 catch { }
 
@@ -38,7 +50,7 @@ namespace BluePenguinMonitoring.Services
             }
         }
 
-        public AppDataState? LoadDataFromInternalStorage(string filesDir)
+        public AppDataState? LoadFromAppDataDir(string filesDir)
         {
             try
             {
@@ -50,7 +62,7 @@ namespace BluePenguinMonitoring.Services
                     return null;
 
                 var json = File.ReadAllText(filePath);
-                return JsonSerializer.Deserialize<AppDataState>(json);
+                return Newtonsoft.Json.JsonConvert.DeserializeObject<AppDataState>(json);
             }
             catch (Exception ex)
             {
@@ -59,14 +71,14 @@ namespace BluePenguinMonitoring.Services
             }
         }
 
-        public void SaveRemotePenguinDataToInternalStorage(string filesDir, Dictionary<string, PenguinData> remotePenguinData)
+        public void cacheRemotePengInfoToAppDataDir(string filesDir, Dictionary<string, PenguinData> remotePenguinData)
         {
             try
             {
                 if (string.IsNullOrEmpty(filesDir))
                     return;
 
-                var json = JsonSerializer.Serialize(remotePenguinData, new JsonSerializerOptions { WriteIndented = true });
+                var json = JsonConvert.SerializeObject(remotePenguinData, Formatting.Indented);
                 var filePath = Path.Combine(filesDir, REMOTE_BIRD_DATA_FILENAME);
 
                 File.WriteAllText(filePath, json);
@@ -77,7 +89,7 @@ namespace BluePenguinMonitoring.Services
             }
         }
 
-        public Dictionary<string, PenguinData>? LoadRemotePenguinDataFromInternalStorage(string filesDir)
+        public Dictionary<string, PenguinData>? loadRemotePengInfoFromAppDataDir(string filesDir)
         {
             try
             {
@@ -89,7 +101,7 @@ namespace BluePenguinMonitoring.Services
                     return null;
 
                 var remoteBirdJson = File.ReadAllText(remoteBirdDataPath);
-                return JsonSerializer.Deserialize<Dictionary<string, PenguinData>>(remoteBirdJson);
+                return JsonConvert.DeserializeObject<Dictionary<string, PenguinData>>(remoteBirdJson);
             }
             catch (Exception ex)
             {

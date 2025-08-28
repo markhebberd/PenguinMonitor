@@ -10,21 +10,23 @@ using Android.OS;
 using Android.Text;
 using Android.Views;
 using Android.Widget;
+using BluePenguinMonitoring.Models;
+using BluePenguinMonitoring.Services;
+using BluePenguinMonitoring.UI.Factories;
+using BluePenguinMonitoring.UI.Gestures;
+using BluePenguinMonitoring.UI.Utils;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using SmtpAuthenticator;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Net.Http;
 using System.Threading.Tasks;
-using System.Text;
-using BluePenguinMonitoring.Models;
-using BluePenguinMonitoring.UI.Gestures;
-using BluePenguinMonitoring.UI.Utils;
-using BluePenguinMonitoring.UI.Factories;
-using BluePenguinMonitoring.Services;
-using SmtpAuthenticator;
 
 namespace BluePenguinMonitoring
 {
@@ -264,6 +266,7 @@ namespace BluePenguinMonitoring
         }
         private void OnEidDataReceived(string eidData)
         {
+            _isBoxLocked = false;
             AddScannedId(eidData);
         }
         private void UpdateStatusText(string? bluetoothStatus = null)
@@ -446,8 +449,8 @@ namespace BluePenguinMonitoring
         {
             try
             {
-                var json = File.ReadAllText(filePath);
-                var loadedData = JsonSerializer.Deserialize<JsonNode>(json);
+                var json = File.ReadAllText(filePath);                
+                var loadedData = JToken.Parse(json);
 
                 if (loadedData == null)
                 {
@@ -467,35 +470,35 @@ namespace BluePenguinMonitoring
                 int boxCount = 0;
                 int birdCount = 0;
 
-                foreach (var boxItem in boxesNode.AsArray())
+                foreach (var boxItem in boxesNode)
                 {
-                    var boxNumber = boxItem?["BoxNumber"]?.GetValue<int>() ?? 0;
+                    var boxNumber = boxItem?["BoxNumber"]?.Value<int>() ?? 0;
                     var dataNode = boxItem?["Data"];
 
                     if (boxNumber > 0 && dataNode != null)
                     {
                         var boxData = new BoxData
                         {
-                            unchippedAdults = dataNode["Adults"]?.GetValue<int>() ?? 0,
-                            Eggs = dataNode["Eggs"]?.GetValue<int>() ?? 0,
-                            unchippedChicks = dataNode["Chicks"]?.GetValue<int>() ?? 0,
-                            GateStatus = dataNode["GateStatus"]?.GetValue<string>(),
-                            Notes = dataNode["Notes"]?.GetValue<string>() ?? ""
+                            Adults = dataNode["Adults"]?.Value<int>() ?? 0,
+                            Eggs = dataNode["Eggs"]?.Value<int>() ?? 0,
+                            Chicks = dataNode["Chicks"]?.Value<int>() ?? 0,
+                            GateStatus = dataNode["GateStatus"]?.Value<string>(),
+                            Notes = dataNode["Notes"]?.Value<string>() ?? ""
                         };
 
                         // Load scanned IDs
                         var scannedIdsNode = dataNode["ScannedIds"];
                         if (scannedIdsNode != null)
                         {
-                            foreach (var scanItem in scannedIdsNode.AsArray())
+                            foreach (var scanItem in scannedIdsNode)
                             {
                                 var scanRecord = new ScanRecord
                                 {
-                                    BirdId = scanItem?["BirdId"]?.GetValue<string>() ?? "",
-                                    Timestamp = scanItem?["Timestamp"]?.GetValue<DateTime>() ?? DateTime.Now,
-                                    Latitude = scanItem?["Latitude"]?.GetValue<double>() ?? 0,
-                                    Longitude = scanItem?["Longitude"]?.GetValue<double>() ?? 0,
-                                    Accuracy = scanItem?["Accuracy"]?.GetValue<float>() ?? -1
+                                    BirdId = scanItem?["BirdId"]?.Value<string>() ?? "",
+                                    Timestamp = scanItem?["Timestamp"]?.Value<DateTime>() ?? DateTime.Now,
+                                    Latitude = scanItem?["Latitude"]?.Value<double>() ?? 0,
+                                    Longitude = scanItem?["Longitude"]?.Value<double>() ?? 0,
+                                    Accuracy = scanItem?["Accuracy"]?.Value<float>() ?? -1
                                 };
 
                                 boxData.ScannedIds.Add(scanRecord);
@@ -518,7 +521,6 @@ namespace BluePenguinMonitoring
 
                 // Refresh UI
                 DrawBoxLayout();
-                SaveToAppDataDir(); // Auto-save the loaded data
 
                 var fileName = System.IO.Path.GetFileName(filePath);
                 Toast.MakeText(this, $"✅ Loaded {boxCount} boxes, {birdCount} birds\nFrom: {fileName}", ToastLength.Long)?.Show();
@@ -537,9 +539,9 @@ namespace BluePenguinMonitoring
             }
 
             var totalBirds = _boxDataStorage.Values.Sum(box => box.ScannedIds.Count);
-            var totalAdults = _boxDataStorage.Values.Sum(box => box.unchippedAdults);
+            var totalAdults = _boxDataStorage.Values.Sum(box => box.Adults);
             var totalEggs = _boxDataStorage.Values.Sum(box => box.Eggs);
-            var totalChicks = _boxDataStorage.Values.Sum(box => box.unchippedChicks);
+            var totalChicks = _boxDataStorage.Values.Sum(box => box.Chicks);
             var gateUpCount = _boxDataStorage.Values.Count(box => box.GateStatus == "gate up");
             var regateCount = _boxDataStorage.Values.Count(box => box.GateStatus == "regate");
 
@@ -641,7 +643,7 @@ namespace BluePenguinMonitoring
                 var internalPath = FilesDir?.AbsolutePath;
                 if (!string.IsNullOrEmpty(internalPath))
                 {
-                    _dataStorageService.SaveRemotePenguinDataToInternalStorage(internalPath, _remotePenguinData);
+                    _dataStorageService.cacheRemotePengInfoToAppDataDir(internalPath, _remotePenguinData);
                     RunOnUiThread(() =>
                     {
                         Toast.MakeText(this, $"💾 Bird stats saved! ({_remotePenguinData.Count} records)", ToastLength.Short)?.Show();
@@ -817,9 +819,9 @@ namespace BluePenguinMonitoring
             if (_boxDataStorage.ContainsKey(_currentBox))
             {
                 var boxData = _boxDataStorage[_currentBox];
-                if (_adultsEditText != null) _adultsEditText.Text = boxData.unchippedAdults.ToString();
+                if (_adultsEditText != null) _adultsEditText.Text = boxData.Adults.ToString();
                 if (_eggsEditText != null) _eggsEditText.Text = boxData.Eggs.ToString();
-                if (_chicksEditText != null) _chicksEditText.Text = boxData.unchippedChicks.ToString();
+                if (_chicksEditText != null) _chicksEditText.Text = boxData.Chicks.ToString();
                 SetSelectedGateStatus(boxData.GateStatus);
                 if (_notesEditText != null) _notesEditText.Text = boxData.Notes;
                 UpdateScannedIdsDisplay(boxData.ScannedIds);
@@ -974,9 +976,9 @@ namespace BluePenguinMonitoring
             headingsParams.SetMargins(0, 0, 0, 8);
             headingsLayout.LayoutParameters = headingsParams;
 
-            var adultsLabel = _uiFactory.CreateDataLabel("Unchipped Adults");
+            var adultsLabel = _uiFactory.CreateDataLabel("Adults");
             var eggsLabel = _uiFactory.CreateDataLabel("Eggs");
-            var chicksLabel = _uiFactory.CreateDataLabel("Unchipped Chicks");
+            var chicksLabel = _uiFactory.CreateDataLabel("Chicks");
             var gateLabel = _uiFactory.CreateDataLabel("Gate Status");
 
             headingsLayout.AddView(adultsLabel);
@@ -1160,9 +1162,9 @@ namespace BluePenguinMonitoring
         {
             var totalBoxes = _boxDataStorage.Count;
             var totalBirds = _boxDataStorage.Values.Sum(box => box.ScannedIds.Count);
-            var totalAdults = _boxDataStorage.Values.Sum(box => box.unchippedAdults);
+            var totalAdults = _boxDataStorage.Values.Sum(box => box.Adults);
             var totalEggs = _boxDataStorage.Values.Sum(box => box.Eggs);
-            var totalChicks = _boxDataStorage.Values.Sum(box => box.unchippedChicks);
+            var totalChicks = _boxDataStorage.Values.Sum(box => box.Chicks);
             
             // Only count actual gate status values - ignore nulls
             var gateUpCount = _boxDataStorage.Values.Count(box => box.GateStatus == "gate up");
@@ -1224,11 +1226,6 @@ namespace BluePenguinMonitoring
             {
                 ShowHighValueConfirmationDialog(highValues);
             }
-            else
-            {
-                // No high values, save normally
-                SaveCurrentBoxData();
-            }
         }
 
         private void ShowHighValueConfirmationDialog(List<(string type, int count)> highValues)
@@ -1275,9 +1272,9 @@ namespace BluePenguinMonitoring
             int.TryParse(_eggsEditText?.Text ?? "0", out eggs);
             int.TryParse(_chicksEditText?.Text ?? "0", out chicks);
 
-            boxData.unchippedAdults = adults;
+            boxData.Adults = adults;
             boxData.Eggs = eggs;
-            boxData.unchippedChicks = chicks;
+            boxData.Chicks = chicks;
             boxData.GateStatus = GetSelectedGateStatus();
             boxData.Notes = _notesEditText?.Text ?? "";
 
@@ -1496,7 +1493,16 @@ namespace BluePenguinMonitoring
                         if (scanToRemove != null)
                         {
                             boxData.ScannedIds.Remove(scanToRemove);
-                            SaveToAppDataDir();
+                            _remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData);
+                            if (LifeStage.Adult == penguinData.LastKnownLifeStage)
+                            {
+                                _adultsEditText.Text = (int.Parse(_adultsEditText.Text ?? "0") - 1).ToString();
+                            }
+                            else if (LifeStage.Chick == penguinData.LastKnownLifeStage)
+                            {
+                                _chicksEditText.Text = (int.Parse(_chicksEditText.Text ?? "0") - 1).ToString();
+                            }
+                            SaveCurrentBoxData();
                             UpdateScannedIdsDisplay(boxData.ScannedIds);
 
                             Toast.MakeText(this, $"🗑️ Bird {scanToDelete.BirdId} deleted from Box {_currentBox}", ToastLength.Short)?.Show();
@@ -1577,7 +1583,11 @@ namespace BluePenguinMonitoring
                             s.BirdId == scanToMove.BirdId &&
                             s.Timestamp == scanToMove.Timestamp);
 
-                        if (scanToRemove != null)
+                        if (_boxDataStorage.ContainsKey(targetBox) && _boxDataStorage[targetBox].ScannedIds.Any(s => s.BirdId == scanToMove.BirdId))
+                        {
+                            Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} exists already in Box {targetBox}", ToastLength.Long)?.Show();
+                        }
+                        else if (scanToRemove != null)
                         {
                             currentBoxData.ScannedIds.Remove(scanToRemove);
 
@@ -1586,23 +1596,23 @@ namespace BluePenguinMonitoring
                                 _boxDataStorage[targetBox] = new BoxData();
 
                             var targetBoxData = _boxDataStorage[targetBox];
-                        
-                            // Check if bird already exists in target box
-                            if (!targetBoxData.ScannedIds.Any(s => s.BirdId == scanToMove.BirdId))
-                            {
-                                targetBoxData.ScannedIds.Add(scanToMove);                                
+                            targetBoxData.ScannedIds.Add(scanToMove);
 
-                                SaveToAppDataDir();
-                                UpdateScannedIdsDisplay(currentBoxData.ScannedIds);
-
-                                Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} moved from Box {_currentBox} to Box {targetBox}", ToastLength.Long)?.Show();
-                            }
-                            else
+                            _remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData);
+                            if (LifeStage.Adult == penguinData.LastKnownLifeStage)
                             {
-                                // Restore to current box since target already has this bird
-                                currentBoxData.ScannedIds.Add(scanToRemove);
-                                Toast.MakeText(this, $"❌ Bird {scanToMove.BirdId} already exists in Box {targetBox}", ToastLength.Long)?.Show();
+                                _adultsEditText.Text = (int.Parse(_adultsEditText.Text ?? "0") - 1).ToString();
+                                _boxDataStorage[targetBox].Adults++;
                             }
+                            else if (LifeStage.Chick == penguinData.LastKnownLifeStage)
+                            {
+                                _chicksEditText.Text = (int.Parse(_chicksEditText.Text ?? "0") - 1).ToString();
+                                _boxDataStorage[targetBox].Adults++;
+                            }
+
+                            SaveCurrentBoxData();
+                            UpdateScannedIdsDisplay(currentBoxData.ScannedIds);
+                            Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} moved from Box {_currentBox} to Box {targetBox}", ToastLength.Long)?.Show();
                         }
                     }
                 }),
@@ -1619,7 +1629,7 @@ namespace BluePenguinMonitoring
                     return;
 
                 // Load remote penguin data.
-                var remotePenguinData = _dataStorageService.LoadRemotePenguinDataFromInternalStorage(internalPath);
+                var remotePenguinData = _dataStorageService.loadRemotePengInfoFromAppDataDir(internalPath);
                 if (remotePenguinData != null)
                 {
                     _remotePenguinData = remotePenguinData;
@@ -1627,12 +1637,11 @@ namespace BluePenguinMonitoring
                 }
 
                 // Load main app data
-                var appState = _dataStorageService.LoadDataFromInternalStorage(internalPath);
+                var appState = _dataStorageService.LoadFromAppDataDir(internalPath);
                 if (appState != null)
                 {
                     _currentBox = appState.CurrentBox;
                     _boxDataStorage = appState.BoxData ?? new Dictionary<int, BoxData>();
-                    _boxDataStorage.Clear();
                     Toast.MakeText(this, $"📱 Data restored...", ToastLength.Short)?.Show();
                 }
             }
@@ -1655,7 +1664,7 @@ namespace BluePenguinMonitoring
             };
             _dataStorageService.SaveDataToInternalStorage(FilesDir?.AbsolutePath ?? "", appState, this);
         }
-        private void TriggerChickAlert()
+        private void TriggerAlert()
         {
             try
             {
@@ -1751,11 +1760,20 @@ namespace BluePenguinMonitoring
                             penguin.LastKnownLifeStage == LifeStage.Returnee)
                         {
                             toastMessage += $" (+1 Adult)";
+                            _adultsEditText.Text = (int.Parse(_adultsEditText.Text ?? "0") + 1).ToString();
+                            SaveCurrentBoxData();
+                            DrawBoxLayout();
                         }
                         else if (penguin.LastKnownLifeStage == LifeStage.Chick)
                         {
-                            toastMessage += $" (Chick)";
-                            TriggerChickAlert();
+                            _chicksEditText.Text = (int.Parse(_chicksEditText.Text ?? "0") + 1).ToString();
+                            SaveCurrentBoxData();
+                            DrawBoxLayout();
+                            toastMessage += $" (+1 Chick)";
+                        }
+                        else
+                        {
+                            TriggerAlert();
                         }
                     }
                     Toast.MakeText(this, toastMessage, ToastLength.Short)?.Show();
@@ -1837,8 +1855,7 @@ namespace BluePenguinMonitoring
                     }).OrderBy(b => b.BoxNumber).ToList()
                 };
 
-                var json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions { WriteIndented = true });
-
+                var json = JsonConvert.SerializeObject(exportData, Formatting.Indented);
                 var downloadsPath = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads)?.AbsolutePath;
 
                 if (string.IsNullOrEmpty(downloadsPath))

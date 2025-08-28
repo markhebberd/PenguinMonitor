@@ -1,18 +1,21 @@
 TODO
 
-CSV file output unless britta gives me a schema!
-flag if detect chick scanned, alarm
 option to disable bluetooth connection
 clicking on a scan entry should 
 	show all know data about the bird 
 	prompt to enter optional information connected with the scan result, i.e. Sex
 GOTO box, improving somehow. keyboard non popping currently. 
-gate up and regate (and automatically lock record)
-scanned bird unlock box
-unchipped adults > adults and implement auto imcrementing. 
+Brittas GPS bug, accuracy 2400m
+CSV file output unless britta gives me a schema!
 
 DONE
 
+flag if unknown chip scanned, alarm/alert
+scanned bird unlock box <----untested as I don't have a scanner
+move change totals
+unchipped adults > adults and implement auto imcrementing. 
+
+gate up and regate (and automatically lock record)
 locked boxes by default
 when bird stats are downloaded the currect box should be redrawn 
 box monitoring date stamp
