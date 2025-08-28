@@ -1,11 +1,14 @@
 TODO
 
-option to disable bluetooth connection
+GOTO box, improving somehow. keyboard non popping currently. 
+Brittas GPS bug, accuracy 
 clicking on a scan entry should 
 	show all know data about the bird 
 	prompt to enter optional information connected with the scan result, i.e. Sex
-GOTO box, improving somehow. keyboard non popping currently. 
-Brittas GPS bug, accuracy 2400m
+	Have move/delete contained. 
+	be bigger and easier to click
+option to disable bluetooth connection
+option to disable PenguinReporting to Marks server. 
 CSV file output unless britta gives me a schema!
 
 DONE

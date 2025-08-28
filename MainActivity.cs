@@ -1494,11 +1494,11 @@ namespace BluePenguinMonitoring
                         {
                             boxData.ScannedIds.Remove(scanToRemove);
                             _remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData);
-                            if (LifeStage.Adult == penguinData.LastKnownLifeStage)
+                            if (penguinData!=null && LifeStage.Adult == penguinData.LastKnownLifeStage)
                             {
                                 _adultsEditText.Text = (int.Parse(_adultsEditText.Text ?? "0") - 1).ToString();
                             }
-                            else if (LifeStage.Chick == penguinData.LastKnownLifeStage)
+                            else if (penguinData != null && LifeStage.Chick == penguinData.LastKnownLifeStage)
                             {
                                 _chicksEditText.Text = (int.Parse(_chicksEditText.Text ?? "0") - 1).ToString();
                             }
@@ -1664,6 +1664,11 @@ namespace BluePenguinMonitoring
             };
             _dataStorageService.SaveDataToInternalStorage(FilesDir?.AbsolutePath ?? "", appState, this);
         }
+        private void triggerAlertAsync()
+        {
+            new Thread(TriggerAlert).Start();
+        }
+
         private void TriggerAlert()
         {
             try
@@ -1773,8 +1778,14 @@ namespace BluePenguinMonitoring
                         }
                         else
                         {
-                            TriggerAlert();
+                            toastMessage += ", Not adult or chick.";
+                            triggerAlertAsync();
                         }
+                    }
+                    else
+                    {
+                        toastMessage += ", Unknown scan ID!";
+                        triggerAlertAsync();
                     }
                     Toast.MakeText(this, toastMessage, ToastLength.Short)?.Show();
                 });
