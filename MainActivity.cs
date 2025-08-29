@@ -128,7 +128,6 @@ namespace BluePenguinMonitoring
             CreateDataRecordingUI();
             InitializeVibrationAndSound();
         }
-
         private void RequestPermissions()
         {
             var permissions = new List<string>();
@@ -414,7 +413,8 @@ namespace BluePenguinMonitoring
                 Toast.MakeText(this, debugInfo.ToString(), ToastLength.Long)?.Show();
 
                 // Look for JSON files (try multiple patterns)
-                var jsonFiles = allFiles.Where(f => f.EndsWith(".json", StringComparison.OrdinalIgnoreCase)).ToArray();
+                var jsonFiles = allFiles.Where(f => f.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+                                            || f.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)).ToArray();
 
                 var files = jsonFiles
                     .OrderByDescending(f => File.GetLastWriteTime(f)) // Use LastWriteTime instead of CreationTime
@@ -479,32 +479,68 @@ namespace BluePenguinMonitoring
             {
                 var json = File.ReadAllText(filePath);                
                 var loadedData = JToken.Parse(json);
+                int boxCount = 0;
+                int birdCount = 0;
 
                 if (loadedData == null)
                 {
                     Toast.MakeText(this, "❌ Invalid JSON file format", ToastLength.Long)?.Show();
                     return;
                 }
-
-                // Extract box data from the JSON structure
-                var boxesNode = loadedData["Boxes"];
-                if (boxesNode == null)
+                // Open *.json style export. 
+                if (loadedData["Boxes"] != null)
                 {
-                    Toast.MakeText(this, "❌ No box data found in JSON file", ToastLength.Long)?.Show();
-                    return;
-                }
-
-                var newBoxDataStorage = new Dictionary<int, BoxData>();
-                int boxCount = 0;
-                int birdCount = 0;
-
-                foreach (var boxItem in boxesNode)
-                {
-                    var boxNumber = boxItem?["BoxNumber"]?.Value<int>() ?? 0;
-                    var dataNode = boxItem?["Data"];
-
-                    if (boxNumber > 0 && dataNode != null)
+                    _boxDataStorage.Clear();
+                    foreach (var boxItem in loadedData["Boxes"])
                     {
+                        var boxNumber = boxItem?["BoxNumber"]?.Value<int>() ?? 0;
+                        var dataNode = boxItem?["Data"];
+
+                        if (boxNumber > 0 && dataNode != null)
+                        {
+                            var boxData = new BoxData
+                            {
+                                Adults = dataNode["Adults"]?.Value<int>() ?? 0,
+                                Eggs = dataNode["Eggs"]?.Value<int>() ?? 0,
+                                Chicks = dataNode["Chicks"]?.Value<int>() ?? 0,
+                                GateStatus = dataNode["GateStatus"]?.Value<string>(),
+                                Notes = dataNode["Notes"]?.Value<string>() ?? ""
+                            };
+
+                            // Load scanned IDs
+                            var scannedIdsNode = dataNode["ScannedIds"];
+                            if (scannedIdsNode != null)
+                            {
+                                foreach (var scanItem in scannedIdsNode)
+                                {
+                                    var scanRecord = new ScanRecord
+                                    {
+                                        BirdId = scanItem?["BirdId"]?.Value<string>() ?? "",
+                                        Timestamp = scanItem?["Timestamp"]?.Value<DateTime>() ?? DateTime.Now,
+                                        Latitude = scanItem?["Latitude"]?.Value<double>() ?? 0,
+                                        Longitude = scanItem?["Longitude"]?.Value<double>() ?? 0,
+                                        Accuracy = scanItem?["Accuracy"]?.Value<float>() ?? -1
+                                    };
+
+                                    boxData.ScannedIds.Add(scanRecord);
+                                    birdCount++;
+                                }
+                            }
+                            _boxDataStorage[boxNumber] = boxData;
+                            boxCount++;
+                        }
+                    }
+                }
+                else if (loadedData["BoxData"] != null)
+                {
+                    _boxDataStorage.Clear();
+                    
+                    var boxDatas = loadedData["BoxData"] as JObject;
+                    foreach (var boxItem in boxDatas)
+                    {
+                        int boxNumber = int.Parse(boxItem.Key);
+                        var dataNode = boxItem.Value;
+
                         var boxData = new BoxData
                         {
                             Adults = dataNode["Adults"]?.Value<int>() ?? 0,
@@ -513,7 +549,6 @@ namespace BluePenguinMonitoring
                             GateStatus = dataNode["GateStatus"]?.Value<string>(),
                             Notes = dataNode["Notes"]?.Value<string>() ?? ""
                         };
-
                         // Load scanned IDs
                         var scannedIdsNode = dataNode["ScannedIds"];
                         if (scannedIdsNode != null)
@@ -533,13 +568,15 @@ namespace BluePenguinMonitoring
                                 birdCount++;
                             }
                         }
-                        newBoxDataStorage[boxNumber] = boxData;
+                        _boxDataStorage[boxNumber] = boxData;
                         boxCount++;
                     }
                 }
-
-                // Replace current data with loaded data
-                _boxDataStorage = newBoxDataStorage;
+                else
+                {
+                    Toast.MakeText(this, "❌ No box data found in JSON file", ToastLength.Long)?.Show();
+                    return;
+                }
 
                 // Update current box if it exists in loaded data, otherwise go to first box
                 if (!_boxDataStorage.ContainsKey(_currentBox))
@@ -2121,7 +2158,6 @@ namespace BluePenguinMonitoring
             var inputMethodManager = (Android.Views.InputMethods.InputMethodManager?)GetSystemService(InputMethodService);
             inputMethodManager?.ShowSoftInput(input, Android.Views.InputMethods.ShowFlags.Implicit);
         }
-
         private void SaveDataWithFilename(string fileName)
         {
             try
@@ -2138,7 +2174,14 @@ namespace BluePenguinMonitoring
                     }).OrderBy(b => b.BoxNumber).ToList()
                 };
 
-                var json = JsonConvert.SerializeObject(exportData, Formatting.Indented);
+                var appState = new AppDataState
+                {
+                    CurrentBox = _currentBox,
+                    LastSaved = DateTime.Now,
+                    BoxData = _boxDataStorage
+                };
+
+                var json = JsonConvert.SerializeObject(appState, Formatting.Indented);
                 var downloadsPath = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads)?.AbsolutePath;
 
                 if (string.IsNullOrEmpty(downloadsPath))
@@ -2169,7 +2212,6 @@ namespace BluePenguinMonitoring
                 Toast.MakeText(this, $"❌ Export failed: {ex.Message}", ToastLength.Short)?.Show();
             }
         }
-
         private void SaveFileToPath(string filePath, string json, string fileName)
         {
             try
@@ -2186,7 +2228,6 @@ namespace BluePenguinMonitoring
                 Toast.MakeText(this, $"❌ Failed to save file: {ex.Message}", ToastLength.Long)?.Show();
             }
         }
-
         public override void OnRequestPermissionsResult(int requestCode, string[] permissions, Android.Content.PM.Permission[] grantResults)
         {
             base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -2223,7 +2264,6 @@ namespace BluePenguinMonitoring
                 }
             }
         }
-
         private bool CheckExternalStoragePermissions()
         {
             try
@@ -2258,12 +2298,10 @@ namespace BluePenguinMonitoring
                 return false;
             }
         }
-
         private void OnBoxNumberClick(object? sender, EventArgs e)
         {
             ShowBoxJumpDialog();
         }
-
         private void ShowBoxJumpDialog()
         {
             var input = new EditText(this)
@@ -2307,7 +2345,6 @@ namespace BluePenguinMonitoring
             var inputMethodManager = (Android.Views.InputMethods.InputMethodManager?)GetSystemService(InputMethodService);
             inputMethodManager?.ShowSoftInput(input, Android.Views.InputMethods.ShowFlags.Implicit);
         }
-
         private void JumpToBox(int targetBox)
         {
             if (targetBox == _currentBox)
@@ -2321,7 +2358,6 @@ namespace BluePenguinMonitoring
 
             Toast.MakeText(this, $"📦 Jumped to Box {_currentBox}", ToastLength.Short)?.Show();
         }
-
         private string? GetSelectedGateStatus()
         {
             if (_gateStatusSpinner?.SelectedItem != null)
@@ -2331,7 +2367,6 @@ namespace BluePenguinMonitoring
             }
             return null;
         }
-
         private void SetSelectedGateStatus(string? gateStatus)
         {
             if (_gateStatusSpinner?.Adapter != null)
@@ -2346,7 +2381,6 @@ namespace BluePenguinMonitoring
                 }
             }
         }
-
         private void OnManualAddClick(object? sender, EventArgs e)
         {
             if (_manualScanEditText == null) return;
@@ -2371,7 +2405,6 @@ namespace BluePenguinMonitoring
 
             AddScannedId(cleanInput);
         }
-
         private void OnDataClick(object? sender, EventArgs e)
         {
             ShowDataOptionsDialog();
