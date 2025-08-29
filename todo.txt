@@ -8,14 +8,16 @@ clicking on a scan entry should
 	prompt to enter optional information connected with the scan result, i.e. Sex
 	Have move/delete contained. 
 	entries should be bigger and easier to click
-Current state of the app to be saved in same format as save/load data. (low priority as load handles both types at the moment)
+Current state of the app to be saved in same format as save/load data. (low priority as load handles both types now)
 
 DONE
 
-Can load/open txt files from backup. 
-what do you think about this - make padlock yellow for "no data" (and locked) instead of the big (No Data) text?
+Make padlock yellow for "no data" (and locked) instead of the big (No Data) text?
 delete shouldn't leave -1 adults. 
-display all data page
+Can load/open txt files from backup. 
+Disable Bluetooth option.
+version number
+display all boxes in a single view
 flag if unknown chip scanned, alarm/alert
 scanned bird unlock box <----untested as I don't have a scanner
 move bird, change totals
