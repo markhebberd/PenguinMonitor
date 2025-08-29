@@ -9,6 +9,7 @@ using Android.Media;
 using Android.OS;
 using Android.Text;
 using Android.Views;
+using Android.Views.InputMethods;
 using Android.Widget;
 using BluePenguinMonitoring.Models;
 using BluePenguinMonitoring.Services;
@@ -103,7 +104,7 @@ namespace BluePenguinMonitoring
         private CheckBox _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int versionNumber = 8;
+        private static int versionNumber = 9;
         private LinearLayout _multiBoxViewCard;
 
         // ===== Multi-page menu state =====
@@ -967,6 +968,8 @@ namespace BluePenguinMonitoring
                 card.AddView(gate_and_notes);
             card.Click += (sender, e) =>
             {
+                if(!_visiblePages.Contains(UIFactory.selectedPage.BoxDataSingle))
+                    _visiblePages.Add(UIFactory.selectedPage.BoxDataSingle);
                 JumpToBox(boxNumber);
                 ScrollToTop();
             };
@@ -2333,48 +2336,57 @@ namespace BluePenguinMonitoring
         {
             ShowBoxJumpDialog();
         }
+
         private void ShowBoxJumpDialog()
         {
             var input = new EditText(this)
             {
-                InputType = Android.Text.InputTypes.ClassNumber,
-                Text = _currentBox.ToString(),
-                Hint = "Box number"
+                Text = _currentBox.ToString()
             };
-            input.SetTextColor(UIFactory.TEXT_PRIMARY);
+            input.InputType = InputTypes.ClassNumber;      // numeric keyboard
+            input.SetSelectAllOnFocus(true);               // easy overwrite
+            input.ImeOptions = (ImeAction)ImeFlags.NoExtractUi | ImeAction.Go;
 
-            var alertDialog = new AlertDialog.Builder(this)
+            var dialog = new AlertDialog.Builder(this)
                 .SetTitle("Jump to Box")
-                .SetMessage("Enter box number (1-150):")
+                .SetMessage("Enter box number (1–150):")
                 .SetView(input)
                 .SetPositiveButton("Go", (s, e) =>
                 {
-                    if (int.TryParse(input.Text, out int targetBox))
+                    if (int.TryParse(input.Text, out int targetBox) && targetBox >= 1 && targetBox <= 150)
                     {
-                        if (targetBox >= 1 && targetBox <= 150)
-                        {
-                            JumpToBox(targetBox);
-                        }
-                        else
-                        {
-                            Toast.MakeText(this, "Box number must be between 1 and 150", ToastLength.Short)?.Show();
-                        }
+                        JumpToBox(targetBox);
                     }
                     else
                     {
-                        Toast.MakeText(this, "Please enter a valid box number", ToastLength.Short)?.Show();
+                        Toast.MakeText(this, "Box number must be between 1 and 150", ToastLength.Short)?.Show();
                     }
                 })
                 .SetNegativeButton("Cancel", (s, e) => { })
                 .Create();
 
-            alertDialog?.Show();
-            
-            input.RequestFocus();
-            input.SelectAll();
+            dialog.Show();
 
-            var inputMethodManager = (Android.Views.InputMethods.InputMethodManager?)GetSystemService(InputMethodService);
-            inputMethodManager?.ShowSoftInput(input, Android.Views.InputMethods.ShowFlags.Implicit);
+            // Ensure the keyboard pops and the input is focused
+            input.Post(() =>
+            {
+                input.RequestFocus();
+                dialog.Window?.SetSoftInputMode(SoftInput.StateAlwaysVisible);
+
+                var imm = (InputMethodManager)GetSystemService(Context.InputMethodService);
+                imm?.ShowSoftInput(input, ShowFlags.Forced);
+            });
+
+            // Let the keyboard's Go/Done key trigger the positive button
+            var btnGo = dialog.GetButton((int)DialogButtonType.Positive);
+            input.EditorAction += (s, e) =>
+            {
+                if (e.ActionId == ImeAction.Go || e.ActionId == ImeAction.Done)
+                {
+                    btnGo?.PerformClick();
+                    e.Handled = true;
+                }
+            };
         }
         private void JumpToBox(int targetBox)
         {

@@ -1,8 +1,6 @@
 TODO
 
 option to disable PenguinReporting to Marks server. 
-GOTO box, improving somehow. keyboard non popping currently. 
-Brittas GPS bug, accuracy 
 clicking on a scan entry should 
 	show all know data about the bird 
 	prompt to enter optional information connected with the scan result, i.e. Sex
@@ -12,7 +10,8 @@ Current state of the app to be saved in same format as save/load data. (low prio
 
 DONE
 
-no more emperor penguin.
+GOTO box, improving somehow. keyboard non popping currently. 
+no more emperor penguin in the title bar
 Make padlock yellow for "no data" (and locked) instead of the big (No Data) text?
 delete shouldn't leave -1 adults. 
 Can load/open txt files from backup. 
@@ -42,3 +41,4 @@ better penguin icon
 FIXED BY DESIGN
 
 move should adjust the box count of the source and destination boxes
+Brittas GPS bug, accuracy 
