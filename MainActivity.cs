@@ -968,8 +968,6 @@ namespace BluePenguinMonitoring
                 card.AddView(gate_and_notes);
             card.Click += (sender, e) =>
             {
-                if(!_visiblePages.Contains(UIFactory.selectedPage.BoxDataSingle))
-                    _visiblePages.Add(UIFactory.selectedPage.BoxDataSingle);
                 JumpToBox(boxNumber);
                 ScrollToTop();
             };
@@ -2396,6 +2394,8 @@ namespace BluePenguinMonitoring
                 return;
             }
 
+            if (!_visiblePages.Contains(UIFactory.selectedPage.BoxDataSingle))
+                _visiblePages.Add(UIFactory.selectedPage.BoxDataSingle);
             _currentBox = targetBox;
             DrawPageLayouts();
 
