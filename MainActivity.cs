@@ -673,7 +673,7 @@ namespace BluePenguinMonitoring
             _gestureDetector = new GestureDetector(this, new SwipeGestureDetector(this));
             scrollView.Touch += OnScrollViewTouch;
 
-            var layout = new LinearLayout(this)
+            var parentLineaerLayout = new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Vertical
             };
@@ -709,12 +709,15 @@ namespace BluePenguinMonitoring
                     {
                         case 0:
                             selectedPage = UIFactory.selectedPage.Settings;
+                            DrawBoxLayout();
                             break;
                         case 1:
                             selectedPage = UIFactory.selectedPage.BoxDataSingle;
+                            DrawBoxLayout();
                             break;
                         case 2:
                             selectedPage = UIFactory.selectedPage.BoxDataMany;
+                            DrawBoxLayout();
                             ShowBoxDataSummary(); 
                             break;
                     }
@@ -750,7 +753,7 @@ namespace BluePenguinMonitoring
             statusParams.SetMargins(0, 20, 0, 0);
             _statusText.LayoutParameters = statusParams;
             headerCard.AddView(_statusText);
-            layout.AddView(headerCard);
+            parentLineaerLayout.AddView(headerCard);
 
             // Action buttons
             _topButtonLayout = CreateStyledButtonLayout(
@@ -772,8 +775,8 @@ namespace BluePenguinMonitoring
             CreateBoxDataCard(_dataCard);
             DrawBoxLayout();
 
-            layout.AddView(_dataCard);
-            scrollView.AddView(layout);
+            parentLineaerLayout.AddView(_dataCard);
+            scrollView.AddView(parentLineaerLayout);
             SetContentView(scrollView);
 
             scrollView.SetOnApplyWindowInsetsListener(new ViewInsetsListener());
@@ -850,6 +853,9 @@ namespace BluePenguinMonitoring
         }
         private void DrawBoxLayout()
         {
+            //Only draw in correct view mode!
+            _dataCard.Visibility = selectedPage == UIFactory.selectedPage.BoxDataSingle ? ViewStates.Visible : ViewStates.Gone;
+
             // Update lock icon
             if (_lockIconView != null)
             {
@@ -896,8 +902,6 @@ namespace BluePenguinMonitoring
             }
 
             //disable/enable UI elememts according to _isBoxLocked
-
-            // disable top buttons (clear, bird stats, save...) on unlocked box
             for (int i = 0; i < _topButtonLayout.ChildCount; i++)
             {
                 var child = _topButtonLayout.GetChildAt(i);
