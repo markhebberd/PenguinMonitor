@@ -1,22 +1,18 @@
 TODO
 
 Current state of the app to be saved in same format as save/load data. 
-version number!
-display all data page
-options menu
+option to disable PenguinReporting to Marks server. 
 GOTO box, improving somehow. keyboard non popping currently. 
 Brittas GPS bug, accuracy 
 clicking on a scan entry should 
 	show all know data about the bird 
 	prompt to enter optional information connected with the scan result, i.e. Sex
 	Have move/delete contained. 
-	be bigger and easier to click
-option to disable bluetooth connection
-option to disable PenguinReporting to Marks server. 
-CSV file output unless britta gives me a schema!
+	entries should be bigger and easier to click
 
 DONE
 
+display all data page
 flag if unknown chip scanned, alarm/alert
 scanned bird unlock box <----untested as I don't have a scanner
 move bird, change totals

@@ -49,7 +49,6 @@ namespace BluePenguinMonitoring.UI.Factories
             {
                 Orientation = orientation
             };
-
             card.SetPadding(20, 16, 20, 16);
             card.Background = CreateCardBackground();
 
