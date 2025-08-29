@@ -62,6 +62,8 @@ namespace BluePenguinMonitoring
         private EditText? _notesEditText;
         private EditText? _manualScanEditText;
 
+        private UIFactory.selectedPage selectedPage;
+
         // Add gesture detection components
         private GestureDetector? _gestureDetector;
         private LinearLayout? _dataCard;
@@ -662,6 +664,7 @@ namespace BluePenguinMonitoring
         }
         private void CreateDataRecordingUI()
         {
+            selectedPage = UIFactory.selectedPage.BoxDataSingle;
             _isBoxLocked = true;
             var scrollView = new ScrollView(this);
             scrollView.SetBackgroundColor(UIFactory.BACKGROUND_COLOR);
@@ -677,6 +680,53 @@ namespace BluePenguinMonitoring
 
             // App header
             var headerCard = _uiFactory.CreateCard();
+            var titleCard = _uiFactory.CreateCard(Android.Widget.Orientation.Horizontal);
+
+
+            var menuButton = new ImageButton(this)
+            {
+                LayoutParameters = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WrapContent,
+                    ViewGroup.LayoutParams.WrapContent)
+            };
+            menuButton.SetImageResource(Android.Resource.Drawable.IcMenuManage); // Use built-in menu icon
+            menuButton.SetBackgroundColor(Color.Transparent); // No background
+            menuButton.Click += (settings, e) =>
+            {
+
+                var options = new string[]
+                    {
+                        "⚙️ Settings",
+                        "Single Box Data",
+                        "📊 Data Overview"
+                    };
+
+                var builder = new AlertDialog.Builder(this);
+                builder.SetTitle("Menu");
+                builder.SetItems(options, (s, args) =>
+                {
+                    switch (args.Which)
+                    {
+                        case 0:
+                            selectedPage = UIFactory.selectedPage.Settings;
+                            break;
+                        case 1:
+                            selectedPage = UIFactory.selectedPage.BoxDataSingle;
+                            break;
+                        case 2:
+                            selectedPage = UIFactory.selectedPage.BoxDataMany;
+                            ShowBoxDataSummary(); 
+                            break;
+                    }
+                });
+                builder.SetNegativeButton("Cancel", (s, args) => { });
+                builder.Show();
+            };
+
+            // Add to headerCard before titleText
+            titleCard.AddView(menuButton);
+
+
             var titleText = new TextView(this)
             {
                 Text = "🐧 Penguin Monitoring",
@@ -685,7 +735,9 @@ namespace BluePenguinMonitoring
             };
             titleText.SetTextColor(UIFactory.PRIMARY_COLOR);
             titleText.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
-            headerCard.AddView(titleText);
+            titleCard.AddView(titleText);
+
+            headerCard.AddView(titleCard);
 
             _statusText = new TextView(this)
             {

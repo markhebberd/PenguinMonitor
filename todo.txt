@@ -1,5 +1,9 @@
 TODO
 
+Current state of the app to be saved in same format as save/load data. 
+version number!
+display all data page
+options menu
 GOTO box, improving somehow. keyboard non popping currently. 
 Brittas GPS bug, accuracy 
 clicking on a scan entry should 

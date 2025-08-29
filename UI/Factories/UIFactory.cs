@@ -35,11 +35,19 @@ namespace BluePenguinMonitoring.UI.Factories
         {
             _context = context;
         }
-        public LinearLayout CreateCard()
+
+        public enum selectedPage
+        {
+            Settings,
+            BoxDataSingle,
+            BoxDataMany
+        }
+
+        public LinearLayout CreateCard(Orientation orientation=Orientation.Vertical)
         {
             var card = new LinearLayout(_context)
             {
-                Orientation = Android.Widget.Orientation.Vertical
+                Orientation = orientation
             };
 
             card.SetPadding(20, 16, 20, 16);
