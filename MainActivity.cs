@@ -103,7 +103,7 @@ namespace BluePenguinMonitoring
         private CheckBox _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int versionNumber = 5;
+        private static int versionNumber = 7;
         private LinearLayout _multiBoxViewCard;
 
         // ===== Multi-page menu state =====
@@ -915,7 +915,7 @@ namespace BluePenguinMonitoring
             {
                 Orientation = Android.Widget.Orientation.Vertical
             };
-            card.SetPadding(20, 16, 20, 16);
+            card.SetPadding(10, 10, 10, 10);
             card.Background = _uiFactory.CreateCardBackground();
 
             var cardParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f);
@@ -939,17 +939,26 @@ namespace BluePenguinMonitoring
             };
             summary.SetTextColor(Color.Black);
 
-            var gate = new TextView(this)
+
+            string gateStatus = boxData.GateStatus;
+            string notes = string.IsNullOrWhiteSpace(boxData.Notes) ? "" : "notes";
+            string lineThreeStatusText = "";
+            if (!string.IsNullOrWhiteSpace(gateStatus) && !string.IsNullOrWhiteSpace(notes))
+                lineThreeStatusText = gateStatus + " & " + notes;
+            else
+                lineThreeStatusText = gateStatus + notes;
+            var gate_and_notes = new TextView(this)
             {
-                Text = string.IsNullOrEmpty(boxData.GateStatus) ? "" : $"{boxData.GateStatus}",
+                Text = lineThreeStatusText,
                 Gravity = GravityFlags.Center,
                 TextSize = 14
             };
-            gate.SetTextColor(Color.DarkGray);
+            gate_and_notes.SetTextColor(Color.DarkGray);
 
             card.AddView(title);
             card.AddView(summary);
-            card.AddView(gate);
+            if(!string.IsNullOrEmpty(lineThreeStatusText))
+                card.AddView(gate_and_notes);
             card.Click += (sender, e) =>
             {
                 JumpToBox(boxNumber);
@@ -977,7 +986,7 @@ namespace BluePenguinMonitoring
 
             TextView versionText = new TextView(this)
             {
-                Text = "Version: " + versionNumber.ToString()
+                Text = "Version: " + versionNumber
             };
             versionText.SetTextColor(Color.Black);
             _settingsCard.AddView(versionText);
@@ -1101,14 +1110,37 @@ namespace BluePenguinMonitoring
             // Update lock icon
             if (_lockIconView != null)
             {
-                _lockIconView.SetImageResource(_isBoxLocked
-                    ? Android.Resource.Drawable.IcLockLock
-                    : Resource.Drawable.LockUnlocked);
+                _lockIconView.SetColorFilter(null);
+                if (!_boxDataStorage.ContainsKey(_currentBox))
+                {
+                    _lockIconView.SetImageResource(Resource.Drawable.locked_yellow);
+                    _lockIconView.SetColorFilter(
+                        new Android.Graphics.PorterDuffColorFilter(
+                            UIFactory.WARNING_COLOR, // yellow
+                            Android.Graphics.PorterDuff.Mode.SrcIn));
+                }
+                else if (_isBoxLocked)
+                {
+                    _lockIconView.SetImageResource(Resource.Drawable.locked_green);
+                    _lockIconView.SetColorFilter(
+                        new Android.Graphics.PorterDuffColorFilter(
+                            UIFactory.SUCCESS_COLOR,     // green
+                            Android.Graphics.PorterDuff.Mode.SrcIn));
+                }
+                else
+                {
+                    _lockIconView.SetImageResource(Resource.Drawable.unlocked_red);
+                    _lockIconView.SetColorFilter(
+                        new Android.Graphics.PorterDuffColorFilter(
+                            UIFactory.DANGER_COLOR,     // red
+                            Android.Graphics.PorterDuff.Mode.SrcIn));
+                }
+
             }
 
             if (_dataCardTitle != null)
             {
-                _dataCardTitle.Text = $"Box {_currentBox} " + (_boxDataStorage.ContainsKey(_currentBox) ? "" : "(No Data)");
+                _dataCardTitle.Text = $"Box {_currentBox}";
             }
 
             var editTexts = new[] { _adultsEditText, _eggsEditText, _chicksEditText, _notesEditText };
@@ -1805,11 +1837,11 @@ namespace BluePenguinMonitoring
                             _remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData);
                             if (penguinData!=null && LifeStage.Adult == penguinData.LastKnownLifeStage)
                             {
-                                _adultsEditText.Text = (int.Parse(_adultsEditText.Text ?? "0") - 1).ToString();
+                                _adultsEditText.Text = "" + Math.Max(0, int.Parse(_adultsEditText.Text ?? "0") - 1);
                             }
                             else if (penguinData != null && LifeStage.Chick == penguinData.LastKnownLifeStage)
                             {
-                                _chicksEditText.Text = (int.Parse(_chicksEditText.Text ?? "0") - 1).ToString();
+                                _chicksEditText.Text = "" + Math.Max(0, int.Parse(_chicksEditText.Text ?? "0") - 1);
                             }
                             SaveCurrentBoxData();
                             UpdateScannedIdsDisplay(boxData.ScannedIds);
@@ -1910,12 +1942,12 @@ namespace BluePenguinMonitoring
                             _remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData);
                             if (LifeStage.Adult == penguinData.LastKnownLifeStage)
                             {
-                                _adultsEditText.Text = (int.Parse(_adultsEditText.Text ?? "0") - 1).ToString();
+                                _adultsEditText.Text = "" + Math.Max(0, int.Parse(_adultsEditText.Text ?? "0") - 1);
                                 _boxDataStorage[targetBox].Adults++;
                             }
                             else if (LifeStage.Chick == penguinData.LastKnownLifeStage)
                             {
-                                _chicksEditText.Text = (int.Parse(_chicksEditText.Text ?? "0") - 1).ToString();
+                                _chicksEditText.Text = "" + Math.Max(0, int.Parse(_chicksEditText.Text ?? "0") - 1);
                                 _boxDataStorage[targetBox].Adults++;
                             }
 

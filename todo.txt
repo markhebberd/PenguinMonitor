@@ -1,6 +1,5 @@
 TODO
 
-Current state of the app to be saved in same format as save/load data. 
 option to disable PenguinReporting to Marks server. 
 GOTO box, improving somehow. keyboard non popping currently. 
 Brittas GPS bug, accuracy 
@@ -9,9 +8,13 @@ clicking on a scan entry should
 	prompt to enter optional information connected with the scan result, i.e. Sex
 	Have move/delete contained. 
 	entries should be bigger and easier to click
+Current state of the app to be saved in same format as save/load data. (low priority as load handles both types at the moment)
 
 DONE
 
+Can load/open txt files from backup. 
+what do you think about this - make padlock yellow for "no data" (and locked) instead of the big (No Data) text?
+delete shouldn't leave -1 adults. 
 display all data page
 flag if unknown chip scanned, alarm/alert
 scanned bird unlock box <----untested as I don't have a scanner

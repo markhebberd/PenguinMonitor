@@ -13,9 +13,9 @@ namespace BluePenguinMonitoring.UI.Factories
         // Color constants
         public static readonly Color PRIMARY_COLOR = Color.ParseColor("#2196F3");
         public static readonly Color PRIMARY_DARK = Color.ParseColor("#1976D2");
-        public static readonly Color SUCCESS_COLOR = Color.ParseColor("#4CAF50");
-        public static readonly Color WARNING_COLOR = Color.ParseColor("#FF9800");
-        public static readonly Color DANGER_COLOR = Color.ParseColor("#F44336");
+        public static readonly Color SUCCESS_COLOR = Color.ParseColor("#4CAF50");   // green
+        public static readonly Color WARNING_COLOR = Color.ParseColor("#FF9800");   // yellow orange
+        public static readonly Color DANGER_COLOR = Color.ParseColor("#F44336");    // red
         public static readonly Color TEXT_FIELD_BACKGROUND_COLOR = Color.ParseColor("#F0F0F0");
         public static readonly Color BACKGROUND_COLOR = Color.LightGray;
         public static readonly Color CARD_COLOR = Color.White;
@@ -27,9 +27,9 @@ namespace BluePenguinMonitoring.UI.Factories
         public static readonly Color SCAN_ROW_ODD = Color.ParseColor("#F5F5F5");
 
         // Add sex-based background colors
-        public static readonly Color FEMALE_BACKGROUND = Color.ParseColor("#FFE4E1"); // Light pink
-        public static readonly Color MALE_BACKGROUND = Color.ParseColor("#E6F3FF"); // Light blue
-        public static readonly Color CHICK_BACKGROUND = Color.ParseColor("#FFFFE6");   // Light yellow
+        public static readonly Color FEMALE_BACKGROUND = Color.ParseColor("#FFE4E1");   // Light pink
+        public static readonly Color MALE_BACKGROUND = Color.ParseColor("#E6F3FF");     // Light blue
+        public static readonly Color CHICK_BACKGROUND = Color.ParseColor("#FFFFE6");    // Light yellow
 
         public UIFactory(Context context)
         {
@@ -49,6 +49,7 @@ namespace BluePenguinMonitoring.UI.Factories
             {
                 Orientation = orientation
             };
+
             card.SetPadding(20, 16, 20, 16);
             card.Background = CreateCardBackground();
 
