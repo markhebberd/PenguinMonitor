@@ -43,7 +43,7 @@ namespace BluePenguinMonitoring.UI.Factories
             BoxDataMany
         }
 
-        public LinearLayout CreateCard(Orientation orientation=Orientation.Vertical)
+        public LinearLayout CreateCard(Orientation orientation = Orientation.Vertical, int? padding = null)
         {
             var card = new LinearLayout(_context)
             {
@@ -51,20 +51,26 @@ namespace BluePenguinMonitoring.UI.Factories
             };
 
             card.SetPadding(20, 16, 20, 16);
+            if (padding != null)
+            {
+                int pad = (int)padding;
+                card.SetPadding(pad, pad, pad, pad);
+            }
             card.Background = CreateCardBackground();
 
             var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
-            cardParams.SetMargins(0, 0, 0, 16);
+            cardParams.SetMargins(0, 0, 0, 10);
             card.LayoutParameters = cardParams;
 
             return card;
         }
-        public GradientDrawable CreateCardBackground()
+        public GradientDrawable CreateCardBackground(int borderWidth=1)
         {
             var drawable = new GradientDrawable();
             drawable.SetColor(CARD_COLOR);
             drawable.SetCornerRadius(12 * _context.Resources?.DisplayMetrics?.Density ?? 12);
-            drawable.SetStroke(1, Color.ParseColor("#E0E0E0"));
+            drawable.SetStroke(borderWidth, Color.ParseColor("#E0E0E0"));
+
             return drawable;
         }
         public GradientDrawable CreateRoundedBackground(Color color, int radiusDp)

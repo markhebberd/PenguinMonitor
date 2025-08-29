@@ -12,6 +12,7 @@ Current state of the app to be saved in same format as save/load data. (low prio
 
 DONE
 
+no more emperor penguin.
 Make padlock yellow for "no data" (and locked) instead of the big (No Data) text?
 delete shouldn't leave -1 adults. 
 Can load/open txt files from backup. 

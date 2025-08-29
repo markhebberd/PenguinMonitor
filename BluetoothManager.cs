@@ -96,7 +96,7 @@ namespace BluePenguinMonitoring
                             continue;
                         }
 
-                        StatusChanged?.Invoke($"📡 Connecting to {device.Name ?? "HR5"} (attempt {attempt})...");
+                        StatusChanged?.Invoke($"🔗 Connecting to {device.Name ?? "HR5"} (attempt {attempt})...");
 
                         var uuid = UUID.FromString(Serial_Port_Profile_UUID);
                         
