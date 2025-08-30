@@ -104,7 +104,7 @@ namespace BluePenguinMonitoring
         private CheckBox _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int versionNumber = 9;
+        private static int versionNumber = 10;
         private LinearLayout _multiBoxViewCard;
 
         // ===== Multi-page menu state =====
@@ -608,6 +608,8 @@ namespace BluePenguinMonitoring
 
             var totalBirds = _boxDataStorage.Values.Sum(box => box.ScannedIds.Count);
             var totalAdults = _boxDataStorage.Values.Sum(box => box.Adults);
+            var totalFemales = _boxDataStorage.Values.Sum(box => box.ScannedIds.Count(id => 
+                _remotePenguinData.ContainsKey(id.BirdId) && _remotePenguinData[id.BirdId].Sex.Equals("F", StringComparison.OrdinalIgnoreCase)));
             var totalEggs = _boxDataStorage.Values.Sum(box => box.Eggs);
             var totalChicks = _boxDataStorage.Values.Sum(box => box.Chicks);
             var gateUpCount = _boxDataStorage.Values.Count(box => box.GateStatus == "gate up");
@@ -615,8 +617,8 @@ namespace BluePenguinMonitoring
 
             var summary = $"📊 Data Summary:\n\n" +
                          $"📦 {_boxDataStorage.Count} boxes with data\n" +
-                         $"🐧 {totalBirds} bird scans\n" +
-                         $"👥 {totalAdults} adults\n" +
+                         $"🐧 {totalBirds} bird scans, " + (int)(100*totalFemales/totalBirds) + "% female\n" +
+                         $"👥 {totalAdults} adults\n" + 
                          $"🥚 {totalEggs} eggs\n" +
                          $"🐣 {totalChicks} chicks\n" +
                          $"🚪 Gate: {gateUpCount} up, {regateCount} regate\n\n" +
@@ -1108,7 +1110,8 @@ namespace BluePenguinMonitoring
                 }
 
                 // If single-box UI is not visible, we can skip the remainder (it only updates single-card widgets).
-                if (!showSingle) return;
+                if (!showSingle) 
+                    return;
 
                 // Update lock icon
                 if (_lockIconView != null)
@@ -1407,7 +1410,6 @@ namespace BluePenguinMonitoring
             _notesEditText.TextChanged += OnDataChanged;
             _dataCard.AddView(_notesEditText);
         }
-
         private void SetEnabledRecursive(View view, bool enabled, float alpha)
         {
             view.Enabled = enabled;
@@ -1420,7 +1422,6 @@ namespace BluePenguinMonitoring
                 }
             }
         }
-
         private void OnNumberFieldClick(object? sender, EventArgs e)
         {
             if (sender is EditText editText)
@@ -1428,7 +1429,6 @@ namespace BluePenguinMonitoring
                 editText.SelectAll();
             }
         }
-
         private void OnNumberFieldFocus(object? sender, View.FocusChangeEventArgs e)
         {
             if (e.HasFocus && sender is EditText editText)
