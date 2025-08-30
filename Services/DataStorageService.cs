@@ -1,4 +1,5 @@
-﻿using BluePenguinMonitoring.Models;
+﻿using Android.OS;
+using BluePenguinMonitoring.Models;
 using Newtonsoft.Json;
 using SmtpAuthenticator;
 using System;
@@ -37,14 +38,17 @@ namespace BluePenguinMonitoring.Services
                     };
                     bw.RunWorkerCompleted += (sender, e) =>
                     {
-                        if (response == "fail")
+                        new Handler(Looper.MainLooper).Post(() =>
                         {
-                            Toast.MakeText(context, "Unable to backup on Marks server.", ToastLength.Short)?.Show();
-                        }
-                        else
-                        {
-                            Toast.MakeText(context, "Data was " + response + " on Marks server.", ToastLength.Short)?.Show();
-                        }
+                            if (response == "fail")
+                            {
+                                Toast.MakeText(context, "Unable to backup on Marks server.", ToastLength.Short)?.Show();
+                            }
+                            else
+                            {
+                                Toast.MakeText(context, "Data was " + response + " on Marks server.", ToastLength.Short)?.Show();
+                            }
+                        });
                     };
                     bw.RunWorkerAsync();
                 }

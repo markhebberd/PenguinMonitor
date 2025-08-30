@@ -288,9 +288,9 @@ namespace BluePenguinMonitoring
         }
         private void OnEidDataReceived(string eidData)
         {
-            _isBoxLocked = false;
             AddScannedId(eidData);
             SaveCurrentBoxData();
+            _isBoxLocked = false;
             DrawPageLayouts();
         }
         private void UpdateStatusText(string? bluetoothStatus = null)
@@ -749,6 +749,7 @@ namespace BluePenguinMonitoring
                     ViewGroup.LayoutParams.WrapContent,
                     ViewGroup.LayoutParams.WrapContent)
             };
+            menuButton.SetPadding(0, 0, 0, 0);
             menuButton.SetImageResource(Android.Resource.Drawable.IcMenuManage); // Use built-in menu icon
             menuButton.SetBackgroundColor(Color.Transparent); // No background
             menuButton.Click += hamburgerButtonClick;
@@ -760,6 +761,7 @@ namespace BluePenguinMonitoring
             titleCard.AddView(menuButton);
 
             ImageView iconView = new ImageView(this);
+            iconView.SetPadding(0, 0, 0, 0);
             iconView.SetImageResource(Resource.Mipmap.appicon);
             iconView.ScaleX = iconView.ScaleY = 0.7f;
             titleCard.AddView(iconView);
@@ -770,6 +772,7 @@ namespace BluePenguinMonitoring
                 TextSize = 28,
                 Gravity = GravityFlags.Center
             };
+            titleText.SetPadding(0, 0, 0, 0);
             titleText.SetTextColor(UIFactory.PRIMARY_COLOR);
             titleText.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
             titleCard.AddView(titleText);
@@ -973,8 +976,6 @@ namespace BluePenguinMonitoring
             };
             return card;
         }
-
-        // Smoothly scroll the root ScrollView to the top
         private void ScrollToTop()
         {
             if (_rootScrollView == null) return;
@@ -1018,7 +1019,6 @@ namespace BluePenguinMonitoring
             };
             _settingsCard.AddView(_isBluetoothEnabled);
         }
-
         private void OnScrollViewTouch(object? sender, View.TouchEventArgs e)
         {
             if (_gestureDetector != null && e.Event != null)
@@ -1049,7 +1049,6 @@ namespace BluePenguinMonitoring
 
             return layout;
         }
-
         private LinearLayout CreateNavigationLayout()
         {
             var layout = new LinearLayout(this)
@@ -1091,113 +1090,116 @@ namespace BluePenguinMonitoring
         }
         private void DrawPageLayouts()
         {
-            // Allow multiple pages visible at once
-            bool showSingle = _visiblePages.Contains(UIFactory.selectedPage.BoxDataSingle);
-            bool showSettings = _visiblePages.Contains(UIFactory.selectedPage.Settings);
-            bool showOverview = _visiblePages.Contains(UIFactory.selectedPage.BoxDataMany);
-            
-            _dataCard.Visibility = showSingle ? ViewStates.Visible : ViewStates.Gone;
-            _settingsCard.Visibility = showSettings ? ViewStates.Visible : ViewStates.Gone;
-            _multiBoxViewCard.Visibility = showOverview ? ViewStates.Visible : ViewStates.Gone;
-
-            if (showOverview)
+            new Handler(Looper.MainLooper).Post(() =>
             {
-                // Rebuild overview content each time it is visible
-                createMultiBoxViewCard();
-            }
+                // Allow multiple pages visible at once
+                bool showSingle = _visiblePages.Contains(UIFactory.selectedPage.BoxDataSingle);
+                bool showSettings = _visiblePages.Contains(UIFactory.selectedPage.Settings);
+                bool showOverview = _visiblePages.Contains(UIFactory.selectedPage.BoxDataMany);
 
-            // If single-box UI is not visible, we can skip the remainder (it only updates single-card widgets).
-            if (!showSingle) return;
+                _dataCard.Visibility = showSingle ? ViewStates.Visible : ViewStates.Gone;
+                _settingsCard.Visibility = showSettings ? ViewStates.Visible : ViewStates.Gone;
+                _multiBoxViewCard.Visibility = showOverview ? ViewStates.Visible : ViewStates.Gone;
 
-            // Update lock icon
-            if (_lockIconView != null)
-            {
-                _lockIconView.SetColorFilter(null);
-                if (!_boxDataStorage.ContainsKey(_currentBox))
+                if (showOverview)
                 {
-                    _lockIconView.SetImageResource(Resource.Drawable.locked_yellow);
-                    _lockIconView.SetColorFilter(
-                        new Android.Graphics.PorterDuffColorFilter(
-                            UIFactory.WARNING_COLOR, // yellow
-                            Android.Graphics.PorterDuff.Mode.SrcIn));
+                    // Rebuild overview content each time it is visible
+                    createMultiBoxViewCard();
                 }
-                else if (_isBoxLocked)
+
+                // If single-box UI is not visible, we can skip the remainder (it only updates single-card widgets).
+                if (!showSingle) return;
+
+                // Update lock icon
+                if (_lockIconView != null)
                 {
-                    _lockIconView.SetImageResource(Resource.Drawable.locked_green);
-                    _lockIconView.SetColorFilter(
-                        new Android.Graphics.PorterDuffColorFilter(
-                            UIFactory.SUCCESS_COLOR,     // green
-                            Android.Graphics.PorterDuff.Mode.SrcIn));
+                    _lockIconView.SetColorFilter(null);
+                    if (!_boxDataStorage.ContainsKey(_currentBox) && _isBoxLocked)
+                    {
+                        _lockIconView.SetImageResource(Resource.Drawable.locked_yellow);
+                        _lockIconView.SetColorFilter(
+                            new Android.Graphics.PorterDuffColorFilter(
+                                UIFactory.WARNING_COLOR, // yellow
+                                Android.Graphics.PorterDuff.Mode.SrcIn));
+                    }
+                    else if (_isBoxLocked)
+                    {
+                        _lockIconView.SetImageResource(Resource.Drawable.locked_green);
+                        _lockIconView.SetColorFilter(
+                            new Android.Graphics.PorterDuffColorFilter(
+                                UIFactory.SUCCESS_COLOR,     // green
+                                Android.Graphics.PorterDuff.Mode.SrcIn));
+                    }
+                    else
+                    {
+                        _lockIconView.SetImageResource(Resource.Drawable.unlocked_red);
+                        _lockIconView.SetColorFilter(
+                            new Android.Graphics.PorterDuffColorFilter(
+                                UIFactory.DANGER_COLOR,     // red
+                                Android.Graphics.PorterDuff.Mode.SrcIn));
+                    }
+
+                }
+
+                if (_dataCardTitleText != null)
+                {
+                    _dataCardTitleText.Text = $"Box {_currentBox}";
+                }
+
+                var editTexts = new[] { _adultsEditText, _eggsEditText, _chicksEditText, _notesEditText };
+
+                foreach (var editText in editTexts)
+                {
+                    if (editText != null) editText.TextChanged -= OnDataChanged;
+                }
+
+                if (_boxDataStorage.ContainsKey(_currentBox))
+                {
+                    var boxData = _boxDataStorage[_currentBox];
+                    if (_adultsEditText != null) _adultsEditText.Text = boxData.Adults.ToString();
+                    if (_eggsEditText != null) _eggsEditText.Text = boxData.Eggs.ToString();
+                    if (_chicksEditText != null) _chicksEditText.Text = boxData.Chicks.ToString();
+                    SetSelectedGateStatus(boxData.GateStatus);
+                    if (_notesEditText != null) _notesEditText.Text = boxData.Notes;
+                    UpdateScannedIdsDisplay(boxData.ScannedIds);
                 }
                 else
                 {
-                    _lockIconView.SetImageResource(Resource.Drawable.unlocked_red);
-                    _lockIconView.SetColorFilter(
-                        new Android.Graphics.PorterDuffColorFilter(
-                            UIFactory.DANGER_COLOR,     // red
-                            Android.Graphics.PorterDuff.Mode.SrcIn));
+                    if (_adultsEditText != null) _adultsEditText.Text = "0";
+                    if (_eggsEditText != null) _eggsEditText.Text = "0";
+                    if (_chicksEditText != null) _chicksEditText.Text = "0";
+                    SetSelectedGateStatus(null);
+                    if (_notesEditText != null) _notesEditText.Text = "";
+                    UpdateScannedIdsDisplay(new List<ScanRecord>());
                 }
 
-            }
+                foreach (var editText in editTexts)
+                {
+                    if (editText != null) editText.TextChanged += OnDataChanged;
+                }
 
-            if (_dataCardTitleText != null)
-            {
-                _dataCardTitleText.Text = $"Box {_currentBox}";
-            }
+                //disable/enable UI elememts according to _isBoxLocked
+                for (int i = 0; i < _topButtonLayout.ChildCount; i++)
+                {
+                    var child = _topButtonLayout.GetChildAt(i);
+                    SetEnabledRecursive(child, _isBoxLocked, _isBoxLocked ? 1.0f : 0.5f);
+                }
 
-            var editTexts = new[] { _adultsEditText, _eggsEditText, _chicksEditText, _notesEditText };
+                // Enable/Disable navigation and data buttons when locked/unlocked
+                List<Button> buttonsToToggle = new List<Button> { _prevBoxButton, _nextBoxButton, _selectBoxButton };
+                foreach (var button in buttonsToToggle)
+                {
+                    button.Enabled = _isBoxLocked;
+                    button.Alpha = _isBoxLocked ? 1.0f : 0.5f; // Grey out when unlocked
+                }
 
-            foreach (var editText in editTexts)
-            {
-                if (editText != null) editText.TextChanged -= OnDataChanged;
-            }
-
-            if (_boxDataStorage.ContainsKey(_currentBox))
-            {
-                var boxData = _boxDataStorage[_currentBox];
-                if (_adultsEditText != null) _adultsEditText.Text = boxData.Adults.ToString();
-                if (_eggsEditText != null) _eggsEditText.Text = boxData.Eggs.ToString();
-                if (_chicksEditText != null) _chicksEditText.Text = boxData.Chicks.ToString();
-                SetSelectedGateStatus(boxData.GateStatus);
-                if (_notesEditText != null) _notesEditText.Text = boxData.Notes;
-                UpdateScannedIdsDisplay(boxData.ScannedIds);
-            }
-            else
-            {
-                if (_adultsEditText != null) _adultsEditText.Text = "0";
-                if (_eggsEditText != null) _eggsEditText.Text = "0";
-                if (_chicksEditText != null) _chicksEditText.Text = "0";
-                SetSelectedGateStatus(null);
-                if (_notesEditText != null) _notesEditText.Text = "";
-                UpdateScannedIdsDisplay(new List<ScanRecord>());
-            }
-
-            foreach (var editText in editTexts)
-            {
-                if (editText != null) editText.TextChanged += OnDataChanged;
-            }
-
-            //disable/enable UI elememts according to _isBoxLocked
-            for (int i = 0; i < _topButtonLayout.ChildCount; i++)
-            {
-                var child = _topButtonLayout.GetChildAt(i);
-                SetEnabledRecursive(child, _isBoxLocked, _isBoxLocked ? 1.0f : 0.5f);
-            }
-
-            // Enable/Disable navigation and data buttons when locked/unlocked
-            List<Button> buttonsToToggle = new List<Button> { _prevBoxButton, _nextBoxButton, _selectBoxButton };
-            foreach (var button in buttonsToToggle)
-            {
-                button.Enabled = _isBoxLocked;
-                button.Alpha = _isBoxLocked ? 1.0f : 0.5f; // Grey out when unlocked
-            }
-
-            // title Layout "Box n" is item 0, which we don't want to disable!
-            for (int i = 1; i < _dataCard.ChildCount; i++)
-            {
-                var child = _dataCard.GetChildAt(i);
-                SetEnabledRecursive(child, !_isBoxLocked, _isBoxLocked ? 0.8f : 1.0f);
-            }
+                // title Layout "Box n" is item 0, which we don't want to disable!
+                for (int i = 1; i < _dataCard.ChildCount; i++)
+                {
+                    var child = _dataCard.GetChildAt(i);
+                    SetEnabledRecursive(child, !_isBoxLocked, _isBoxLocked ? 0.8f : 1.0f);
+                }
+            });
         }
         private bool dataCardHasZeroData()
         {
