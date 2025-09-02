@@ -136,20 +136,48 @@ namespace BluePenguinMonitoring.UI.Factories
             var spinner = new Spinner(_context);
             spinner.SetPadding(16, 20, 16, 20);
             spinner.Background = CreateRoundedBackground(TEXT_FIELD_BACKGROUND_COLOR, 8);
-            
-            // Create options with blank first option instead of "null"
-            var gateStatusOptions = new string[] { "", "gate up", "regate" };
-            var adapter = new ArrayAdapter<string>(_context, Android.Resource.Layout.SimpleSpinnerItem, gateStatusOptions);
+
+            // Create options with the long text in the first item for dropdown, but use a custom adapter 
+            // to display no text in the main view.
+            var gateStatusOptions = new string[] { "Gate-open or no-data", "gate up", "regate" };
+            var adapter = new CustomSpinnerAdapter(_context, Android.Resource.Layout.SimpleSpinnerItem, gateStatusOptions);
             adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
             spinner.Adapter = adapter;
 
-            
             // Set the spinner to have the same layout weight as the input fields
             var spinnerParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             spinnerParams.SetMargins(4, 0, 4, 0);
             spinner.LayoutParameters = spinnerParams;
 
             return spinner;
+        }
+
+        private class CustomSpinnerAdapter : ArrayAdapter<string>
+        {
+            private readonly string[] _values;
+
+            public CustomSpinnerAdapter(Context context, int resource, string[] values)
+                : base(context, resource, values)
+            {
+                _values = values;
+            }
+
+            public override View GetView(int position, View convertView, ViewGroup parent)
+            {
+                // Use the base implementation and then clear the text so the spinner shows no text normally
+                var view = base.GetView(position, convertView, parent);
+                if (view is TextView tv)
+                {
+                    tv.Text = "";
+                }
+                return view;
+            }
+
+            public override View GetDropDownView(int position, View convertView, ViewGroup parent)
+            {
+                // Use the full text in the dropdown view
+                return base.GetDropDownView(position, convertView, parent);
+            }
         }
     }
 }
