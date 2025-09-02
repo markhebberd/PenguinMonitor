@@ -137,8 +137,6 @@ namespace BluePenguinMonitoring.Services
                 var birdJson = JsonConvert.SerializeObject(_remotePenguinData, Formatting.Indented);
                 File.WriteAllText(Path.Combine(internalPath, REMOTE_BIRD_DATA_FILENAME), birdJson);
 
-
-
                 var csvUrl = _csvDataService.ConvertToGoogleSheetsCsvUrl(BOX_STATUS_URL);
                 var response = await _httpClient.GetAsync(csvUrl);
                 response.EnsureSuccessStatusCode();
@@ -171,11 +169,15 @@ namespace BluePenguinMonitoring.Services
                   });
             }
         }
-        public Dictionary<string, PenguinData>? loadRemotePengInfoFromAppDataDir(Android.Content.Context? context)
+        public async Task<Dictionary<string, PenguinData>?> loadRemotePengInfoFromAppDataDir(Android.Content.Context? context)
         {
             try
             {
                 string remoteBirdPath = Path.Combine(context.FilesDir?.AbsolutePath, REMOTE_BIRD_DATA_FILENAME);
+                if (!File.Exists(remoteBirdPath))
+                {
+                    await DownloadCsvDataAsync(context);
+                }
                 var remoteBirdJson = File.ReadAllText(remoteBirdPath);
                 return JsonConvert.DeserializeObject<Dictionary<string, PenguinData>>(remoteBirdJson);
             }
@@ -185,11 +187,15 @@ namespace BluePenguinMonitoring.Services
                 return null;
             }
         }
-        public Dictionary<int, BoxStatusRemoteData>? loadRemoteBoxInfoFromAppDataDir(Android.Content.Context? context)
+        public async Task<Dictionary<int, BoxStatusRemoteData>?> loadRemoteBoxInfoFromAppDataDir(Android.Content.Context? context)
         {
             try
             {
                 string remoteBoxDataPath = Path.Combine(context.FilesDir?.AbsolutePath, REMOTE_BOX_DATA_FILENAME);
+                if (!File.Exists(remoteBoxDataPath))
+                {
+                    await DownloadCsvDataAsync(context);
+                }
                 var remoteBoxDataJson = File.ReadAllText(remoteBoxDataPath);
                 return JsonConvert.DeserializeObject<Dictionary<int, BoxStatusRemoteData>>(remoteBoxDataJson);
             }

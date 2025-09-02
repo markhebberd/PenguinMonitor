@@ -56,7 +56,7 @@ namespace BluePenguinMonitoring
         private Button? _selectBoxButton;
         private Button? _nextBoxButton;
 
-        private LinearLayout? _scannedIdsContainer;
+        private LinearLayout? _scannedIdsLayout;
         private EditText? _adultsEditText;
         private EditText? _eggsEditText;
         private EditText? _chicksEditText;
@@ -230,14 +230,12 @@ namespace BluePenguinMonitoring
         private void InitializeGPS()
         {
             _locationManager = (LocationManager?)GetSystemService(LocationService);
-
             if (_locationManager?.IsProviderEnabled(LocationManager.GpsProvider) != true &&
                 _locationManager?.IsProviderEnabled(LocationManager.NetworkProvider) != true)
             {
                 Toast.MakeText(this, "Please enable location services for accurate positioning", ToastLength.Short)?.Show();
                 return;
             }
-
             if (CheckSelfPermission(Android.Manifest.Permission.AccessFineLocation) == Android.Content.PM.Permission.Granted)
             {
                 _locationManager?.RequestLocationUpdates(LocationManager.GpsProvider, 1000, 1, this);
@@ -299,7 +297,6 @@ namespace BluePenguinMonitoring
         private void OnEidDataReceived(string eidData)
         {
             AddScannedId(eidData);
-            SaveCurrentBoxData();
             _isBoxLocked = false;
             DrawPageLayouts();
         }
@@ -663,8 +660,8 @@ namespace BluePenguinMonitoring
             _ = Task.Run(async () =>
             {
                 await _dataStorageService.DownloadCsvDataAsync(this);
-                _remotePenguinData = _dataStorageService.loadRemotePengInfoFromAppDataDir(this );
-                _remoteBoxData = _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
+                _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
+                _remoteBoxData = await _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
                 new Handler(Looper.MainLooper).Post(() =>
                {
                    DrawPageLayouts();
@@ -1331,7 +1328,7 @@ namespace BluePenguinMonitoring
                     if (_chicksEditText != null) _chicksEditText.Text = boxData.Chicks.ToString();
                     SetSelectedGateStatus(boxData.GateStatus);
                     if (_notesEditText != null) _notesEditText.Text = boxData.Notes;
-                    UpdateScannedIdsDisplay(boxData.ScannedIds);
+                    buildScannedIdsLayout(boxData.ScannedIds);
                 }
                 else
                 {
@@ -1340,7 +1337,7 @@ namespace BluePenguinMonitoring
                     if (_chicksEditText != null) _chicksEditText.Text = "0";
                     SetSelectedGateStatus(null);
                     if (_notesEditText != null) _notesEditText.Text = "";
-                    UpdateScannedIdsDisplay(new List<ScanRecord>());
+                    buildScannedIdsLayout(new List<ScanRecord>());
                 }
 
                 foreach (var editText in editTexts)
@@ -1476,16 +1473,16 @@ namespace BluePenguinMonitoring
             _dataCard.AddView(_interestingBoxTextView);
 
             // Scanned birds container
-            _scannedIdsContainer = new LinearLayout(this)
+            _scannedIdsLayout = new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Vertical
             };
-            _scannedIdsContainer.SetPadding(16, 16, 16, 16);
-            _scannedIdsContainer.Background = _uiFactory.CreateRoundedBackground(UIFactory.TEXT_FIELD_BACKGROUND_COLOR, 8);
+            _scannedIdsLayout.SetPadding(16, 16, 16, 16);
+            _scannedIdsLayout.Background = _uiFactory.CreateRoundedBackground(UIFactory.TEXT_FIELD_BACKGROUND_COLOR, 8);
             var idsParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             idsParams.SetMargins(0, 0, 0, 16);
-            _scannedIdsContainer.LayoutParameters = idsParams;
-            _dataCard.AddView(_scannedIdsContainer);
+            _scannedIdsLayout.LayoutParameters = idsParams;
+            _dataCard.AddView(_scannedIdsLayout);
 
             // Headings row: Adults, Eggs, Chicks, Gate Status
             var headingsLayout = new LinearLayout(this)
@@ -1801,12 +1798,12 @@ namespace BluePenguinMonitoring
             }
             SaveToAppDataDir();
         }
-        private void UpdateScannedIdsDisplay(List<ScanRecord> scans)
+        private void buildScannedIdsLayout(List<ScanRecord> scans)
         {
-            if (_scannedIdsContainer == null) return;
+            if (_scannedIdsLayout == null) return;
 
             // Clear existing views
-            _scannedIdsContainer.RemoveAllViews();
+            _scannedIdsLayout.RemoveAllViews();
 
             if (scans.Count == 0)
             {
@@ -1816,7 +1813,7 @@ namespace BluePenguinMonitoring
                     TextSize = 14
                 };
                 emptyText.SetTextColor(UIFactory.TEXT_SECONDARY);
-                _scannedIdsContainer.AddView(emptyText);
+                _scannedIdsLayout.AddView(emptyText);
             }
             else
             {
@@ -1831,14 +1828,14 @@ namespace BluePenguinMonitoring
                 var headerParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
                 headerParams.SetMargins(0, 0, 0, 12);
                 headerText.LayoutParameters = headerParams;
-                _scannedIdsContainer.AddView(headerText);
+                _scannedIdsLayout.AddView(headerText);
 
                 // Individual scan records with delete buttons
                 for (int i = 0; i < scans.Count; i++)
                 {
                     var scan = scans[i];
                     var scanLayout = CreateScanRecordView(scan, i);
-                    _scannedIdsContainer.AddView(scanLayout);
+                    _scannedIdsLayout.AddView(scanLayout);
                 }
             }
 
@@ -1885,7 +1882,7 @@ namespace BluePenguinMonitoring
 
             manualInputLayout.AddView(_manualScanEditText);
             manualInputLayout.AddView(addButton);
-            _scannedIdsContainer.AddView(manualInputLayout);
+            _scannedIdsLayout.AddView(manualInputLayout);
         }
 
         private LinearLayout CreateScanRecordView(ScanRecord scan, int index)
@@ -2020,7 +2017,8 @@ namespace BluePenguinMonitoring
                                 _chicksEditText.Text = "" + Math.Max(0, int.Parse(_chicksEditText.Text ?? "0") - 1);
                             }
                             SaveCurrentBoxData();
-                            UpdateScannedIdsDisplay(boxData.ScannedIds);
+                            //buildScannedIdsLayout(boxData.ScannedIds);
+                            DrawPageLayouts();
 
                             Toast.MakeText(this, $"🗑️ Bird {scanToDelete.BirdId} deleted from Box {_currentBox}", ToastLength.Short)?.Show();
                         }
@@ -2128,7 +2126,8 @@ namespace BluePenguinMonitoring
                             }
 
                             SaveCurrentBoxData();
-                            UpdateScannedIdsDisplay(currentBoxData.ScannedIds);
+                            //buildScannedIdsLayout(currentBoxData.ScannedIds);
+                            DrawPageLayouts();
                             Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} moved from Box {_currentBox} to Box {targetBox}", ToastLength.Long)?.Show();
                         }
                     }
@@ -2137,7 +2136,7 @@ namespace BluePenguinMonitoring
             );
         }
 
-        private void LoadFromAppDataDir()
+        private async void LoadFromAppDataDir()
         {
             try
             {
@@ -2146,8 +2145,8 @@ namespace BluePenguinMonitoring
                     return;
 
                 // Load remote penguin data.
-                _remotePenguinData = _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
-                _remoteBoxData = _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
+                _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
+                _remoteBoxData = await _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
                 if (_remotePenguinData != null && _remoteBoxData != null)
                 {
                     Toast.MakeText(this, $"🐧 {_remotePenguinData.Count} bird & {_remoteBoxData.Count} box status loaded.", ToastLength.Short)?.Show();
@@ -2157,6 +2156,7 @@ namespace BluePenguinMonitoring
                 var appState = _dataStorageService.LoadFromAppDataDir(internalPath);
                 if (appState != null)
                 {
+                    DrawPageLayouts();
                     _currentBox = appState.CurrentBox;
                     _boxDataStorage = appState.BoxData ?? new Dictionary<int, BoxData>();
                     Toast.MakeText(this, $"📱 Data restored...", ToastLength.Short)?.Show();
@@ -2267,13 +2267,10 @@ namespace BluePenguinMonitoring
                 };
 
                 boxData.ScannedIds.Add(scanRecord);
-
-                SaveToAppDataDir();
+                SaveCurrentBoxData();
 
                 RunOnUiThread(() =>
                 {
-                    UpdateScannedIdsDisplay(boxData.ScannedIds);
-                    
                     // Enhanced toast message with life stage info
                     string toastMessage = $"🐧 Bird {shortId} added to Box {_currentBox}";
                     if (_remotePenguinData.TryGetValue(shortId, out var penguin))
@@ -2284,13 +2281,11 @@ namespace BluePenguinMonitoring
                             toastMessage += $" (+1 Adult)";
                             _adultsEditText.Text = (int.Parse(_adultsEditText.Text ?? "0") + 1).ToString();
                             SaveCurrentBoxData();
-                            DrawPageLayouts();
                         }
                         else if (penguin.LastKnownLifeStage == LifeStage.Chick)
                         {
                             _chicksEditText.Text = (int.Parse(_chicksEditText.Text ?? "0") + 1).ToString();
                             SaveCurrentBoxData();
-                            DrawPageLayouts();
                             toastMessage += $" (+1 Chick)";
                         }
                         else
@@ -2304,6 +2299,7 @@ namespace BluePenguinMonitoring
                         toastMessage += ", Unknown scan ID!";
                         triggerAlertAsync();
                     }
+                    DrawPageLayouts();
                     Toast.MakeText(this, toastMessage, ToastLength.Short)?.Show();
                 });
             }
@@ -2621,7 +2617,6 @@ namespace BluePenguinMonitoring
                 _manualScanEditText.RequestFocus();
                 return;
             }
-
             AddScannedId(cleanInput);
         }
         private void OnDataClick(object? sender, EventArgs e)
