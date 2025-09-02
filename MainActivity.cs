@@ -99,7 +99,7 @@ namespace BluePenguinMonitoring
         private CheckBox _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int versionNumber = 12;
+        private static int versionNumber = 13;
         private static int numberMonitorBoxes = 156;
 
         //multibox View
@@ -1306,10 +1306,8 @@ namespace BluePenguinMonitoring
                 {
                     _dataCardTitleText.Text = $"Box {_currentBox}";
                 }
-
-
                 _interestingBoxTextView.Visibility = ViewStates.Gone;
-                if(_remoteBoxData.ContainsKey(_currentBox) && !string.IsNullOrWhiteSpace(_remoteBoxData[_currentBox].PersistentNotes))
+                if(null != _remoteBoxData && _remoteBoxData.ContainsKey(_currentBox) && !string.IsNullOrWhiteSpace(_remoteBoxData[_currentBox].PersistentNotes))
                 {
                     _interestingBoxTextView.Text = "💡 Note: " + _remoteBoxData[_currentBox].PersistentNotes;
                     _interestingBoxTextView.Visibility = ViewStates.Visible;
@@ -1472,7 +1470,7 @@ namespace BluePenguinMonitoring
 
             _interestingBoxTextView = new TextView(this)
             {
-                Text = _remoteBoxData[_currentBox].PersistentNotes
+                //Text = _remoteBoxData[_currentBox].PersistentNotes
             };
             _interestingBoxTextView.Visibility = ViewStates.Gone;
             _dataCard.AddView(_interestingBoxTextView);
@@ -1905,7 +1903,7 @@ namespace BluePenguinMonitoring
             Color backgroundColor;
             string additionalInfo = "";
             
-            if (_remotePenguinData.TryGetValue(scan.BirdId, out var penguinData))
+            if (null != _remotePenguinData && _remotePenguinData.TryGetValue(scan.BirdId, out var penguinData))
             {
                 // Penguin found in remote data - prioritize life stage over sex
                 if (penguinData.LastKnownLifeStage == LifeStage.Chick)
