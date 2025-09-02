@@ -18,6 +18,7 @@ namespace BluePenguinMonitoring.UI.Factories
         public static readonly Color DANGER_COLOR = Color.ParseColor("#F44336");    // red
         public static readonly Color TEXT_FIELD_BACKGROUND_COLOR = Color.ParseColor("#F0F0F0");
         public static readonly Color BACKGROUND_COLOR = Color.LightGray;
+        public static readonly Color BORDER_COLOUR = Color.ParseColor("#E0E0E0");
         public static readonly Color CARD_COLOR = Color.White;
         public static readonly Color TEXT_PRIMARY = Color.ParseColor("#212121");
         public static readonly Color TEXT_SECONDARY = Color.ParseColor("#757575");
@@ -61,15 +62,16 @@ namespace BluePenguinMonitoring.UI.Factories
             var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             cardParams.SetMargins(0, 0, 0, 10);
             card.LayoutParameters = cardParams;
+            card.SetGravity( GravityFlags.Center);
 
             return card;
         }
-        public GradientDrawable CreateCardBackground(int borderWidth=1)
+        public GradientDrawable CreateCardBackground(int borderWidth = 1, Color? borderColour = null)
         {
             var drawable = new GradientDrawable();
             drawable.SetColor(CARD_COLOR);
-            drawable.SetCornerRadius(12 * _context.Resources?.DisplayMetrics?.Density ?? 12);
-            drawable.SetStroke(borderWidth, Color.ParseColor("#E0E0E0"));
+            drawable.SetCornerRadius(12 * (_context.Resources?.DisplayMetrics?.Density ?? 1));
+            drawable.SetStroke(borderWidth, borderColour ?? UIFactory.BORDER_COLOUR);
 
             return drawable;
         }

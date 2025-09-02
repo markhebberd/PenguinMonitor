@@ -73,16 +73,11 @@ namespace BluePenguinMonitoring
         // Services
         private UIFactory _uiFactory;
         private DataStorageService _dataStorageService = new DataStorageService();
-        private CsvDataService _csvDataService = new CsvDataService();
-
-        // HTTP client for CSV downloads
-        private static readonly HttpClient _httpClient = new HttpClient();
-        private const string GOOGLE_SHEETS_URL = "https://docs.google.com/spreadsheets/d/1A2j56iz0_VNHiWNJORAzGDqTbZsEd76j-YI_gQZsDEE";
 
         // Data storage
         private Dictionary<int, BoxData> _boxDataStorage = new Dictionary<int, BoxData>();
-        private List<CsvRowData> _downloadedCsvData = new List<CsvRowData>();
-        private Dictionary<string, PenguinData> _remotePenguinData = new Dictionary<string, PenguinData>();
+        private Dictionary<string, PenguinData> _remotePenguinData ;
+        private Dictionary<int, BoxStatusRemoteData> _remoteBoxData;
 
         private int _currentBox = 1;
 
@@ -105,7 +100,19 @@ namespace BluePenguinMonitoring
 
         //Lazy versioning.
         private static int versionNumber = 10;
+
+        //multibox View
         private LinearLayout _multiBoxViewCard;
+        private LinearLayout _multiboxBoxFilterCard;
+        private bool _showMultiboxFilterCard;
+        private bool _showAllBoxesInMultiBoxView;
+        private bool _showBoxesWithDataInMultiBoxView;
+        private bool _showUnlikleyBoxesInMultiBoxView;
+        private bool _showPotentialBoxesInMultiBoxView;
+        private bool _showConfidentBoxesInMultiBoxView;
+        private bool _showInterestingBoxesInMultiBoxView;
+        private bool _showSingleEggBoxesInMultiboxView;
+
 
         // ===== Multi-page menu state =====
         private readonly (string Text, UIFactory.selectedPage Page)[] _menuItems = new[]
@@ -114,12 +121,14 @@ namespace BluePenguinMonitoring
             ("Single Box Data",  UIFactory.selectedPage.BoxDataSingle),
             ("📊 Data Overview", UIFactory.selectedPage.BoxDataMany),
          };
-        // Pages currently visible (start with Single Box)
+        // Pages currently visible at app start
         private HashSet<UIFactory.selectedPage> _visiblePages = new HashSet<UIFactory.selectedPage>
         {
             UIFactory.selectedPage.BoxDataSingle,
             UIFactory.selectedPage.BoxDataMany
         };
+        private TextView _interestingBoxTextView;
+
         protected override void OnCreate(Bundle? savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
@@ -326,11 +335,11 @@ namespace BluePenguinMonitoring
                 if (!CheckExternalStoragePermissions())
                 {
                     var sdkVersion = (int)Android.OS.Build.VERSION.SdkInt;
-                    
+
                     if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.R) // Android 11+
                     {
                         Toast.MakeText(this, "⚠️ Android 11+ detected!\n\nFor file access, please:\n1. Go to Settings > Apps > BluePenguinMonitoring\n2. Enable 'All files access'", ToastLength.Long)?.Show();
-                        
+
                         // Try to open the manage storage settings
                         try
                         {
@@ -347,7 +356,7 @@ namespace BluePenguinMonitoring
                     else
                     {
                         Toast.MakeText(this, "Storage permission required to load files. Please grant permission and try again.", ToastLength.Long)?.Show();
-                        
+
                         // Request permission if not granted (Android 6-10)
                         if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.M)
                         {
@@ -371,12 +380,12 @@ namespace BluePenguinMonitoring
                     var intent = new Intent(Intent.ActionMediaScannerScanFile);
                     intent.SetData(Android.Net.Uri.FromFile(new Java.IO.File(downloadsPath)));
                     SendBroadcast(intent);
-                    
+
                     // Also try scanning the entire Downloads directory
                     var mediaScanIntent = new Intent(Intent.ActionMediaMounted);
                     mediaScanIntent.SetData(Android.Net.Uri.FromFile(new Java.IO.File(downloadsPath)));
                     SendBroadcast(mediaScanIntent);
-                    
+
                     // Give it a moment to scan
                     System.Threading.Thread.Sleep(500);
                 }
@@ -389,18 +398,18 @@ namespace BluePenguinMonitoring
                 var allFiles = Directory.GetFiles(downloadsPath, "*", SearchOption.TopDirectoryOnly);
                 System.Diagnostics.Debug.WriteLine($"Downloads path: {downloadsPath}");
                 System.Diagnostics.Debug.WriteLine($"Total files found: {allFiles.Length}");
-                
+
                 var debugInfo = new System.Text.StringBuilder();
                 debugInfo.AppendLine($"📂 Downloads: {allFiles.Length} files found");
                 debugInfo.AppendLine($"🤖 Android API: {(int)Android.OS.Build.VERSION.SdkInt}");
-                
+
                 foreach (var file in allFiles.Take(10)) // Show first 10 files
                 {
                     var fileInfo = new FileInfo(file);
                     System.Diagnostics.Debug.WriteLine($"File: {fileInfo.Name}, Size: {fileInfo.Length}, Created: {fileInfo.CreationTime}, LastWrite: {fileInfo.LastWriteTime}");
                     debugInfo.AppendLine($"• {fileInfo.Name} ({fileInfo.Length / 1024}KB)");
                 }
-                
+
                 if (allFiles.Length > 10)
                 {
                     debugInfo.AppendLine($"... and {allFiles.Length - 10} more files");
@@ -428,7 +437,7 @@ namespace BluePenguinMonitoring
                                  $"📋 Permissions: {(hasReadPermission ? "✅" : "❌")}\n" +
                                  $"🤖 Android API: {(int)Android.OS.Build.VERSION.SdkInt}\n" +
                                  $"📁 Path: {downloadsPath}";
-                    
+
                     Toast.MakeText(this, message, ToastLength.Long)?.Show();
                     return;
                 }
@@ -442,6 +451,21 @@ namespace BluePenguinMonitoring
                 System.Diagnostics.Debug.WriteLine($"LoadJsonDataFromFile error: {ex}");
             }
         }
+
+        private void LoadJsonDataFromServer()
+        {
+            try
+            {
+                string jsonReply = Backend.RequestServerResponse("PenguinReportRequest:");
+                LoadJsonData(jsonReply);
+            }
+            catch (Exception ex)
+            {
+                Toast.MakeText(this, $"❌ Failed to download from Marks Sever: {ex.Message}", ToastLength.Long)?.Show();
+                System.Diagnostics.Debug.WriteLine($"LoadJsonDataFromFile error: {ex}");
+            }
+        }
+
         private void ShowFileSelectionDialog(string[] files)
         {
             var fileNames = files.Select(f => 
@@ -476,9 +500,13 @@ namespace BluePenguinMonitoring
         }
         private void LoadJsonFileData(string filePath)
         {
+            var json = File.ReadAllText(filePath);
+            LoadJsonData(json);
+        }
+        private void LoadJsonData(string json)
+        {
             try
-            {
-                var json = File.ReadAllText(filePath);                
+            {         
                 var loadedData = JToken.Parse(json);
                 int boxCount = 0;
                 int birdCount = 0;
@@ -590,8 +618,7 @@ namespace BluePenguinMonitoring
                 // Refresh UI
                 DrawPageLayouts();
 
-                var fileName = System.IO.Path.GetFileName(filePath);
-                Toast.MakeText(this, $"✅ Loaded {boxCount} boxes, {birdCount} birds\nFrom: {fileName}", ToastLength.Long)?.Show();
+                Toast.MakeText(this, $"✅ Loaded {boxCount} boxes, {birdCount} birds", ToastLength.Long)?.Show();
             }
             catch (Exception ex)
             {
@@ -630,102 +657,18 @@ namespace BluePenguinMonitoring
                 ("OK", () => { } )
             );
         }
-        private async Task DownloadCsvDataAsync()
-        {
-            try
-            {
-                var csvUrl = _csvDataService.ConvertToGoogleSheetsCsvUrl(GOOGLE_SHEETS_URL);
-
-                RunOnUiThread(() =>
-                {
-                    Toast.MakeText(this, "📥 Downloading CSV data...", ToastLength.Short)?.Show();
-                });
-
-                var response = await _httpClient.GetAsync(csvUrl);
-                response.EnsureSuccessStatusCode();
-
-                var csvContent = await response.Content.ReadAsStringAsync();
-                var parsedData = _csvDataService.ParseCsvData(csvContent);
-
-                _downloadedCsvData = parsedData;
-
-                // Populate the penguin data dictionary
-                _remotePenguinData.Clear();
-                foreach (var row in parsedData)
-                {
-                    if (!string.IsNullOrEmpty(row.ScannedId) && row.ScannedId.Length >= 8)
-                    {
-                        // Extract the 8-digit ID (take last 8 characters to match scanning behavior)
-                        var cleanId = new string(row.ScannedId.Where(char.IsLetterOrDigit).ToArray());
-                        var eightDigitId = cleanId.Length >= 8 ? cleanId.Substring(cleanId.Length - 8).ToUpper() : cleanId.ToUpper();
-
-                        if (eightDigitId.Length == 8)
-                        {
-                            // Parse life stage
-                            var lifeStage = LifeStage.Adult; // Default
-                            if (!string.IsNullOrEmpty(row.LastKnownLifeStage))
-                            {
-                                if (Enum.TryParse<LifeStage>(row.LastKnownLifeStage, true, out var parsedLifeStage))
-                                {
-                                    lifeStage = parsedLifeStage;
-                                }
-                            }
-
-                            var penguinData = new PenguinData
-                            {
-                                ScannedId = eightDigitId,
-                                LastKnownLifeStage = lifeStage,
-                                Sex = row.Sex ?? "",
-                                VidForScanner = row.VidForScanner ?? ""
-                            };
-
-                            _remotePenguinData[eightDigitId] = penguinData;
-                        }
-                    }
-                }
-
-                // Save the remote penguin data to internal storage
-                SaveRemotePenguinDataToInternalStorage();
-
-                RunOnUiThread(() =>
-                {
-                    Toast.MakeText(this, $"✅ Downloaded {parsedData.Count} rows, {_remotePenguinData.Count} penguin records", ToastLength.Short)?.Show();
-                    DrawPageLayouts();
-                });
-            }
-            catch (Exception ex)
-            {
-                RunOnUiThread(() =>
-                {
-                    Toast.MakeText(this, $"❌ Download failed: {ex.Message}", ToastLength.Long)?.Show();
-                });
-            }
-        }
         private void OnDownloadCsvClick(object? sender, EventArgs e)
         {
-            _ = Task.Run(async () => await DownloadCsvDataAsync());
-        }
-        private void SaveRemotePenguinDataToInternalStorage()
-        {
-            try
+            _ = Task.Run(async () =>
             {
-                var internalPath = FilesDir?.AbsolutePath;
-                if (!string.IsNullOrEmpty(internalPath))
-                {
-                    _dataStorageService.cacheRemotePengInfoToAppDataDir(internalPath, _remotePenguinData);
-                    RunOnUiThread(() =>
-                    {
-                        Toast.MakeText(this, $"💾 Bird stats saved! ({_remotePenguinData.Count} records)", ToastLength.Short)?.Show();
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                RunOnUiThread(() =>
-                {
-                    Toast.MakeText(this, $"❌ Failed to save bird stats: {ex.Message}", ToastLength.Long)?.Show();
-                });
-            }
+                await _dataStorageService.DownloadCsvDataAsync(this);
+                _remotePenguinData = _dataStorageService.loadRemotePengInfoFromAppDataDir(this );
+                _remoteBoxData = _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
+                new Handler(Looper.MainLooper).Post(() =>
+               {
+                   DrawPageLayouts();
+               });
+            });
         }
         private void CreateDataRecordingUI()
         {
@@ -819,6 +762,8 @@ namespace BluePenguinMonitoring
             CreateBoxDataCard();
 
             //Create Multi box view card
+            _showMultiboxFilterCard = false;
+            _showBoxesWithDataInMultiBoxView = true;
             createMultiBoxViewCard();
 
             parentLinearLayout.AddView(_settingsCard);
@@ -875,6 +820,23 @@ namespace BluePenguinMonitoring
             {
                 _multiBoxViewCard.RemoveAllViews();
             }
+            var headerCard = _uiFactory.CreateCard(Android.Widget.Orientation.Horizontal);
+
+            var menuButton = new ImageButton(this)
+            {
+                LayoutParameters = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WrapContent,
+                    ViewGroup.LayoutParams.WrapContent)
+            };
+            menuButton.SetPadding(0, 0, 0, 0);
+            menuButton.SetImageResource(Android.Resource.Drawable.IcMenuManage); // Use built-in menu icon
+            menuButton.SetBackgroundColor(Color.Transparent); // No background
+            menuButton.Click += (sender, e) =>
+            {
+                _showMultiboxFilterCard = !_showMultiboxFilterCard;
+                DrawPageLayouts();
+            };
+            headerCard.AddView(menuButton);
 
             TextView multiBoxTitle = new TextView(this)
             {
@@ -884,25 +846,122 @@ namespace BluePenguinMonitoring
             };
             multiBoxTitle.SetTextColor(Color.Black);
             multiBoxTitle.SetPadding(10, 10, 10, 20);
-            _multiBoxViewCard.AddView(multiBoxTitle);
+
+
+            headerCard.AddView(multiBoxTitle);
+            _multiBoxViewCard.AddView(headerCard);
+
+            _multiboxBoxFilterCard = new LinearLayout(this)
+            {
+                Orientation = Android.Widget.Orientation.Vertical
+            };
+            CheckBox showAllBoxesInMultiBoxView = new CheckBox(this)
+            {
+                Text = "Show all boxes",
+                Checked = _showAllBoxesInMultiBoxView
+            };
+            showAllBoxesInMultiBoxView.SetTextColor(Color.Black);
+            showAllBoxesInMultiBoxView.Click += (s, e) =>
+            {
+                _showAllBoxesInMultiBoxView = showAllBoxesInMultiBoxView.Checked;
+                DrawPageLayouts();
+            };
+            _multiboxBoxFilterCard.AddView(showAllBoxesInMultiBoxView);
+
+            CheckBox showBoxesWithDataInMultiboxView = new CheckBox(this)
+            {
+                Text = "Show boxes with data",
+                Checked = _showBoxesWithDataInMultiBoxView
+            };
+            showBoxesWithDataInMultiboxView.SetTextColor(Color.Black);
+            showBoxesWithDataInMultiboxView.Click += (s, e) =>
+            {
+                _showBoxesWithDataInMultiBoxView = showBoxesWithDataInMultiboxView.Checked;
+                DrawPageLayouts();
+            };
+            _multiboxBoxFilterCard.AddView(showBoxesWithDataInMultiboxView);
+
+            CheckBox showUnlikelyBoxesInMultiboxView = new CheckBox(this)
+            {
+                Text = "Show unlikley boxes",
+                Checked = _showUnlikleyBoxesInMultiBoxView,
+            };
+            showUnlikelyBoxesInMultiboxView.SetTextColor(Color.Black);
+            showUnlikelyBoxesInMultiboxView.Click += (s, e) =>
+            {
+                _showUnlikleyBoxesInMultiBoxView = showUnlikelyBoxesInMultiboxView.Checked;
+                DrawPageLayouts();
+            };
+            _multiboxBoxFilterCard.AddView(showUnlikelyBoxesInMultiboxView);
+
+            CheckBox showPotentialBoxesInMultiboxView = new CheckBox(this)
+            {
+                Text = "Show potential boxes",
+                Checked = _showPotentialBoxesInMultiBoxView,
+            };
+            showPotentialBoxesInMultiboxView.SetTextColor(Color.Black);
+            showPotentialBoxesInMultiboxView.Click += (s, e) =>
+            {
+                _showPotentialBoxesInMultiBoxView = showPotentialBoxesInMultiboxView.Checked;
+                DrawPageLayouts();
+            };
+            _multiboxBoxFilterCard.AddView(showPotentialBoxesInMultiboxView);
+
+            CheckBox showConfidentBoxesInMultiboxView = new CheckBox(this)
+            {
+                Text = "Show confident boxes",
+                Checked = _showConfidentBoxesInMultiBoxView,
+            };
+            showConfidentBoxesInMultiboxView.SetTextColor(Color.Black);
+            showConfidentBoxesInMultiboxView.Click += (s, e) =>
+            {
+                _showConfidentBoxesInMultiBoxView = showConfidentBoxesInMultiboxView.Checked;
+                DrawPageLayouts();
+            };
+            _multiboxBoxFilterCard.AddView(showConfidentBoxesInMultiboxView);
+
+            CheckBox showInterestingBoxesInMultiboxView = new CheckBox(this)
+            {
+                Text = "Show interesting boxes",
+                Checked = _showInterestingBoxesInMultiBoxView
+            };
+            showInterestingBoxesInMultiboxView.SetTextColor(Color.Black);
+            showInterestingBoxesInMultiboxView.Click += (s, e) =>
+            {
+                _showInterestingBoxesInMultiBoxView = showInterestingBoxesInMultiboxView.Checked;
+                DrawPageLayouts();
+            };
+            _multiboxBoxFilterCard.AddView(showInterestingBoxesInMultiboxView);
+
+            CheckBox showSingleEggBoxesInMultiboxView = new CheckBox(this)
+            {
+                Text = "Show single egg boxes",
+                Checked = _showSingleEggBoxesInMultiboxView
+            };
+            showSingleEggBoxesInMultiboxView.SetTextColor(Color.Black);
+            showSingleEggBoxesInMultiboxView.Click += (s, e) =>
+            {
+                _showSingleEggBoxesInMultiboxView = showSingleEggBoxesInMultiboxView.Checked;
+                DrawPageLayouts();
+            };
+            _multiboxBoxFilterCard.AddView(showSingleEggBoxesInMultiboxView);
+
+            _multiBoxViewCard.AddView(_multiboxBoxFilterCard);
+            _multiboxBoxFilterCard.Visibility = _showMultiboxFilterCard ? ViewStates.Visible : ViewStates.Gone;
 
             int boxesPerRow = 3;
             LinearLayout? currentRow = null;
 
-            int count = 0;
-
-            foreach (var kvp in _boxDataStorage.OrderBy(k => k.Key))
+            int visibleBoxCount = 0;
+            for (int boxNumber = 1; boxNumber <= 150; boxNumber++)
             {
-                var boxNumber = kvp.Key;
-                var boxData = kvp.Value;
-
-                if (count % boxesPerRow == 0)
+                if (visibleBoxCount % boxesPerRow == 0)
                 {
                     currentRow = new LinearLayout(this)
                     {
                         Orientation = Android.Widget.Orientation.Horizontal
                     };
-                    currentRow.SetPadding(0, 0, 0, 16);
+                    currentRow.SetPadding(0, 0, 0, 0);
 
                     var rowParams = new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MatchParent,
@@ -911,17 +970,82 @@ namespace BluePenguinMonitoring
 
                     _multiBoxViewCard.AddView(currentRow);
                 }
-
-                var card = CreateBoxSummaryCard(boxNumber, boxData);
-                currentRow?.AddView(card);
-                count++;
+                if (_boxDataStorage.ContainsKey(boxNumber) && (_showBoxesWithDataInMultiBoxView || _showAllBoxesInMultiBoxView))
+                {
+                    var card = CreateBoxSummaryCard(boxNumber, _boxDataStorage[boxNumber]);                    
+                    currentRow?.AddView(card);
+                    visibleBoxCount++;
+                    currentRow.SetPadding(0, 0, 0, 10);
+                }
+                else
+                {
+                    if (_remoteBoxData != null &&  _remoteBoxData.ContainsKey(boxNumber))
+                    {
+                        if (boxNumber == 39)
+                            ;
+                        bool showBox = _showAllBoxesInMultiBoxView
+                                        || _showConfidentBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON"
+                                        || _showPotentialBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "POT"
+                                        || _showUnlikleyBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL"
+                                        || _showInterestingBoxesInMultiBoxView && !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes)
+                                        || _showSingleEggBoxesInMultiboxView && _remoteBoxData[boxNumber].numEggs() ==1;
+                        if(showBox)
+                        {
+                            var card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber]);
+                            currentRow?.AddView(card);
+                            currentRow.SetPadding(0, 0, 0, 10);
+                            visibleBoxCount++;
+                        }
+                    }
+                }
             }
-            if (count == 0)
+            if (visibleBoxCount == 0)
             {
                 var empty = new TextView(this) { Text = "No boxes yet — scan or load data." };
                 _multiBoxViewCard.AddView(empty);
             }
         }
+
+        private View? CreateBoxRemoteSummaryCard(int boxNumber, BoxStatusRemoteData boxData)
+        {
+            var card = new LinearLayout(this)
+            {
+                Orientation = Android.Widget.Orientation.Vertical
+            };
+            card.SetPadding(10, 10, 10, 10);
+            card.Background = _uiFactory.CreateCardBackground(borderWidth: 10, UIFactory.WARNING_COLOR);
+
+            var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent, 1f);
+            cardParams.SetMargins(8, 0, 8, 0);
+            card.LayoutParameters = cardParams;
+
+            var title = new TextView(this)
+            {
+                Text = $"Box {boxNumber}",
+                Gravity = GravityFlags.Center,
+                TextSize = 16
+            };
+            title.SetTypeface(Typeface.DefaultBold, TypefaceStyle.Normal);
+            title.SetTextColor(Color.Black);
+
+            var summary = new TextView(this)
+            {
+                Text = boxData.boxMiniStatus(),
+                Gravity = GravityFlags.Center,
+                TextSize = 14
+            };
+            summary.SetTextColor(Color.Black);
+
+            card.AddView(title);
+            card.AddView(summary);
+            card.Click += (sender, e) =>
+            {
+                JumpToBox(boxNumber);
+                ScrollToTop();
+            };
+            return card;
+        }
+
         private View? CreateBoxSummaryCard(int boxNumber, BoxData boxData)
         {
             var card = new LinearLayout(this)
@@ -1090,7 +1214,7 @@ namespace BluePenguinMonitoring
 
             return layout;
         }
-        private void DrawPageLayouts()
+        internal void DrawPageLayouts()
         {
             new Handler(Looper.MainLooper).Post(() =>
             {
@@ -1108,10 +1232,6 @@ namespace BluePenguinMonitoring
                     // Rebuild overview content each time it is visible
                     createMultiBoxViewCard();
                 }
-
-                // If single-box UI is not visible, we can skip the remainder (it only updates single-card widgets).
-                if (!showSingle) 
-                    return;
 
                 // Update lock icon
                 if (_lockIconView != null)
@@ -1147,6 +1267,17 @@ namespace BluePenguinMonitoring
                 if (_dataCardTitleText != null)
                 {
                     _dataCardTitleText.Text = $"Box {_currentBox}";
+                }
+
+
+                _interestingBoxTextView.Visibility = ViewStates.Gone;
+                if(_remoteBoxData.ContainsKey(_currentBox) && !string.IsNullOrWhiteSpace(_remoteBoxData[_currentBox].PersistentNotes))
+                {
+                    _interestingBoxTextView.Text = "💡 Note: " + _remoteBoxData[_currentBox].PersistentNotes;
+                    _interestingBoxTextView.Visibility = ViewStates.Visible;
+                    _interestingBoxTextView.Gravity = GravityFlags.Center;
+                    _interestingBoxTextView.SetBackgroundColor(UIFactory.BACKGROUND_COLOR);
+                    _interestingBoxTextView.SetTextColor(UIFactory.PRIMARY_DARK);
                 }
 
                 var editTexts = new[] { _adultsEditText, _eggsEditText, _chicksEditText, _notesEditText };
@@ -1240,7 +1371,6 @@ namespace BluePenguinMonitoring
                 _isBoxLocked = !_isBoxLocked;
                 if (!_isBoxLocked) 
                 {
-                    //Toast.MakeText(this, "🔓 Box unlocked for editing\nLock the box when done.", ToastLength.Short)?.Show();
                     DrawPageLayouts();
                 }
                 else 
@@ -1300,6 +1430,14 @@ namespace BluePenguinMonitoring
             _dataCardTitleLayout.AddView(_lockIconView);
 
             _dataCard.AddView(_dataCardTitleLayout);
+
+
+            _interestingBoxTextView = new TextView(this)
+            {
+                Text = _remoteBoxData[_currentBox].PersistentNotes
+            };
+            _interestingBoxTextView.Visibility = ViewStates.Gone;
+            _dataCard.AddView(_interestingBoxTextView);
 
             // Scanned birds container
             _scannedIdsContainer = new LinearLayout(this)
@@ -1972,11 +2110,11 @@ namespace BluePenguinMonitoring
                     return;
 
                 // Load remote penguin data.
-                var remotePenguinData = _dataStorageService.loadRemotePengInfoFromAppDataDir(internalPath);
-                if (remotePenguinData != null)
+                _remotePenguinData = _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
+                _remoteBoxData = _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
+                if (_remotePenguinData != null && _remoteBoxData != null)
                 {
-                    _remotePenguinData = remotePenguinData;
-                    Toast.MakeText(this, $"🐧 {_remotePenguinData.Count} bird records loaded", ToastLength.Short)?.Show();
+                    Toast.MakeText(this, $"🐧 {_remotePenguinData.Count} bird & {_remoteBoxData.Count} box status loaded.", ToastLength.Short)?.Show();
                 }
 
                 // Load main app data
@@ -2459,8 +2597,9 @@ namespace BluePenguinMonitoring
             var options = new string[] 
             {
                 "📊 Summary - View data overview",
-                "💾 Save Data - Export to file", 
-                "📂 Load Data - Import from file"
+                "💾 Save to file", 
+                "📂 Load from file",
+                "📂 Load from server"
             };
 
             var builder = new AlertDialog.Builder(this);
@@ -2478,6 +2617,9 @@ namespace BluePenguinMonitoring
                         break;
                     case 2: // Load Data
                         LoadJsonDataFromFile();
+                        break;
+                    case 3: // Load Data
+                        LoadJsonDataFromServer();
                         break;
                 }
             });

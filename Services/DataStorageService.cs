@@ -14,7 +14,15 @@ namespace BluePenguinMonitoring.Services
     public class DataStorageService
     {
         private const string AUTO_SAVE_FILENAME = "penguin_data_autosave.json";
-        private const string REMOTE_BIRD_DATA_FILENAME = "remotePenguinData.json";
+        internal const string REMOTE_BIRD_DATA_FILENAME = "remotePenguinData.json";
+        internal const string REMOTE_BOX_DATA_FILENAME = "remoteBoxData.json";
+
+        private CsvDataService _csvDataService = new CsvDataService();
+
+        // HTTP client for CSV downloads
+        private static readonly HttpClient _httpClient = new HttpClient();
+        internal const string ALL_PENGS_URL = "https://docs.google.com/spreadsheets/d/1A2j56iz0_VNHiWNJORAzGDqTbZsEd76j-YI_gQZsDEE";
+        internal const string BOX_STATUS_URL = "https://docs.google.com/spreadsheets/d/1B-jWzxb4PhbMerWD36jO3TysTCbNsZ9Lo0gldgYreLc";
 
         public void SaveDataToInternalStorage(string filesDir, AppDataState appState, Android.Content.Context context)
         {
@@ -60,7 +68,6 @@ namespace BluePenguinMonitoring.Services
                 System.Diagnostics.Debug.WriteLine($"Auto-save failed: {ex.Message}");
             }
         }
-
         public AppDataState? LoadFromAppDataDir(string filesDir)
         {
             try
@@ -81,37 +88,95 @@ namespace BluePenguinMonitoring.Services
                 return null;
             }
         }
-
-        public void cacheRemotePengInfoToAppDataDir(string filesDir, Dictionary<string, PenguinData> remotePenguinData)
+        internal async Task DownloadCsvDataAsync(Android.Content.Context? context)
         {
             try
             {
-                if (string.IsNullOrEmpty(filesDir))
-                    return;
+                var csvUrlBirds = _csvDataService.ConvertToGoogleSheetsCsvUrl(ALL_PENGS_URL);
+                var responseBirds = await _httpClient.GetAsync(csvUrlBirds);
+                responseBirds.EnsureSuccessStatusCode();
 
-                var json = JsonConvert.SerializeObject(remotePenguinData, Formatting.Indented);
-                var filePath = Path.Combine(filesDir, REMOTE_BIRD_DATA_FILENAME);
+                var csvContentBirds = await responseBirds.Content.ReadAsStringAsync();
+                var parsedDataBirds = _csvDataService.ParseBirdCsvData(csvContentBirds);
 
-                File.WriteAllText(filePath, json);
+                Dictionary<string, PenguinData> _remotePenguinData = new Dictionary<string, PenguinData>();
+                foreach (var row in parsedDataBirds)
+                {
+                    if (!string.IsNullOrEmpty(row.ScannedId) && row.ScannedId.Length >= 8)
+                    {
+                        // Extract the 8-digit ID (take last 8 characters to match scanning behavior)
+                        var cleanId = new string(row.ScannedId.Where(char.IsLetterOrDigit).ToArray());
+                        var eightDigitId = cleanId.Length >= 8 ? cleanId.Substring(cleanId.Length - 8).ToUpper() : cleanId.ToUpper();
+
+                        if (eightDigitId.Length == 8)
+                        {
+                            // Parse life stage
+                            var lifeStage = LifeStage.Adult; // Default
+                            if (!string.IsNullOrEmpty(row.LastKnownLifeStage))
+                            {
+                                if (Enum.TryParse<LifeStage>(row.LastKnownLifeStage, true, out var parsedLifeStage))
+                                {
+                                    lifeStage = parsedLifeStage;
+                                }
+                            }
+                            var penguinData = new PenguinData
+                            {
+                                ScannedId = eightDigitId,
+                                LastKnownLifeStage = lifeStage,
+                                Sex = row.Sex ?? "",
+                                VidForScanner = row.VidForScanner ?? ""
+                            };
+                            _remotePenguinData[eightDigitId] = penguinData;
+                        }
+                    }
+                }
+
+                // Save the remote penguin data to internal storage
+                var internalPath = context.FilesDir?.AbsolutePath;
+
+                var birdJson = JsonConvert.SerializeObject(_remotePenguinData, Formatting.Indented);
+                File.WriteAllText(Path.Combine(internalPath, REMOTE_BIRD_DATA_FILENAME), birdJson);
+
+
+
+                var csvUrl = _csvDataService.ConvertToGoogleSheetsCsvUrl(BOX_STATUS_URL);
+                var response = await _httpClient.GetAsync(csvUrl);
+                response.EnsureSuccessStatusCode();
+
+                var csvContent = await response.Content.ReadAsStringAsync();
+                List<BoxStatusRemoteData> parsedData = _csvDataService.ParseBoxCsvData(csvContent);
+
+                Dictionary<int, BoxStatusRemoteData> _remoteBoxData = new Dictionary<int, BoxStatusRemoteData>();
+                foreach (var row in parsedData)
+                {
+                    if ( row.boxNumber != null)
+                    {
+                        _remoteBoxData.Add(row.boxNumber, row);
+                    }
+                }
+
+                var boxJson = JsonConvert.SerializeObject(_remoteBoxData, Formatting.Indented);
+                File.WriteAllText(Path.Combine(context.FilesDir?.AbsolutePath, REMOTE_BOX_DATA_FILENAME), boxJson);
+
+                new Handler(Looper.MainLooper).Post(() =>
+                {
+                    Toast.MakeText(context, $"✅ Downloaded {_remotePenguinData.Count} penguin records, {_remoteBoxData.Count} box records", ToastLength.Short)?.Show();
+                });
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to save remote penguin data: {ex.Message}");
+                new Handler(Looper.MainLooper).Post(() =>
+                  {
+                      Toast.MakeText(context, $"❌ Download failed: {ex.Message}", ToastLength.Long)?.Show();
+                  });
             }
         }
-
-        public Dictionary<string, PenguinData>? loadRemotePengInfoFromAppDataDir(string filesDir)
+        public Dictionary<string, PenguinData>? loadRemotePengInfoFromAppDataDir(Android.Content.Context? context)
         {
             try
             {
-                if (string.IsNullOrEmpty(filesDir))
-                    return null;
-
-                var remoteBirdDataPath = Path.Combine(filesDir, REMOTE_BIRD_DATA_FILENAME);
-                if (!File.Exists(remoteBirdDataPath))
-                    return null;
-
-                var remoteBirdJson = File.ReadAllText(remoteBirdDataPath);
+                string remoteBirdPath = Path.Combine(context.FilesDir?.AbsolutePath, REMOTE_BIRD_DATA_FILENAME);
+                var remoteBirdJson = File.ReadAllText(remoteBirdPath);
                 return JsonConvert.DeserializeObject<Dictionary<string, PenguinData>>(remoteBirdJson);
             }
             catch (Exception ex)
@@ -120,7 +185,20 @@ namespace BluePenguinMonitoring.Services
                 return null;
             }
         }
-
+        public Dictionary<int, BoxStatusRemoteData>? loadRemoteBoxInfoFromAppDataDir(Android.Content.Context? context)
+        {
+            try
+            {
+                string remoteBoxDataPath = Path.Combine(context.FilesDir?.AbsolutePath, REMOTE_BOX_DATA_FILENAME);
+                var remoteBoxDataJson = File.ReadAllText(remoteBoxDataPath);
+                return JsonConvert.DeserializeObject<Dictionary<int, BoxStatusRemoteData>>(remoteBoxDataJson);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load remote box data: {ex.Message}");
+                return null;
+            }
+        }
         public void ClearInternalStorageData(string filesDir)
         {
             try

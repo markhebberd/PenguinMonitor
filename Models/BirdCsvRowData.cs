@@ -1,6 +1,6 @@
 namespace BluePenguinMonitoring.Models
 {
-    public class CsvRowData
+    public class BirdCsvRowData
     {
         public string Number { get; set; } = "";
         public string ScannedId { get; set; } = "";

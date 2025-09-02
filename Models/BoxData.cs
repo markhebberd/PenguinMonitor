@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Security.Cryptography.X509Certificates;
 
 namespace BluePenguinMonitoring.Models
 {
@@ -8,9 +9,9 @@ namespace BluePenguinMonitoring.Models
         public int Adults { get; set; } = 0;
         public int Eggs { get; set; } = 0;
         public int Chicks { get; set; } = 0;
-        public string? GateStatus { get; set; } = null; 
+        public string? GateStatus { get; set; } = null;
         public string Notes { get; set; } = "";
-        public DateTime whenDataCollectedUtc { get; set; } 
+        public DateTime whenDataCollectedUtc { get; set; }
         public string ToString()
         {
             string scannedIDs = "";
