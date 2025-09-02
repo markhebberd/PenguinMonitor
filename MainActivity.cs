@@ -99,7 +99,8 @@ namespace BluePenguinMonitoring
         private CheckBox _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int versionNumber = 11;
+        private static int versionNumber = 12;
+        private static int numberMonitorBoxes = 156;
 
         //multibox View
         private LinearLayout _multiBoxViewCard;
@@ -286,9 +287,9 @@ namespace BluePenguinMonitoring
                 Toast.MakeText(this, "Please lock the current box before navigating", ToastLength.Short)?.Show();
                 return;
             }
-            if (_currentBox < 150)
+            if (_currentBox < numberMonitorBoxes)
             {
-                NavigateToBox(_currentBox + 1, () => _currentBox < 150);
+                NavigateToBox(_currentBox + 1, () => _currentBox < numberMonitorBoxes);
             }
             else
             {
@@ -984,7 +985,7 @@ namespace BluePenguinMonitoring
             LinearLayout? currentRow = null;
 
             int visibleBoxCount = 0;
-            for (int boxNumber = 1; boxNumber <= 150; boxNumber++)
+            for (int boxNumber = 1; boxNumber <= numberMonitorBoxes; boxNumber++)
             {
                 if (visibleBoxCount % boxesPerRow == 0)
                 {
@@ -1022,7 +1023,11 @@ namespace BluePenguinMonitoring
                                         || _showSingleEggBoxesInMultiboxView && _remoteBoxData[boxNumber].numEggs() ==1;
                         if(showBox)
                         {
-                            var card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber]);
+                            View? card;
+                            if (_boxDataStorage.ContainsKey(boxNumber))
+                                card = CreateBoxSummaryCard(boxNumber, _boxDataStorage[boxNumber]);
+                            else
+                                card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber]);
                             currentRow?.AddView(card);
                             currentRow.SetPadding(0, 0, 0, 10);
                             visibleBoxCount++;
@@ -1101,7 +1106,9 @@ namespace BluePenguinMonitoring
 
             var summary = new TextView(this)
             {
-                Text = $"A:{boxData.Adults} C:{boxData.Chicks} E:{boxData.Eggs}",
+                Text = $"{string.Concat(Enumerable.Repeat("🐧", boxData.Adults))}" +
+                    $"{string.Concat(Enumerable.Repeat("🐣", boxData.Chicks))}" + 
+                    $"{string.Concat(Enumerable.Repeat("🥚", boxData.Eggs))}",
                 Gravity = GravityFlags.Center,
                 TextSize = 14
             };
@@ -1612,7 +1619,7 @@ namespace BluePenguinMonitoring
 
         private void OnNextBoxClick(object? sender, EventArgs e)
         {
-            NavigateToBox(_currentBox + 1, () => _currentBox < 150);
+            NavigateToBox(_currentBox + 1, () => _currentBox < numberMonitorBoxes);
         }
 
         private void NavigateToBox(int targetBox, Func<bool> canNavigate)
@@ -2037,7 +2044,7 @@ namespace BluePenguinMonitoring
             var input = new EditText(this)
             {
                 InputType = Android.Text.InputTypes.ClassNumber,
-                Hint = "Enter box number (1-150)"
+                Hint = $"Enter box number (1-{numberMonitorBoxes})"
             };
             input.SetTextColor(UIFactory.TEXT_PRIMARY);
 
@@ -2049,7 +2056,7 @@ namespace BluePenguinMonitoring
                 {
                     if (int.TryParse(input.Text, out int targetBox))
                     {
-                        if (targetBox >= 1 && targetBox <= 150)
+                        if (targetBox >= 1 && targetBox <= numberMonitorBoxes)
                         {
                             if (targetBox == _currentBox)
                             {
@@ -2062,7 +2069,7 @@ namespace BluePenguinMonitoring
                         }
                         else
                         {
-                            Toast.MakeText(this, "Box number must be between 1 and 150", ToastLength.Short)?.Show();
+                            Toast.MakeText(this, $"Box number must be between 1 and {numberMonitorBoxes}", ToastLength.Short)?.Show();
                         }
                     }
                     else
@@ -2518,17 +2525,17 @@ namespace BluePenguinMonitoring
 
             var dialog = new AlertDialog.Builder(this)
                 .SetTitle("Jump to Box")
-                .SetMessage("Enter box number (1–150):")
+                .SetMessage($"Enter box number (1–{numberMonitorBoxes}):")
                 .SetView(input)
                 .SetPositiveButton("Go", (s, e) =>
                 {
-                    if (int.TryParse(input.Text, out int targetBox) && targetBox >= 1 && targetBox <= 150)
+                    if (int.TryParse(input.Text, out int targetBox) && targetBox >= 1 && targetBox <= numberMonitorBoxes)
                     {
                         JumpToBox(targetBox);
                     }
                     else
                     {
-                        Toast.MakeText(this, "Box number must be between 1 and 150", ToastLength.Short)?.Show();
+                        Toast.MakeText(this, $"Box number must be between 1 and {numberMonitorBoxes}", ToastLength.Short)?.Show();
                     }
                 })
                 .SetNegativeButton("Cancel", (s, e) => { })
