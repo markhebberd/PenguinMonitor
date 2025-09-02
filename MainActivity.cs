@@ -1906,7 +1906,7 @@ namespace BluePenguinMonitoring
                 if (penguinData.LastKnownLifeStage == LifeStage.Chick)
                 {
                     backgroundColor = UIFactory.CHICK_BACKGROUND;
-                    additionalInfo = " 🐣"; // Chick emoji
+                    additionalInfo = " 🐣";
                 }
                 else if (penguinData.Sex.Equals("F", StringComparison.OrdinalIgnoreCase))
                 {
@@ -2017,9 +2017,7 @@ namespace BluePenguinMonitoring
                                 _chicksEditText.Text = "" + Math.Max(0, int.Parse(_chicksEditText.Text ?? "0") - 1);
                             }
                             SaveCurrentBoxData();
-                            //buildScannedIdsLayout(boxData.ScannedIds);
-                            DrawPageLayouts();
-
+                            buildScannedIdsLayout(boxData.ScannedIds);
                             Toast.MakeText(this, $"🗑️ Bird {scanToDelete.BirdId} deleted from Box {_currentBox}", ToastLength.Short)?.Show();
                         }
                     }
@@ -2126,8 +2124,7 @@ namespace BluePenguinMonitoring
                             }
 
                             SaveCurrentBoxData();
-                            //buildScannedIdsLayout(currentBoxData.ScannedIds);
-                            DrawPageLayouts();
+                            buildScannedIdsLayout(currentBoxData.ScannedIds);
                             Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} moved from Box {_currentBox} to Box {targetBox}", ToastLength.Long)?.Show();
                         }
                     }
