@@ -44,7 +44,7 @@ namespace BluePenguinMonitoring.UI.Factories
             BoxDataMany
         }
 
-        public LinearLayout CreateCard(Orientation orientation = Orientation.Vertical, int? padding = null)
+        public LinearLayout CreateCard(Orientation orientation = Orientation.Vertical, int? padding = null, int borderWidth = 1, Color? borderColour = null)
         {
             var card = new LinearLayout(_context)
             {
@@ -57,7 +57,7 @@ namespace BluePenguinMonitoring.UI.Factories
                 int pad = (int)padding;
                 card.SetPadding(pad, pad, pad, pad);
             }
-            card.Background = CreateCardBackground();
+            card.Background = CreateCardBackground(borderWidth, borderColour);
 
             var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             cardParams.SetMargins(0, 0, 0, 10);

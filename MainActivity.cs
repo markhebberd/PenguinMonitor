@@ -99,7 +99,7 @@ namespace BluePenguinMonitoring
         private CheckBox _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int versionNumber = 10;
+        private static int versionNumber = 11;
 
         //multibox View
         private LinearLayout _multiBoxViewCard;
@@ -613,7 +613,7 @@ namespace BluePenguinMonitoring
                     _currentBox = _boxDataStorage.Keys.Any() ? _boxDataStorage.Keys.Min() : 1;
                 }
 
-                SaveToAppDataDir();
+                //SaveToAppDataDir();
 
                 // Refresh UI
                 DrawPageLayouts();
@@ -851,13 +851,28 @@ namespace BluePenguinMonitoring
             headerCard.AddView(multiBoxTitle);
             _multiBoxViewCard.AddView(headerCard);
 
-            _multiboxBoxFilterCard = new LinearLayout(this)
+
+
+            _multiboxBoxFilterCard = _uiFactory.CreateCard(padding: 0, borderWidth: 4);
+            TextView filtersTitle = new TextView(this)
             {
-                Orientation = Android.Widget.Orientation.Vertical
+                Text = "Show Boxes",
+                TextSize = 16,
+                Gravity = GravityFlags.Center,
+                
             };
+            filtersTitle.SetTypeface(null, TypefaceStyle.Bold);
+            filtersTitle.SetTextColor(Color.Black);
+            _multiboxBoxFilterCard.AddView(filtersTitle);
+
+            var allAndDataFiltersLayout = new LinearLayout(this)
+            {
+                Orientation = Android.Widget.Orientation.Horizontal
+            };
+
             CheckBox showAllBoxesInMultiBoxView = new CheckBox(this)
             {
-                Text = "Show all boxes",
+                Text = "All",
                 Checked = _showAllBoxesInMultiBoxView
             };
             showAllBoxesInMultiBoxView.SetTextColor(Color.Black);
@@ -866,24 +881,32 @@ namespace BluePenguinMonitoring
                 _showAllBoxesInMultiBoxView = showAllBoxesInMultiBoxView.Checked;
                 DrawPageLayouts();
             };
-            _multiboxBoxFilterCard.AddView(showAllBoxesInMultiBoxView);
+            allAndDataFiltersLayout.AddView(showAllBoxesInMultiBoxView);
 
             CheckBox showBoxesWithDataInMultiboxView = new CheckBox(this)
             {
-                Text = "Show boxes with data",
+                Text = "With data",
                 Checked = _showBoxesWithDataInMultiBoxView
+                
             };
             showBoxesWithDataInMultiboxView.SetTextColor(Color.Black);
             showBoxesWithDataInMultiboxView.Click += (s, e) =>
             {
                 _showBoxesWithDataInMultiBoxView = showBoxesWithDataInMultiboxView.Checked;
+                if(_showBoxesWithDataInMultiBoxView) _showAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
-            _multiboxBoxFilterCard.AddView(showBoxesWithDataInMultiboxView);
+            allAndDataFiltersLayout.AddView(showBoxesWithDataInMultiboxView);
+            _multiboxBoxFilterCard.AddView(allAndDataFiltersLayout);
 
+
+            var breedingChanceFilterLayout= new LinearLayout(this)
+            {
+                Orientation = Android.Widget.Orientation.Horizontal
+            };
             CheckBox showUnlikelyBoxesInMultiboxView = new CheckBox(this)
             {
-                Text = "Show unlikley boxes",
+                Text = "Unlikley",
                 Checked = _showUnlikleyBoxesInMultiBoxView,
             };
             showUnlikelyBoxesInMultiboxView.SetTextColor(Color.Black);
@@ -892,11 +915,11 @@ namespace BluePenguinMonitoring
                 _showUnlikleyBoxesInMultiBoxView = showUnlikelyBoxesInMultiboxView.Checked;
                 DrawPageLayouts();
             };
-            _multiboxBoxFilterCard.AddView(showUnlikelyBoxesInMultiboxView);
+            breedingChanceFilterLayout.AddView(showUnlikelyBoxesInMultiboxView);
 
             CheckBox showPotentialBoxesInMultiboxView = new CheckBox(this)
             {
-                Text = "Show potential boxes",
+                Text = "Potential",
                 Checked = _showPotentialBoxesInMultiBoxView,
             };
             showPotentialBoxesInMultiboxView.SetTextColor(Color.Black);
@@ -905,11 +928,11 @@ namespace BluePenguinMonitoring
                 _showPotentialBoxesInMultiBoxView = showPotentialBoxesInMultiboxView.Checked;
                 DrawPageLayouts();
             };
-            _multiboxBoxFilterCard.AddView(showPotentialBoxesInMultiboxView);
+            breedingChanceFilterLayout.AddView(showPotentialBoxesInMultiboxView);
 
             CheckBox showConfidentBoxesInMultiboxView = new CheckBox(this)
             {
-                Text = "Show confident boxes",
+                Text = "Confident",
                 Checked = _showConfidentBoxesInMultiBoxView,
             };
             showConfidentBoxesInMultiboxView.SetTextColor(Color.Black);
@@ -918,11 +941,16 @@ namespace BluePenguinMonitoring
                 _showConfidentBoxesInMultiBoxView = showConfidentBoxesInMultiboxView.Checked;
                 DrawPageLayouts();
             };
-            _multiboxBoxFilterCard.AddView(showConfidentBoxesInMultiboxView);
+            breedingChanceFilterLayout.AddView(showConfidentBoxesInMultiboxView);
+            _multiboxBoxFilterCard.AddView(breedingChanceFilterLayout);
 
+            var interestingFilterLayout = new LinearLayout(this)
+            {
+                Orientation = Android.Widget.Orientation.Horizontal
+            };
             CheckBox showInterestingBoxesInMultiboxView = new CheckBox(this)
             {
-                Text = "Show interesting boxes",
+                Text = "Interesting",
                 Checked = _showInterestingBoxesInMultiBoxView
             };
             showInterestingBoxesInMultiboxView.SetTextColor(Color.Black);
@@ -931,20 +959,23 @@ namespace BluePenguinMonitoring
                 _showInterestingBoxesInMultiBoxView = showInterestingBoxesInMultiboxView.Checked;
                 DrawPageLayouts();
             };
-            _multiboxBoxFilterCard.AddView(showInterestingBoxesInMultiboxView);
+            allAndDataFiltersLayout.AddView(showInterestingBoxesInMultiboxView);
 
             CheckBox showSingleEggBoxesInMultiboxView = new CheckBox(this)
             {
-                Text = "Show single egg boxes",
+                Text = "Single egg",
                 Checked = _showSingleEggBoxesInMultiboxView
             };
+            showSingleEggBoxesInMultiboxView.SetPadding(0, 0, 0, 40);
             showSingleEggBoxesInMultiboxView.SetTextColor(Color.Black);
             showSingleEggBoxesInMultiboxView.Click += (s, e) =>
             {
                 _showSingleEggBoxesInMultiboxView = showSingleEggBoxesInMultiboxView.Checked;
                 DrawPageLayouts();
             };
-            _multiboxBoxFilterCard.AddView(showSingleEggBoxesInMultiboxView);
+            allAndDataFiltersLayout.AddView(showSingleEggBoxesInMultiboxView);
+
+            _multiboxBoxFilterCard.AddView(interestingFilterLayout);    
 
             _multiBoxViewCard.AddView(_multiboxBoxFilterCard);
             _multiboxBoxFilterCard.Visibility = _showMultiboxFilterCard ? ViewStates.Visible : ViewStates.Gone;
