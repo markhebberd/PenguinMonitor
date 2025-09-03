@@ -1,13 +1,15 @@
 TODO
 
-penguin reporting under specific name to seperate britta from alternate
-option to disable PenguinReporting to Marks server. 
+penguin reporting under specific name to seperate britta from alternate locations
 clicking on a scan entry should 
 	show all know data about the bird 
-	prompt to enter optional information connected with the scan result, i.e. Sex
+	prompt to enter optional information connected with the scan result, i.e. Sex, weight, etc.
 	Have move/delete contained. 
-	entries should be bigger and easier to click
-Current state of the app to be saved in same format as save/load data. (low priority as load handles both types now)
+	Scanned entries should be bigger and easier to click
+
+MAYBE_DO?
+
+Current state of the app to be saved in same format as save/load data.
 
 DONE
 
