@@ -99,7 +99,7 @@ namespace BluePenguinMonitoring
         private CheckBox _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int versionNumber = 15;
+        private static int version = 15;
         private static int numberMonitorBoxes = 156;
 
         //multibox View
@@ -1152,7 +1152,7 @@ namespace BluePenguinMonitoring
 
             TextView versionText = new TextView(this)
             {
-                Text = "Version: " + versionNumber
+                Text = "Version: " + version
             };
             versionText.SetTextColor(Color.Black);
             _settingsCard.AddView(versionText);
