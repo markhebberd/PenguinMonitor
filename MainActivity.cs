@@ -114,7 +114,6 @@ namespace BluePenguinMonitoring
         private bool _showInterestingBoxesInMultiBoxView;
         private bool _showSingleEggBoxesInMultiboxView;
 
-
         // ===== Multi-page menu state =====
         private readonly (string Text, UIFactory.selectedPage Page)[] _menuItems = new[]
         {
@@ -447,7 +446,6 @@ namespace BluePenguinMonitoring
                 System.Diagnostics.Debug.WriteLine($"LoadJsonDataFromFile error: {ex}");
             }
         }
-
         private void LoadJsonDataFromServer()
         {
             try
@@ -461,7 +459,6 @@ namespace BluePenguinMonitoring
                 System.Diagnostics.Debug.WriteLine($"LoadJsonDataFromFile error: {ex}");
             }
         }
-
         private void ShowFileSelectionDialog(string[] files)
         {
             var fileNames = files.Select(f => 
@@ -1033,7 +1030,6 @@ namespace BluePenguinMonitoring
                 _multiBoxViewCard.AddView(empty);
             }
         }
-
         private View? CreateBoxRemoteSummaryCard(int boxNumber, BoxStatusRemoteData boxData)
         {
             var card = new LinearLayout(this)
@@ -1073,7 +1069,6 @@ namespace BluePenguinMonitoring
             };
             return card;
         }
-
         private View? CreateBoxSummaryCard(int boxNumber, BoxData boxData)
         {
             var card = new LinearLayout(this)
@@ -1605,12 +1600,10 @@ namespace BluePenguinMonitoring
         {
             NavigateToBox(_currentBox - 1, () => _currentBox > 1);
         }
-
         private void OnNextBoxClick(object? sender, EventArgs e)
         {
             NavigateToBox(_currentBox + 1, () => _currentBox < numberMonitorBoxes);
         }
-
         private void NavigateToBox(int targetBox, Func<bool> canNavigate)
         {
             if (!canNavigate())
@@ -1643,7 +1636,6 @@ namespace BluePenguinMonitoring
             )
             );
         }
-
         private void OnClearBoxesClick(object? sender, EventArgs e)
         {
             ShowConfirmationDialog(
@@ -1660,12 +1652,10 @@ namespace BluePenguinMonitoring
                 ("Cancel", new Action(() => { }))
             );
         }
-
         private void OnSaveDataClick(object? sender, EventArgs e)
         {
             ShowSaveConfirmation();
         }
-
         private void ShowSaveConfirmation()
         {
             var totalBoxes = _boxDataStorage.Count;
@@ -1685,7 +1675,6 @@ namespace BluePenguinMonitoring
                 ("Cancel", () => { } )
             );
         }
-
         private void ShowConfirmationDialog(string title, string message, (string text, Action action) positiveButton)
         {
             var alertDialog = new AlertDialog.Builder(this)
@@ -1709,14 +1698,12 @@ namespace BluePenguinMonitoring
 
             alertDialog?.Show();
         }
-
         private void OnDataChanged(object? sender, TextChangedEventArgs e)
         {
             if (_isProcessingConfirmation)
                 return;
             CheckForHighValueConfirmation();
         }
-
         private void CheckForHighValueConfirmation()
         {
             int adults, eggs, chicks;
@@ -1735,7 +1722,6 @@ namespace BluePenguinMonitoring
                 ShowHighValueConfirmationDialog(highValues);
             }
         }
-
         private void ShowHighValueConfirmationDialog(List<(string type, int count)> highValues)
         {
             _isProcessingConfirmation = true;
@@ -1763,7 +1749,6 @@ namespace BluePenguinMonitoring
             )
             );
         }
-
         private void SaveCurrentBoxData()
         {
             if (!_boxDataStorage.ContainsKey(_currentBox))
@@ -1878,7 +1863,6 @@ namespace BluePenguinMonitoring
             manualInputLayout.AddView(addButton);
             _scannedIdsLayout.AddView(manualInputLayout);
         }
-
         private LinearLayout CreateScanRecordView(ScanRecord scan, int index)
         {
             var scanLayout = new LinearLayout(this)
@@ -1983,7 +1967,6 @@ namespace BluePenguinMonitoring
 
             return scanLayout;
         }
-
         private void OnDeleteScanClick(ScanRecord scanToDelete)
         {
             ShowConfirmationDialog(
@@ -2021,12 +2004,10 @@ namespace BluePenguinMonitoring
             )
             );
         }
-
         private void OnMoveScanClick(ScanRecord scanToMove)
         {
             ShowMoveDialog(scanToMove);
         }
-
         private void ShowMoveDialog(ScanRecord scanToMove)
         {
             var input = new EditText(this)
@@ -2074,7 +2055,6 @@ namespace BluePenguinMonitoring
             var inputMethodManager = (Android.Views.InputMethods.InputMethodManager?)GetSystemService(InputMethodService);
             inputMethodManager?.ShowSoftInput(input, Android.Views.InputMethods.ShowFlags.Implicit);
         }
-
         private void MoveScanToBox(ScanRecord scanToMove, int targetBox)
         {
             ShowConfirmationDialog(
@@ -2125,7 +2105,6 @@ namespace BluePenguinMonitoring
                 ("Cancel", () => { })
             );
         }
-
         private async void LoadFromAppDataDir()
         {
             try
@@ -2175,7 +2154,6 @@ namespace BluePenguinMonitoring
         {
             new Thread(TriggerAlert).Start();
         }
-
         private void TriggerAlert()
         {
             try
@@ -2234,7 +2212,6 @@ namespace BluePenguinMonitoring
                 System.Diagnostics.Debug.WriteLine($"Failed to clear auto-save file: {ex.Message}");
             }
         }
-
         private void AddScannedId(String fullEid)
         {
             var cleanEid = new String(fullEid.Where(char.IsLetterOrDigit).ToArray());
@@ -2496,7 +2473,6 @@ namespace BluePenguinMonitoring
         {
             ShowBoxJumpDialog();
         }
-
         private void ShowBoxJumpDialog()
         {
             var input = new EditText(this)
