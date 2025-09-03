@@ -99,7 +99,7 @@ namespace BluePenguinMonitoring
         private CheckBox _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int versionNumber = 13;
+        private static int versionNumber = 15;
         private static int numberMonitorBoxes = 156;
 
         //multibox View
@@ -363,9 +363,7 @@ namespace BluePenguinMonitoring
                         return;
                     }
                 }
-
                 var downloadsPath = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads)?.AbsolutePath;
-
                 if (string.IsNullOrEmpty(downloadsPath))
                 {
                     Toast.MakeText(this, "Downloads directory not accessible", ToastLength.Long)?.Show();
@@ -611,7 +609,7 @@ namespace BluePenguinMonitoring
                     _currentBox = _boxDataStorage.Keys.Any() ? _boxDataStorage.Keys.Min() : 1;
                 }
 
-                //SaveToAppDataDir();
+                SaveToAppDataDir(reportHome: false);
 
                 // Refresh UI
                 DrawPageLayouts();
@@ -845,11 +843,8 @@ namespace BluePenguinMonitoring
             multiBoxTitle.SetTextColor(Color.Black);
             multiBoxTitle.SetPadding(10, 10, 10, 20);
 
-
             headerCard.AddView(multiBoxTitle);
             _multiBoxViewCard.AddView(headerCard);
-
-
 
             _multiboxBoxFilterCard = _uiFactory.CreateCard(padding: 0, borderWidth: 4);
             TextView filtersTitle = new TextView(this)
@@ -1127,9 +1122,8 @@ namespace BluePenguinMonitoring
             gate_and_notes.SetTextColor(Color.DarkGray);
 
             card.AddView(title);
-            card.AddView(summary);
-            if(!string.IsNullOrEmpty(lineThreeStatusText))
-                card.AddView(gate_and_notes);
+            if(!string.IsNullOrEmpty(summary.Text)) card.AddView(summary);
+            if(!string.IsNullOrEmpty(gate_and_notes.Text)) card.AddView(gate_and_notes);
             card.Click += (sender, e) =>
             {
                 JumpToBox(boxNumber);
@@ -2122,7 +2116,6 @@ namespace BluePenguinMonitoring
                                 _chicksEditText.Text = "" + Math.Max(0, int.Parse(_chicksEditText.Text ?? "0") - 1);
                                 _boxDataStorage[targetBox].Adults++;
                             }
-
                             SaveCurrentBoxData();
                             buildScannedIdsLayout(currentBoxData.ScannedIds);
                             Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} moved from Box {_currentBox} to Box {targetBox}", ToastLength.Long)?.Show();
@@ -2168,7 +2161,7 @@ namespace BluePenguinMonitoring
                 System.Diagnostics.Debug.WriteLine($"Failed to load data: {ex.Message}");
             }
         }
-        private void SaveToAppDataDir()
+        private void SaveToAppDataDir(bool reportHome = true)
         {
             var appState = new AppDataState
             {
@@ -2176,7 +2169,7 @@ namespace BluePenguinMonitoring
                 LastSaved = DateTime.Now,
                 BoxData = _boxDataStorage
             };
-            _dataStorageService.SaveDataToInternalStorage(FilesDir?.AbsolutePath ?? "", appState, this);
+            _dataStorageService.SaveDataToInternalStorage(FilesDir?.AbsolutePath ?? "", appState, this, reportHome: reportHome);
         }
         private void triggerAlertAsync()
         {

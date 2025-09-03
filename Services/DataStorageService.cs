@@ -24,7 +24,7 @@ namespace BluePenguinMonitoring.Services
         internal const string ALL_PENGS_URL = "https://docs.google.com/spreadsheets/d/1A2j56iz0_VNHiWNJORAzGDqTbZsEd76j-YI_gQZsDEE";
         internal const string BOX_STATUS_URL = "https://docs.google.com/spreadsheets/d/1B-jWzxb4PhbMerWD36jO3TysTCbNsZ9Lo0gldgYreLc";
 
-        public void SaveDataToInternalStorage(string filesDir, AppDataState appState, Android.Content.Context context)
+        public void SaveDataToInternalStorage(string filesDir, AppDataState appState, Android.Content.Context context, bool reportHome = true)
         {
             try
             {
@@ -36,31 +36,34 @@ namespace BluePenguinMonitoring.Services
 
                 File.WriteAllText(filePath, json);
 
-                try
+                if (reportHome)
                 {
-                    string response = "No Response";
-                    BackgroundWorker bw = new BackgroundWorker();
-                    bw.DoWork += (sender, e) =>
+                    try
                     {
-                        response = Backend.RequestServerResponse("PenguinReport:" + json.ToString());
-                    };
-                    bw.RunWorkerCompleted += (sender, e) =>
-                    {
-                        new Handler(Looper.MainLooper).Post(() =>
+                        string response = "No Response";
+                        BackgroundWorker bw = new BackgroundWorker();
+                        bw.DoWork += (sender, e) =>
                         {
-                            if (response == "fail")
+                            response = Backend.RequestServerResponse("PenguinReport:" + json.ToString());
+                        };
+                        bw.RunWorkerCompleted += (sender, e) =>
+                        {
+                            new Handler(Looper.MainLooper).Post(() =>
                             {
-                                Toast.MakeText(context, "Unable to backup on Marks server.", ToastLength.Short)?.Show();
-                            }
-                            else
-                            {
-                                Toast.MakeText(context, "Data was " + response + " on Marks server.", ToastLength.Short)?.Show();
-                            }
-                        });
-                    };
-                    bw.RunWorkerAsync();
+                                if (response == "fail")
+                                {
+                                    Toast.MakeText(context, "Unable to backup on Marks server.", ToastLength.Short)?.Show();
+                                }
+                                else
+                                {
+                                    Toast.MakeText(context, "Data was " + response + " on Marks server.", ToastLength.Short)?.Show();
+                                }
+                            });
+                        };
+                        bw.RunWorkerAsync();
+                    }
+                    catch { }
                 }
-                catch { }
 
             }
             catch (Exception ex)
