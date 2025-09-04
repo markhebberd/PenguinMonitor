@@ -71,13 +71,13 @@ namespace BluePenguinMonitoring
         private LinearLayout? _dataCard;
 
         // Services
-        private UIFactory _uiFactory;
+        public UIFactory? _uiFactory;
         private DataStorageService _dataStorageService = new DataStorageService();
 
         // Data storage
         private Dictionary<int, BoxData> _boxDataStorage = new Dictionary<int, BoxData>();
-        private Dictionary<string, PenguinData> _remotePenguinData ;
-        private Dictionary<int, BoxStatusRemoteData> _remoteBoxData;
+        private Dictionary<string, PenguinData>? _remotePenguinData ;
+        private Dictionary<int, BoxStatusRemoteData>? _remoteBoxData;
 
         private int _currentBox = 1;
 
@@ -90,21 +90,21 @@ namespace BluePenguinMonitoring
 
         // Add a field for the data card title so it can be updated dynamically
         private TextView? _dataCardTitleText;
-        private LinearLayout _dataCardTitleLayout;
-        private ImageView _lockIconView;
+        private LinearLayout? _dataCardTitleLayout;
+        private ImageView? _lockIconView;
         private bool _isBoxLocked;
-        private ScrollView _rootScrollView;
-        private LinearLayout _topButtonLayout;
-        private LinearLayout _settingsCard;
-        private CheckBox _isBluetoothEnabled;
+        private ScrollView? _rootScrollView;
+        private LinearLayout? _topButtonLayout;
+        private LinearLayout? _settingsCard;
+        private CheckBox? _isBluetoothEnabled;
 
         //Lazy versioning.
         private static int version = 15 ;
         private static int numberMonitorBoxes = 156;
 
         //multibox View
-        private LinearLayout _multiBoxViewCard;
-        private LinearLayout _multiboxBoxFilterCard;
+        private LinearLayout? _multiBoxViewCard;
+        private LinearLayout? _multiboxBoxFilterCard;
         private bool _showMultiboxFilterCard;
         private bool _showAllBoxesInMultiBoxView;
         private bool _showBoxesWithDataInMultiBoxView;
@@ -127,7 +127,7 @@ namespace BluePenguinMonitoring
             UIFactory.selectedPage.BoxDataSingle,
             UIFactory.selectedPage.BoxDataMany
         };
-        private TextView _interestingBoxTextView;
+        private TextView? _interestingBoxTextView;
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
@@ -212,13 +212,16 @@ namespace BluePenguinMonitoring
                 var notificationUri = Android.Media.RingtoneManager.GetDefaultUri(Android.Media.RingtoneType.Notification);
                 if (notificationUri != null)
                 {
+                    var audioAttributesBuilder = new AudioAttributes.Builder();
+                    var audioAttributes = audioAttributesBuilder?.SetUsage(AudioUsageKind.Alarm)
+                                                                ?.SetContentType(AudioContentType.Sonification)
+                                                                ?.Build();
+
                     _alertMediaPlayer = MediaPlayer.Create(this, notificationUri);
-                    _alertMediaPlayer?.SetAudioAttributes(
-                        new AudioAttributes.Builder()
-                            .SetUsage(AudioUsageKind.Alarm)
-                            .SetContentType(AudioContentType.Sonification)
-                            .Build()
-                    );
+                    if (_alertMediaPlayer != null && audioAttributes != null)
+                    {
+                        _alertMediaPlayer.SetAudioAttributes(audioAttributes);
+                    }
                 }
             }
             catch (Exception ex)
@@ -650,13 +653,14 @@ namespace BluePenguinMonitoring
                 ("OK", () => { } )
             );
         }
+        private bool _isDownloadingCsvData = false;
         private void OnDownloadCsvClick(object? sender, EventArgs e)
         {
-            if (sender is Button clickedButton)
+            if (sender is Button clickedButton && _isDownloadingCsvData == false)
             {
+                _isDownloadingCsvData = true;
                 clickedButton.Text = "Loading data";
                 clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.WARNING_COLOR, 8);
-                clickedButton.Click += (s, e) => { };
 
                 _ = Task.Run(async () =>
                 {
@@ -667,7 +671,7 @@ namespace BluePenguinMonitoring
                     {
                         clickedButton.Text = "Bird Stats";
                         clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_DARK, 8);
-                        clickedButton.Click += OnDownloadCsvClick;
+                        _isDownloadingCsvData = false;
                         DrawPageLayouts();
                     });
                 });
