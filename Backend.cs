@@ -394,8 +394,12 @@ namespace SmtpAuthenticator
     }
     public class StringComparerIgnoreCase : IEqualityComparer<string>
     {
-        public bool Equals(string a, string b)
+        public bool Equals(string? a, string? b)
         {
+            if(a== null && b == null)
+                return true;
+            if(a == null || b == null)
+                return false;
             return a.ToLower().Trim().Equals(b.ToLower().Trim());
         }
         public int GetHashCode(string a)

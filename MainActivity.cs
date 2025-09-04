@@ -149,7 +149,7 @@ namespace BluePenguinMonitoring
                 permissions.Add(Android.Manifest.Permission.ReadExternalStorage);
             }
 
-            if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.S)
+            if (OperatingSystem.IsAndroidVersionAtLeast(31))
             {
                 permissions.AddRange(new[]
                 {
@@ -174,7 +174,7 @@ namespace BluePenguinMonitoring
                 Android.Manifest.Permission.Internet
             });
 
-            if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.M && permissions.Count > 0)
+            if (OperatingSystem.IsAndroidVersionAtLeast(23) && permissions.Count > 0)
             {
                 // Check which permissions are not granted using native .NET Android API
                 var permissionsToRequest = permissions.Where(p => 
@@ -333,7 +333,7 @@ namespace BluePenguinMonitoring
                 {
                     var sdkVersion = (int)Android.OS.Build.VERSION.SdkInt;
 
-                    if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.R) // Android 11+
+                    if (OperatingSystem.IsAndroidVersionAtLeast(30)) // Android 11+
                     {
                         Toast.MakeText(this, "⚠️ Android 11+ detected!\n\nFor file access, please:\n1. Go to Settings > Apps > BluePenguinMonitoring\n2. Enable 'All files access'", ToastLength.Long)?.Show();
 
@@ -355,7 +355,7 @@ namespace BluePenguinMonitoring
                         Toast.MakeText(this, "Storage permission required to load files. Please grant permission and try again.", ToastLength.Long)?.Show();
 
                         // Request permission if not granted (Android 6-10)
-                        if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.M)
+                        if (OperatingSystem.IsAndroidVersionAtLeast(23))
                         {
                             RequestPermissions(new string[] { Android.Manifest.Permission.ReadExternalStorage }, 2);
                         }
@@ -2169,7 +2169,7 @@ namespace BluePenguinMonitoring
                 // Vibrate for 500ms
                 if (_vibrator != null)
                 {
-                    if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.O)
+                    if (OperatingSystem.IsAndroidVersionAtLeast(26))
                     {
                         // Use VibrationEffect for API 26+
                         var vibrationEffect = VibrationEffect.CreateOneShot(500, VibrationEffect.DefaultAmplitude);
@@ -2409,37 +2409,40 @@ namespace BluePenguinMonitoring
         }
         public override void OnRequestPermissionsResult(int requestCode, string[] permissions, Android.Content.PM.Permission[] grantResults)
         {
-            base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
-
-            if (requestCode == 1)
+            if (OperatingSystem.IsAndroidVersionAtLeast(23))
             {
-                bool allPermissionsGranted = grantResults.All(result => result == Android.Content.PM.Permission.Granted);
+                base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
 
-                if (allPermissionsGranted)
+                if (requestCode == 1)
                 {
-                    InitializeGPS();
-                    InitializeBluetooth();
-                    Toast.MakeText(this, "✅ All permissions granted", ToastLength.Short)?.Show();
+                    bool allPermissionsGranted = grantResults.All(result => result == Android.Content.PM.Permission.Granted);
+
+                    if (allPermissionsGranted)
+                    {
+                        InitializeGPS();
+                        InitializeBluetooth();
+                        Toast.MakeText(this, "✅ All permissions granted", ToastLength.Short)?.Show();
+                    }
+                    else
+                    {
+                        var deniedPermissions = permissions.Zip(grantResults, (perm, result) => new { Permission = perm, Granted = result == Permission.Granted })
+                            .Where(x => !x.Granted)
+                            .Select(x => x.Permission)
+                            .ToArray();
+
+                        Toast.MakeText(this, $"⚠️ Some permissions denied. App functionality may be limited.\nDenied: {string.Join(", ", deniedPermissions.Select(p => p.Split('.').Last()))}", ToastLength.Long)?.Show();
+                    }
                 }
-                else
+                else if (requestCode == 2) // READ_EXTERNAL_STORAGE request from LoadJsonDataFromFile
                 {
-                    var deniedPermissions = permissions.Zip(grantResults, (perm, result) => new { Permission = perm, Granted = result == Permission.Granted })
-                        .Where(x => !x.Granted)
-                        .Select(x => x.Permission)
-                        .ToArray();
-                    
-                    Toast.MakeText(this, $"⚠️ Some permissions denied. App functionality may be limited.\nDenied: {string.Join(", ", deniedPermissions.Select(p => p.Split('.').Last()))}", ToastLength.Long)?.Show();
-                }
-            }
-            else if (requestCode == 2) // READ_EXTERNAL_STORAGE request from LoadJsonDataFromFile
-            {
-                if (grantResults.Length > 0 && grantResults[0] == Permission.Granted)
-                {
-                    Toast.MakeText(this, "✅ Storage permission granted. Try loading files again.", ToastLength.Short)?.Show();
-                }
-                else
-                {
-                    Toast.MakeText(this, "❌ Storage permission denied. Cannot access Downloads folder.", ToastLength.Short)?.Show();
+                    if (grantResults.Length > 0 && grantResults[0] == Permission.Granted)
+                    {
+                        Toast.MakeText(this, "✅ Storage permission granted. Try loading files again.", ToastLength.Short)?.Show();
+                    }
+                    else
+                    {
+                        Toast.MakeText(this, "❌ Storage permission denied. Cannot access Downloads folder.", ToastLength.Short)?.Show();
+                    }
                 }
             }
         }
@@ -2450,14 +2453,14 @@ namespace BluePenguinMonitoring
                 var sdkVersion = (int)Android.OS.Build.VERSION.SdkInt;
                 System.Diagnostics.Debug.WriteLine($"Checking permissions for Android API {sdkVersion}");
 
-                if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.R) // Android 11+ (API 30+)
+                if (OperatingSystem.IsAndroidVersionAtLeast(30)) // Android 11+ (API 30+)
                 {
                     // Android 11+ - Check if we have MANAGE_EXTERNAL_STORAGE
                     var hasManageStorage = Android.OS.Environment.IsExternalStorageManager;
                     System.Diagnostics.Debug.WriteLine($"Android 11+: MANAGE_EXTERNAL_STORAGE = {hasManageStorage}");
                     return hasManageStorage;
                 }
-                else if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.M) // Android 6+ (API 23+)
+                else if (OperatingSystem.IsAndroidVersionAtLeast(23)) // Android 6+ (API 23+)
                 {
                     // Android 6-10 - Check READ_EXTERNAL_STORAGE permission using native API
                     var hasReadPermission = CheckSelfPermission(Android.Manifest.Permission.ReadExternalStorage) == Android.Content.PM.Permission.Granted;
