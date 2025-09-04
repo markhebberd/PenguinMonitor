@@ -5,6 +5,7 @@
     <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion>21</TargetPlatformMinVersion>
 	<NoWarn>$(NoWarn);CA1422</NoWarn>
+	  <Platforms>ARM64</Platforms>
 	  
     <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
@@ -13,15 +14,12 @@
     <ApplicationId>com.companyname.BluePenguinMonitoring</ApplicationId>
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-    
-    <TrimMode>full</TrimMode>
-    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
-    
+
 	<AndroidPackageFormat>apk</AndroidPackageFormat>
 	<PublishSingleFile>false</PublishSingleFile>
-	<UseAppHost>false</UseAppHost>	  
-	  
-	<Platforms>ARM64</Platforms>
+	<UseAppHost>false</UseAppHost>
+	<TrimMode>full</TrimMode>
+	<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
     
 	<!-- Signing Deets-->
 	<AndroidKeyStore>True</AndroidKeyStore>
