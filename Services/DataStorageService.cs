@@ -161,7 +161,7 @@ namespace BluePenguinMonitoring.Services
 
                 new Handler(Looper.MainLooper).Post(() =>
                 {
-                    Toast.MakeText(context, $"✅ Downloaded {_remotePenguinData.Count} penguin records, {_remoteBoxData.Count} box records", ToastLength.Short)?.Show();
+                    Toast.MakeText(context, $"✅ Got {_remotePenguinData.Count} penguin, {_remoteBoxData.Count} box records", ToastLength.Short)?.Show();
                 });
             }
             catch (Exception ex)

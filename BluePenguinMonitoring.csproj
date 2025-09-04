@@ -1,20 +1,26 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <Import Project="secrets.props" Condition="Exists('secrets.props')" />
   <PropertyGroup>
     <TargetFramework>net9.0-android</TargetFramework>
     <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion>21</TargetPlatformMinVersion>
 	<NoWarn>$(NoWarn);CA1422</NoWarn>
+	  
     <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+	  
     <ApplicationId>com.companyname.BluePenguinMonitoring</ApplicationId>
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    
     <TrimMode>full</TrimMode>
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
-    <AndroidPackageFormat>apk</AndroidPackageFormat>
-    <AndroidFastDeploymentType>None</AndroidFastDeploymentType> <!---->
+    
+	<AndroidPackageFormat>apk</AndroidPackageFormat>
+	<PublishSingleFile>false</PublishSingleFile>
+	<UseAppHost>false</UseAppHost>	  
+	  
 	<Platforms>ARM64</Platforms>
     
 	<!-- Signing Deets-->
@@ -24,6 +30,11 @@
 	<AndroidSigningStorePass>$(KeystorePassword)</AndroidSigningStorePass>
 	<AndroidSigningKeyPass>$(SigningKeyPassword)</AndroidSigningKeyPass>
   </PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)'=='Debug'">
+		<EmbedAssembliesIntoApk>false</EmbedAssembliesIntoApk> <!-- Speeds up debug builds -->
+		<AndroidAot>false</AndroidAot> <!-- Optional: skip AOT for debug -->
+		<AndroidLinkMode>None</AndroidLinkMode> <!-- Optional: reduce linking in debug -->
+	</PropertyGroup>
   <ItemGroup>
     <None Remove=".gitattributes" />
     <None Remove=".gitignore" />
