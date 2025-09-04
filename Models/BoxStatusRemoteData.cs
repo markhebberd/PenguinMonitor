@@ -32,9 +32,9 @@
             }
             if (string.IsNullOrWhiteSpace(miniStatus))
             {
-                return breedingLikelyhoodText;
+                miniStatus = breedingLikelyhoodText;
             }
-            return miniStatus;
+            return $"{miniStatus} \n{PersistentNotes}".Trim();
         }
     }
 }

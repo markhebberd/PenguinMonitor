@@ -99,7 +99,7 @@ namespace BluePenguinMonitoring
         private CheckBox? _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int version = 15 ;
+        private static int version = 16 ;
         private static int numberMonitorBoxes = 156;
 
         //multibox View
@@ -669,9 +669,9 @@ namespace BluePenguinMonitoring
                     _remoteBoxData = await _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
                     new Handler(Looper.MainLooper).Post(() =>
                     {
+                        _isDownloadingCsvData = false;
                         clickedButton.Text = "Bird Stats";
                         clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_DARK, 8);
-                        _isDownloadingCsvData = false;
                         DrawPageLayouts();
                     });
                 });
