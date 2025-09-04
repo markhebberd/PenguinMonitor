@@ -8,9 +8,9 @@ namespace BluePenguinMonitoring.Services
 {
     public class CsvDataService
     {
-        internal List<BoxStatusRemoteData> ParseBoxCsvData(string csvContent)
+        internal List<BoxRemoteData> ParseBoxCsvData(string csvContent)
         {
-            var result = new List<BoxStatusRemoteData>();
+            var result = new List<BoxRemoteData>();
             try
             {
                 var lines = csvContent.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -35,7 +35,7 @@ namespace BluePenguinMonitoring.Services
                         columns.Add("");
                     }
 
-                    BoxStatusRemoteData newBoxStatusData = new BoxStatusRemoteData
+                    BoxRemoteData newBoxStatusData = new BoxRemoteData
                     {
                         boxNumber = int.Parse(columns[0]),
                         eggChickStatusText = columns[1],

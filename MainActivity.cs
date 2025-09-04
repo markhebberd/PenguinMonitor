@@ -77,7 +77,7 @@ namespace BluePenguinMonitoring
         // Data storage
         private Dictionary<int, BoxData> _boxDataStorage = new Dictionary<int, BoxData>();
         private Dictionary<string, PenguinData>? _remotePenguinData ;
-        private Dictionary<int, BoxStatusRemoteData>? _remoteBoxData;
+        private Dictionary<int, BoxRemoteData>? _remoteBoxData;
 
         private int _currentBox = 1;
 
@@ -1044,7 +1044,7 @@ namespace BluePenguinMonitoring
                 _multiBoxViewCard.AddView(empty);
             }
         }
-        private View? CreateBoxRemoteSummaryCard(int boxNumber, BoxStatusRemoteData boxData)
+        private View? CreateBoxRemoteSummaryCard(int boxNumber, BoxRemoteData boxData)
         {
             var card = new LinearLayout(this)
             {

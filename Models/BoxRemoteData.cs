@@ -1,6 +1,6 @@
 ﻿namespace BluePenguinMonitoring.Models
 {
-    public class BoxStatusRemoteData
+    public class BoxRemoteData
     {
         public int boxNumber { get; set; }
         public string eggChickStatusText { get; set; }
