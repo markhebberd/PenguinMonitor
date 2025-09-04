@@ -35,7 +35,6 @@ namespace BluePenguinMonitoring.Services
                 var filePath = Path.Combine(filesDir, AUTO_SAVE_FILENAME);
 
                 File.WriteAllText(filePath, json);
-
                 if (reportHome)
                 {
                     try
@@ -95,10 +94,18 @@ namespace BluePenguinMonitoring.Services
         {
             try
             {
-                var csvUrlBirds = _csvDataService.ConvertToGoogleSheetsCsvUrl(ALL_PENGS_URL);
-                var responseBirds = await _httpClient.GetAsync(csvUrlBirds);
-                responseBirds.EnsureSuccessStatusCode();
+                Task<HttpResponseMessage> responseBirdsTask = 
+                     _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(ALL_PENGS_URL));
+                Task<HttpResponseMessage> responseBoxesTask =
+                    _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(BOX_STATUS_URL));
+                ;
+                // Await them in parallel
+                await Task.WhenAll(responseBirdsTask, responseBoxesTask);
+                // Retrieve results
+                HttpResponseMessage responseBirds = await responseBirdsTask;
+                HttpResponseMessage responseBoxes = await responseBoxesTask;
 
+                responseBirds.EnsureSuccessStatusCode();
                 var csvContentBirds = await responseBirds.Content.ReadAsStringAsync();
                 var parsedDataBirds = _csvDataService.ParseBirdCsvData(csvContentBirds);
 
@@ -140,14 +147,12 @@ namespace BluePenguinMonitoring.Services
                 var birdJson = JsonConvert.SerializeObject(_remotePenguinData, Formatting.Indented);
                 File.WriteAllText(Path.Combine(internalPath, REMOTE_BIRD_DATA_FILENAME), birdJson);
 
-                var csvUrl = _csvDataService.ConvertToGoogleSheetsCsvUrl(BOX_STATUS_URL);
-                var response = await _httpClient.GetAsync(csvUrl);
-                response.EnsureSuccessStatusCode();
 
-                var csvContent = await response.Content.ReadAsStringAsync();
-                List<BoxStatusRemoteData> parsedData = _csvDataService.ParseBoxCsvData(csvContent);
+                responseBoxes.EnsureSuccessStatusCode();
+                var csvContent = await responseBoxes.Content.ReadAsStringAsync();
+                List<BoxRemoteData> parsedData = _csvDataService.ParseBoxCsvData(csvContent);
 
-                Dictionary<int, BoxStatusRemoteData> _remoteBoxData = new Dictionary<int, BoxStatusRemoteData>();
+                Dictionary<int, BoxRemoteData> _remoteBoxData = new Dictionary<int, BoxRemoteData>();
                 foreach (var row in parsedData)
                 {
                     if ( row.boxNumber != null)
@@ -190,7 +195,7 @@ namespace BluePenguinMonitoring.Services
                 return null;
             }
         }
-        public async Task<Dictionary<int, BoxStatusRemoteData>?> loadRemoteBoxInfoFromAppDataDir(Android.Content.Context? context)
+        public async Task<Dictionary<int, BoxRemoteData>?> loadRemoteBoxInfoFromAppDataDir(Android.Content.Context? context)
         {
             try
             {
@@ -200,7 +205,7 @@ namespace BluePenguinMonitoring.Services
                     await DownloadCsvDataAsync(context);
                 }
                 var remoteBoxDataJson = File.ReadAllText(remoteBoxDataPath);
-                return JsonConvert.DeserializeObject<Dictionary<int, BoxStatusRemoteData>>(remoteBoxDataJson);
+                return JsonConvert.DeserializeObject<Dictionary<int, BoxRemoteData>>(remoteBoxDataJson);
             }
             catch (Exception ex)
             {
