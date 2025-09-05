@@ -99,7 +99,7 @@ namespace BluePenguinMonitoring
         private CheckBox? _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int version = 21;
+        private static int version = 22;
         private static int numberMonitorBoxes = 156;
 
         //multibox View
@@ -1178,7 +1178,6 @@ namespace BluePenguinMonitoring
             {
                 // Smooth scroll first, then ensure we're at absolute top as a fallback
                 _rootScrollView.SmoothScrollTo(0, 0);
-                _rootScrollView.FullScroll(FocusSearchDirection.Up);
             });
         }
         private void createSettingsCard()
