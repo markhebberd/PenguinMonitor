@@ -65,13 +65,15 @@ namespace BluePenguinMonitoring.UI.Factories
 
             return card;
         }
-        public GradientDrawable CreateCardBackground(int borderWidth = 1, Color? borderColour = null)
+        public GradientDrawable CreateCardBackground(int borderWidth = 1, Color? borderColour = null, Color? backgroundColor = null)
         {
-            var drawable = new GradientDrawable();
-            drawable.SetColor(CARD_COLOR);
+            var drawable = new GradientDrawable();            
+            if (backgroundColor != null)
+                drawable.SetColor(Color.Argb(128, backgroundColor.Value.R, backgroundColor.Value.G, backgroundColor.Value.B));
+            else
+                drawable.SetColor(CARD_COLOR);            
             drawable.SetCornerRadius(12 * (_context.Resources?.DisplayMetrics?.Density ?? 1));
             drawable.SetStroke(borderWidth, borderColour ?? UIFactory.BORDER_COLOUR);
-
             return drawable;
         }
         public GradientDrawable CreateRoundedBackground(Color color, int radiusDp)

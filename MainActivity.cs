@@ -132,7 +132,6 @@ namespace BluePenguinMonitoring
         protected override void OnCreate(Bundle? savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
-            _uiFactory = new UIFactory(this);
             RequestPermissions();
             LoadFromAppDataDir();
             CreateDataRecordingUI();
@@ -680,6 +679,7 @@ namespace BluePenguinMonitoring
         }
         private void CreateDataRecordingUI()
         {
+            _uiFactory = new UIFactory(this);
             selectedPage = UIFactory.selectedPage.BoxDataSingle;
             _isBoxLocked = true;
             _rootScrollView = new ScrollView(this);
@@ -1008,7 +1008,7 @@ namespace BluePenguinMonitoring
                 }
                 if (_monitoredBoxDataDB.ContainsKey(boxNumber) && (_showBoxesWithDataInMultiBoxView || _showAllBoxesInMultiBoxView))
                 {
-                    var card = CreateBoxSummaryCard(boxNumber, _monitoredBoxDataDB[boxNumber]);                    
+                    var card = CreateBoxSummaryCard(boxNumber, _monitoredBoxDataDB[boxNumber], boxNumber == _currentBox);
                     currentRow?.AddView(card);
                     visibleBoxCount++;
                     currentRow.SetPadding(0, 0, 0, 10);
@@ -1017,8 +1017,6 @@ namespace BluePenguinMonitoring
                 {
                     if (_remoteBoxData != null &&  _remoteBoxData.ContainsKey(boxNumber))
                     {
-                        if (boxNumber == 39)
-                            ;
                         bool showBox = _showAllBoxesInMultiBoxView
                                         || _showConfidentBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON"
                                         || _showPotentialBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "POT"
@@ -1029,9 +1027,9 @@ namespace BluePenguinMonitoring
                         {
                             View? card;
                             if (_monitoredBoxDataDB.ContainsKey(boxNumber))
-                                card = CreateBoxSummaryCard(boxNumber, _monitoredBoxDataDB[boxNumber]);
+                                card = CreateBoxSummaryCard(boxNumber, _monitoredBoxDataDB[boxNumber], boxNumber==_currentBox);
                             else
-                                card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber]);
+                                card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber], boxNumber == _currentBox);
                             currentRow?.AddView(card);
                             currentRow.SetPadding(0, 0, 0, 10);
                             visibleBoxCount++;
@@ -1045,14 +1043,14 @@ namespace BluePenguinMonitoring
                 _multiBoxViewCard.AddView(empty);
             }
         }
-        private View? CreateBoxRemoteSummaryCard(int boxNumber, BoxRemoteData boxData)
+        private View? CreateBoxRemoteSummaryCard(int boxNumber, BoxRemoteData boxData, bool selected = false)
         {
             var card = new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Vertical
             };
             card.SetPadding(10, 10, 10, 10);
-            card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, UIFactory.WARNING_YELLOW);
+            card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, UIFactory.WARNING_YELLOW, backgroundColor: selected?UIFactory.WARNING_YELLOW:null);
 
             var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent, 1f);
             cardParams.SetMargins(8, 0, 8, 0);
@@ -1088,7 +1086,7 @@ namespace BluePenguinMonitoring
             };
             return card;
         }
-        private View? CreateBoxSummaryCard(int boxNumber, BoxData thisBoxData)
+        private View? CreateBoxSummaryCard(int boxNumber, BoxData thisBoxData, bool selected)
         {
             var card = new LinearLayout(this)
             {
@@ -1105,11 +1103,11 @@ namespace BluePenguinMonitoring
                 || thisRemoteBoxData?.breedingLikelyhoodText != "BR" && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
             {
                 differenceFound = true;
-                card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.PRIMARY_BLUE);
+                card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.PRIMARY_BLUE, backgroundColor:selected?UIFactory.WARNING_YELLOW:null);
             }
             else
             {
-                card.Background = _uiFactory.CreateCardBackground(borderWidth: 3);
+                card.Background = _uiFactory.CreateCardBackground(borderWidth: 3, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
             }
 
             var title = new TextView(this)
@@ -1330,7 +1328,6 @@ namespace BluePenguinMonitoring
                                     UIFactory.DANGER_RED,     // red
                                     Android.Graphics.PorterDuff.Mode.SrcIn));
                         }
-
                     }
 
                     if (_dataCardTitleText != null)
@@ -1390,12 +1387,17 @@ namespace BluePenguinMonitoring
                             SetEnabledRecursive(child, false, 0.5f);
                     }
 
-                    // Enable/Disable navigation and data buttons when locked/unlocked
+                    // Enable/Disable navigation and data buttons when available
                     List<Button> buttonsToToggle = new List<Button> { _prevBoxButton, _nextBoxButton, _selectBoxButton };
                     foreach (var button in buttonsToToggle)
                     {
-                        button.Enabled = _isBoxLocked;
-                        button.Alpha = _isBoxLocked ? 1.0f : 0.5f; // Grey out when unlocked
+                        bool canGo = true;
+                        if(button.Text.Contains("rev") && _currentBox == 1 || button.Text.Contains("ext") && _currentBox == numberMonitorBoxes) 
+                        {
+                            canGo = false;
+                        }
+                        button.Enabled = _isBoxLocked && canGo;
+                        button.Alpha = (_isBoxLocked && canGo) ? 1.0f : 0.5f; // Grey out when unlocked
                     }
 
                     // title Layout "Box n" is item 0, which we don't want to disable!
@@ -2589,13 +2591,10 @@ namespace BluePenguinMonitoring
                 Toast.MakeText(this, $"Cannot change box while current box is unlocked.", ToastLength.Short)?.Show();
                 return;
             }
-
             if (!_visiblePages.Contains(UIFactory.selectedPage.BoxDataSingle))
                 _visiblePages.Add(UIFactory.selectedPage.BoxDataSingle);
             _currentBox = targetBox;
             DrawPageLayouts();
-
-            Toast.MakeText(this, $"📦 Jumped to Box {_currentBox}", ToastLength.Short)?.Show();
         }
         private string? GetSelectedGateStatus()
         {
