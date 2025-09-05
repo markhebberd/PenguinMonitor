@@ -2,7 +2,7 @@ TODO
 
 penguin reporting under specific name to seperate britta from alternate locations
 clicking on a scan entry should 
-	show all know data about the bird 
+	show all known data about the bird 
 	prompt to enter optional information connected with the scan result, i.e. Sex, weight, etc.
 	Have move/delete contained. 
 	Scanned entries should be bigger and easier to click

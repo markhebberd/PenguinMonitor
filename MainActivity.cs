@@ -1,4 +1,5 @@
 ﻿using Android;
+using Android.Animation;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
@@ -9,6 +10,7 @@ using Android.Media;
 using Android.OS;
 using Android.Text;
 using Android.Views;
+using Android.Views.Animations;
 using Android.Views.InputMethods;
 using Android.Widget;
 using BluePenguinMonitoring.Models;
@@ -99,7 +101,7 @@ namespace BluePenguinMonitoring
         private CheckBox? _isBluetoothEnabledCheckBox;
 
         //Lazy versioning.
-        private static int version = 24;
+        private static int version = 25;
         private static int numberMonitorBoxes = 156;
 
         //multibox View
@@ -1177,8 +1179,10 @@ namespace BluePenguinMonitoring
             if (_rootScrollView == null) return;
             _rootScrollView.Post(() =>
             {
-                // Smooth scroll first, then ensure we're at absolute top as a fallback
-                _rootScrollView.SmoothScrollTo(0, 0);
+                var animator = ObjectAnimator.OfInt(_rootScrollView, "scrollY", _rootScrollView.ScrollY, 0);
+                animator.SetDuration(750); // millis
+                animator.SetInterpolator(new DecelerateInterpolator());
+                animator.Start();
             });
         }
         private void createSettingsCard()
