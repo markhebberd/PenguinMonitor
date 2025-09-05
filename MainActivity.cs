@@ -99,7 +99,7 @@ namespace BluePenguinMonitoring
         private CheckBox? _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int version = 19;
+        private static int version = 20;
         private static int numberMonitorBoxes = 156;
 
         //multibox View
@@ -2572,6 +2572,11 @@ namespace BluePenguinMonitoring
             if (targetBox == _currentBox)
             {
                 Toast.MakeText(this, $"Already at Box {_currentBox}", ToastLength.Short)?.Show();
+                return;
+            }
+            if (!_isBoxLocked)
+            {
+                Toast.MakeText(this, $"Cannot change box while current box is unlocked.", ToastLength.Short)?.Show();
                 return;
             }
 
