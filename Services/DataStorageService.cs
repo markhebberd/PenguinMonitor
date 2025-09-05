@@ -16,6 +16,7 @@ namespace BluePenguinMonitoring.Services
         private const string AUTO_SAVE_FILENAME = "penguin_data_autosave.json";
         internal const string REMOTE_BIRD_DATA_FILENAME = "remotePenguinData.json";
         internal const string REMOTE_BOX_DATA_FILENAME = "remoteBoxData.json";
+        internal const string BREEDING_DATES_FILENAME = "predictedDates.json";
 
         private CsvDataService _csvDataService = new CsvDataService();
 
@@ -23,6 +24,7 @@ namespace BluePenguinMonitoring.Services
         private static readonly HttpClient _httpClient = new HttpClient();
         internal const string ALL_PENGS_URL = "https://docs.google.com/spreadsheets/d/1A2j56iz0_VNHiWNJORAzGDqTbZsEd76j-YI_gQZsDEE";
         internal const string BOX_STATUS_URL = "https://docs.google.com/spreadsheets/d/1B-jWzxb4PhbMerWD36jO3TysTCbNsZ9Lo0gldgYreLc";
+        internal const string BREEDING_DATES_URL = "https://docs.google.com/spreadsheets/d/1OZMPnmEm2YAGx8M9Ha_qKoB3KJgSQ4qw";
 
         public void SaveDataToInternalStorage(string filesDir, AppDataState appState, Android.Content.Context context, bool reportHome = true)
         {
@@ -98,18 +100,21 @@ namespace BluePenguinMonitoring.Services
                      _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(ALL_PENGS_URL));
                 Task<HttpResponseMessage> responseBoxesTask =
                     _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(BOX_STATUS_URL));
+                Task<HttpResponseMessage> responseBreedingDatesTask =
+                    _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(BREEDING_DATES_URL)); 
                 ;
                 // Await them in parallel
-                await Task.WhenAll(responseBirdsTask, responseBoxesTask);
+                await Task.WhenAll(responseBirdsTask, responseBoxesTask, responseBreedingDatesTask);
                 // Retrieve results
                 HttpResponseMessage responseBirds = await responseBirdsTask;
                 HttpResponseMessage responseBoxes = await responseBoxesTask;
+                HttpResponseMessage responseBreedingDates = await responseBreedingDatesTask;
 
                 responseBirds.EnsureSuccessStatusCode();
                 var csvContentBirds = await responseBirds.Content.ReadAsStringAsync();
                 var parsedDataBirds = _csvDataService.ParseBirdCsvData(csvContentBirds);
 
-                Dictionary<string, PenguinData> _remotePenguinData = new Dictionary<string, PenguinData>();
+                Dictionary<string, PenguinData> remotePenguinData = new Dictionary<string, PenguinData>();
                 foreach (var row in parsedDataBirds)
                 {
                     if (!string.IsNullOrEmpty(row.ScannedId) && row.ScannedId.Length >= 8)
@@ -136,37 +141,48 @@ namespace BluePenguinMonitoring.Services
                                 Sex = row.Sex ?? "",
                                 VidForScanner = row.VidForScanner ?? ""
                             };
-                            _remotePenguinData[eightDigitId] = penguinData;
+                            remotePenguinData[eightDigitId] = penguinData;
                         }
                     }
                 }
-
-                // Save the remote penguin data to internal storage
-                var internalPath = context.FilesDir?.AbsolutePath;
-
-                var birdJson = JsonConvert.SerializeObject(_remotePenguinData, Formatting.Indented);
-                File.WriteAllText(Path.Combine(internalPath, REMOTE_BIRD_DATA_FILENAME), birdJson);
+                var birdJson = JsonConvert.SerializeObject(remotePenguinData, Formatting.Indented);
+                File.WriteAllText(Path.Combine(context.FilesDir?.AbsolutePath, REMOTE_BIRD_DATA_FILENAME), birdJson);
 
 
                 responseBoxes.EnsureSuccessStatusCode();
                 var csvContent = await responseBoxes.Content.ReadAsStringAsync();
                 List<BoxRemoteData> parsedData = _csvDataService.ParseBoxCsvData(csvContent);
 
-                Dictionary<int, BoxRemoteData> _remoteBoxData = new Dictionary<int, BoxRemoteData>();
+                Dictionary<int, BoxRemoteData> remoteBoxData = new Dictionary<int, BoxRemoteData>();
                 foreach (var row in parsedData)
                 {
                     if ( row.boxNumber != null)
                     {
-                        _remoteBoxData.Add(row.boxNumber, row);
+                        remoteBoxData.Add(row.boxNumber, row);
                     }
                 }
-
-                var boxJson = JsonConvert.SerializeObject(_remoteBoxData, Formatting.Indented);
+                var boxJson = JsonConvert.SerializeObject(remoteBoxData, Formatting.Indented);
                 File.WriteAllText(Path.Combine(context.FilesDir?.AbsolutePath, REMOTE_BOX_DATA_FILENAME), boxJson);
+
+
+                responseBreedingDates.EnsureSuccessStatusCode();
+                var csvBreedingContent = await responseBreedingDates.Content.ReadAsStringAsync();
+                List<BoxPredictedDates> parsedBreedingData = _csvDataService.ParseBreedingDatesCsvData(csvBreedingContent);
+
+                Dictionary<int, BoxPredictedDates> predictedDates = new Dictionary<int, BoxPredictedDates>();
+                foreach (var row in parsedBreedingData)
+                {
+                    if (row.boxNumber != null)
+                    {
+                        predictedDates.Add(row.boxNumber, row);
+                    }
+                }
+                var pdJson = JsonConvert.SerializeObject(predictedDates, Formatting.Indented);
+                File.WriteAllText(Path.Combine(context.FilesDir?.AbsolutePath, BREEDING_DATES_FILENAME), pdJson);
 
                 new Handler(Looper.MainLooper).Post(() =>
                 {
-                    Toast.MakeText(context, $"✅ Got {_remotePenguinData.Count} penguin, {_remoteBoxData.Count} box records", ToastLength.Short)?.Show();
+                    Toast.MakeText(context, $"✅ Got {remotePenguinData.Count} bird, {remoteBoxData.Count} box, {predictedDates.Count} breeding records", ToastLength.Short)?.Show();
                 });
             }
             catch (Exception ex)
@@ -210,6 +226,24 @@ namespace BluePenguinMonitoring.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to load remote box data: {ex.Message}");
+                return null;
+            }
+        }
+        public async Task<Dictionary<int, BoxPredictedDates>?> loadBreedingDatesFromAppDataDir(Android.Content.Context? context)
+        {
+            try
+            {
+                string breedingDatesPath = Path.Combine(context.FilesDir?.AbsolutePath, BREEDING_DATES_FILENAME);
+                if (!File.Exists(breedingDatesPath))
+                {
+                    await DownloadCsvDataAsync(context);
+                }
+                var breedingDatesJson = File.ReadAllText(breedingDatesPath);
+                return JsonConvert.DeserializeObject<Dictionary<int, BoxPredictedDates>>(breedingDatesJson);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load predicted breeding data: {ex.Message}");
                 return null;
             }
         }

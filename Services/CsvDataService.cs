@@ -8,6 +8,48 @@ namespace BluePenguinMonitoring.Services
 {
     public class CsvDataService
     {
+        internal List<BoxPredictedDates> ParseBreedingDatesCsvData(string csvBreedingContent)
+        {
+            var result = new List<BoxPredictedDates>();
+            try {                 var lines = csvBreedingContent.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                if (lines.Length <= 1)
+                {
+                    return result; // No data rows
+                }
+                // Skip header row (first line)
+                for (int i = 1; i < lines.Length; i++)
+                {
+                    var line = lines[i].Trim();
+                    if (string.IsNullOrEmpty(line))
+                        continue;
+                    var columns = ParseCsvLine(line);
+                    // Ensure we have enough columns (should have 6 based on header)
+                    while (columns.Count < 6)
+                    {
+                        columns.Add("");
+                    }
+                    try
+                    {
+                        BoxPredictedDates newBoxStatusData = new BoxPredictedDates
+                        {
+                            boxNumber = int.Parse(columns[2]),
+                            estHatchDate = columns[5],
+                            estPGDate = columns[8],
+                            estFledgeDate = columns[10],
+                            chipWindowStart = columns[12],
+                            chipWindowFinish = columns[13],
+                        };
+                        result.Add(newBoxStatusData);
+                    }
+                    catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"CSV parsing error: {ex.Message}");
+            }
+            return result;
+        }
         internal List<BoxRemoteData> ParseBoxCsvData(string csvContent)
         {
             var result = new List<BoxRemoteData>();

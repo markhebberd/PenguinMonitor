@@ -78,7 +78,7 @@ namespace BluePenguinMonitoring
         private Dictionary<int, BoxData> _monitoredBoxDataDB = new Dictionary<int, BoxData>();
         private Dictionary<string, PenguinData>? _remotePenguinData ;
         private Dictionary<int, BoxRemoteData>? _remoteBoxData;
-
+        private Dictionary<int, BoxPredictedDates>? _remoteBreedingDates;
         private int _currentBox = 1;
 
         // High value confirmation tracking - reset on each entry
@@ -99,7 +99,7 @@ namespace BluePenguinMonitoring
         private CheckBox? _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int version = 20;
+        private static int version = 21;
         private static int numberMonitorBoxes = 156;
 
         //multibox View
@@ -667,6 +667,7 @@ namespace BluePenguinMonitoring
                     await _dataStorageService.DownloadCsvDataAsync(this);
                     _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
                     _remoteBoxData = await _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
+                    _remoteBreedingDates = await _dataStorageService.loadBreedingDatesFromAppDataDir(this);
                     new Handler(Looper.MainLooper).Post(() =>
                     {
                         _isDownloadingCsvData = false;
@@ -1072,6 +1073,10 @@ namespace BluePenguinMonitoring
                 Gravity = GravityFlags.Center,
                 TextSize = 14
             };
+            if (_remoteBreedingDates.ContainsKey(boxNumber))
+            {
+                summary.Text += "\n" + _remoteBreedingDates[boxNumber].breedingDateStatus();
+            }
             summary.SetTextColor(Color.Black);
 
             card.AddView(title);
@@ -1135,6 +1140,10 @@ namespace BluePenguinMonitoring
             if (differenceFound)
             {
                 summary.Text += ")";
+            }
+            if (_remoteBreedingDates.ContainsKey(boxNumber))
+            {
+                summary.Text += "\n" + _remoteBreedingDates[boxNumber].breedingDateStatus();
             }
             summary.SetTextColor(Color.Black);
 
@@ -2156,9 +2165,10 @@ namespace BluePenguinMonitoring
                 // Load remote penguin data.
                 _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
                 _remoteBoxData = await _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
-                if (_remotePenguinData != null && _remoteBoxData != null)
+                _remoteBreedingDates = await _dataStorageService.loadBreedingDatesFromAppDataDir(this);
+                if (_remotePenguinData != null && _remoteBoxData != null && _remoteBreedingDates != null)
                 {
-                    Toast.MakeText(this, $"🐧 {_remotePenguinData.Count} bird & {_remoteBoxData.Count} box status loaded.", ToastLength.Short)?.Show();
+                    Toast.MakeText(this, $"{_remotePenguinData.Count} bird, {_remoteBoxData.Count} box, {_remoteBreedingDates.Count} breeding dates found.", ToastLength.Short)?.Show();
                 }
 
                 // Load main app data
