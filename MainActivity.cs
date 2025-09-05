@@ -911,7 +911,7 @@ namespace BluePenguinMonitoring
             };
             CheckBox showUnlikelyBoxesInMultiboxView = new CheckBox(this)
             {
-                Text = "Unlikley",
+                Text = "Unlikely",
                 Checked = _showUnlikleyBoxesInMultiBoxView,
             };
             showUnlikelyBoxesInMultiboxView.SetTextColor(Color.Black);
