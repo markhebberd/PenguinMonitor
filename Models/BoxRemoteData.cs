@@ -34,7 +34,7 @@
             {
                 miniStatus = breedingLikelyhoodText;
             }
-            return $"{miniStatus} \n{PersistentNotes}".Trim();
+            return $"({miniStatus}) \n({PersistentNotes})".Trim();
         }
     }
 }

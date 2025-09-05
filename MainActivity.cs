@@ -1051,7 +1051,7 @@ namespace BluePenguinMonitoring
                 Orientation = Android.Widget.Orientation.Vertical
             };
             card.SetPadding(10, 10, 10, 10);
-            card.Background = _uiFactory.CreateCardBackground(borderWidth: 10, UIFactory.WARNING_COLOR);
+            card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, UIFactory.WARNING_COLOR);
 
             var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent, 1f);
             cardParams.SetMargins(8, 0, 8, 0);
@@ -1083,18 +1083,29 @@ namespace BluePenguinMonitoring
             };
             return card;
         }
-        private View? CreateBoxSummaryCard(int boxNumber, BoxData boxData)
+        private View? CreateBoxSummaryCard(int boxNumber, BoxData thisBoxData)
         {
             var card = new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Vertical
             };
             card.SetPadding(10, 10, 10, 10);
-            card.Background = _uiFactory.CreateCardBackground(borderWidth:3);
-
             var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent, 1f);
             cardParams.SetMargins(8, 0, 8, 0);
             card.LayoutParameters = cardParams;
+            bool gotRemoteBoxData = _remoteBoxData.TryGetValue(boxNumber, out var thisRemoteBoxData);
+            bool differenceFound = false;
+            if (gotRemoteBoxData && thisBoxData.Eggs != thisRemoteBoxData?.numEggs()
+                || thisBoxData.Chicks != thisRemoteBoxData?.numChicks()
+                || thisRemoteBoxData?.breedingLikelyhoodText != "BR" && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
+            {
+                differenceFound = true;
+                card.Background = _uiFactory.CreateCardBackground(borderWidth: 6, borderColour: UIFactory.SUCCESS_COLOR);
+            }
+            else
+            {
+                card.Background = _uiFactory.CreateCardBackground(borderWidth: 3);
+            }
 
             var title = new TextView(this)
             {
@@ -1107,16 +1118,29 @@ namespace BluePenguinMonitoring
 
             var summary = new TextView(this)
             {
-                Text = $"{string.Concat(Enumerable.Repeat("🐧", boxData.Adults))}" +
-                    $"{string.Concat(Enumerable.Repeat("🐣", boxData.Chicks))}" + 
-                    $"{string.Concat(Enumerable.Repeat("🥚", boxData.Eggs))}",
+                Text = $"{string.Concat(Enumerable.Repeat("🐧", thisBoxData.Adults))}" +
+                    $"{string.Concat(Enumerable.Repeat("🐣", thisBoxData.Chicks))}" +
+                    $"{string.Concat(Enumerable.Repeat("🥚", thisBoxData.Eggs))}" + (differenceFound ? " (" : ""),
                 Gravity = GravityFlags.Center,
                 TextSize = 14
             };
+            if (differenceFound && thisBoxData.Eggs != thisRemoteBoxData?.numEggs() || thisBoxData.Chicks != thisRemoteBoxData?.numChicks())
+            {
+                summary.Text += $"{string.Concat(Enumerable.Repeat("🐣", thisRemoteBoxData.numChicks()))}{string.Concat(Enumerable.Repeat("🥚", thisRemoteBoxData.numEggs()))}";
+            }
+            if (differenceFound && thisRemoteBoxData?.breedingLikelyhoodText != "BR" && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
+            {
+                summary.Text += thisRemoteBoxData.breedingLikelyhoodText;
+            }
+            if (differenceFound)
+            {
+                summary.Text += ")";
+            }
             summary.SetTextColor(Color.Black);
 
-            string gateStatus = boxData.GateStatus;
-            string notes = string.IsNullOrWhiteSpace(boxData.Notes) ? "" : "notes";
+            string gateStatus = thisBoxData.GateStatus;
+            string notes = string.IsNullOrWhiteSpace(thisBoxData.Notes) ? "" : "notes";
+            notes += gotRemoteBoxData && !string.IsNullOrEmpty(thisRemoteBoxData.PersistentNotes) ? $" ({thisRemoteBoxData.PersistentNotes})" : ""; 
             string lineThreeStatusText = "";
             if (!string.IsNullOrWhiteSpace(gateStatus) && !string.IsNullOrWhiteSpace(notes))
                 lineThreeStatusText = gateStatus + " & " + notes;
