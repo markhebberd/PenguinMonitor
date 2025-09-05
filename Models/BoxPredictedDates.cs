@@ -17,29 +17,51 @@
                     ;
                 DateTime estHatch = DateTime.Parse(estHatchDate);
                 if (estHatch.AddDays(3) > DateTime.Now)
-                    return "Hatch " + (estHatch.Equals(DateTime.Today) ?"today": (estHatch - DateTime.Now).TotalDays.ToString("F1") + " days");
+                    return "Hatch " + getDateString(estHatch);
 
                 DateTime estPG = DateTime.Parse(estHatchDate);
                 if (estPG.AddDays(3) > DateTime.Now)
-                    return "PG " + (estPG.Equals(DateTime.Today) ? "today" : (estPG - DateTime.Now).TotalDays.ToString("F1") + " days");
+                    return "PG " + getDateString(estPG);
 
                 DateTime estFledge = DateTime.Parse(estFledgeDate);
                 if (estFledge.AddDays(3) > DateTime.Now)
-                    return "Fledge " + (estFledge.Equals(DateTime.Today) ? "today" : (estFledge - DateTime.Now).TotalDays.ToString("F1") + " days");
+                    return "Fledge " + getDateString(estFledge);
 
                 DateTime chipStart = DateTime.Parse(chipWindowStart);
                 if (chipStart.AddDays(3) > DateTime.Now)
-                    return "ChipStart " + (chipStart.Equals(DateTime.Today) ? "today" : (chipStart - DateTime.Now).TotalDays.ToString("F1") + " days");
+                    return "ChipStart " + getDateString(chipStart);
 
                 DateTime chipFinish = DateTime.Parse(chipWindowFinish);
                 if (chipFinish.AddDays(3) > DateTime.Now)
-                    return "ChipFin " + (chipFinish.Equals(DateTime.Today) ? "today" : (chipFinish - DateTime.Now).TotalDays.ToString("F1") + " days");
+                    return "ChipFin " + getDateString(chipFinish);
             }
             catch
             {
                 return "BreedingDateError";
             }
             return "";
+        }
+
+        private string getDateString(DateTime expectedDate)
+        {
+            DateTime today = DateTime.Today;
+            if (expectedDate.Date.Equals(today))
+            {
+                return "today";
+            }
+            if ((expectedDate.Date - today).TotalDays == 1)
+            {
+                return "tomorrow";
+            }
+            if ((expectedDate.Date - today).TotalDays == -1)
+            {
+                return "yesterday";
+            }
+            if (expectedDate > today)
+            {
+                return "in " + Math.Ceiling((expectedDate - DateTime.Now).TotalDays) + " days";
+            }
+            return Math.Ceiling((DateTime.Now - expectedDate).TotalDays) + " days ago";
         }
     }
 }

@@ -99,7 +99,7 @@ namespace BluePenguinMonitoring
         private CheckBox? _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int version = 22;
+        private static int version = 23;
         private static int numberMonitorBoxes = 156;
 
         //multibox View
@@ -721,7 +721,7 @@ namespace BluePenguinMonitoring
 
             var titleText = new TextView(this)
             {
-                Text = "Penguin Monitoring",
+                Text = "Penguin Monitor",
                 TextSize = 28,
                 Gravity = GravityFlags.Center
             };
@@ -848,7 +848,7 @@ namespace BluePenguinMonitoring
 
             TextView multiBoxTitle = new TextView(this)
             {
-                Text = "📦 Box Data Overview",
+                Text = "📦 Box Overview",
                 TextSize = 30,
                 Gravity = GravityFlags.Center
             };
@@ -1197,7 +1197,7 @@ namespace BluePenguinMonitoring
             };
             _isBluetoothEnabled.SetTextColor(Color.Black);
 
-            _isBluetoothEnabled.Checked = true;
+            _isBluetoothEnabled.Checked = false;
             _isBluetoothEnabled.CheckedChange += (s, e) =>
             {
                 if (_isBluetoothEnabled.Checked)
@@ -1206,6 +1206,7 @@ namespace BluePenguinMonitoring
                 }
                 else
                 {
+                    _bluetoothManager?.Disconnect();
                     _bluetoothManager?.Dispose();
                     _bluetoothManager = null;
                     UpdateStatusText("Bluetooth Disabled");
