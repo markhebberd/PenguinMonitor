@@ -96,10 +96,10 @@ namespace BluePenguinMonitoring
         private ScrollView? _rootScrollView;
         private LinearLayout? _topButtonLayout;
         private LinearLayout? _settingsCard;
-        private CheckBox? _isBluetoothEnabled;
+        private CheckBox? _isBluetoothEnabledCheckBox;
 
         //Lazy versioning.
-        private static int version = 23;
+        private static int version = 24;
         private static int numberMonitorBoxes = 156;
 
         //multibox View
@@ -190,14 +190,14 @@ namespace BluePenguinMonitoring
                     // All permissions already granted
                     System.Diagnostics.Debug.WriteLine("All permissions already granted");
                     InitializeGPS();
-                    InitializeBluetooth();
+                    //InitializeBluetooth();
                 }
             }
             else
             {
                 // Pre-Android 6 or no permissions needed
                 InitializeGPS();
-                InitializeBluetooth();
+                //InitializeBluetooth();
             }
         }
         private void InitializeVibrationAndSound()
@@ -257,7 +257,8 @@ namespace BluePenguinMonitoring
             _bluetoothManager = new BluetoothManager();
             _bluetoothManager.StatusChanged += OnBluetoothStatusChanged;
             _bluetoothManager.EidDataReceived += OnEidDataReceived;
-            _ = _bluetoothManager.StartConnectionAsync();
+            if (_isBluetoothEnabledCheckBox.Checked)
+                _ = _bluetoothManager.StartConnectionAsync();
         }
         private void OnBluetoothStatusChanged(string status)
         {
@@ -1191,16 +1192,16 @@ namespace BluePenguinMonitoring
             versionText.SetTextColor(Color.Black);
             _settingsCard.AddView(versionText);
 
-            _isBluetoothEnabled = new CheckBox(this)
+            _isBluetoothEnabledCheckBox = new CheckBox(this)
             {
                 Text = "Enable bluetooth",
             };
-            _isBluetoothEnabled.SetTextColor(Color.Black);
+            _isBluetoothEnabledCheckBox.SetTextColor(Color.Black);
 
-            _isBluetoothEnabled.Checked = false;
-            _isBluetoothEnabled.CheckedChange += (s, e) =>
+            _isBluetoothEnabledCheckBox.Checked = false;
+            _isBluetoothEnabledCheckBox.CheckedChange += (s, e) =>
             {
-                if (_isBluetoothEnabled.Checked)
+                if (_isBluetoothEnabledCheckBox.Checked)
                 {
                     InitializeBluetooth();
                 }
@@ -1212,7 +1213,7 @@ namespace BluePenguinMonitoring
                     UpdateStatusText("Bluetooth Disabled");
                 }
             };
-            _settingsCard.AddView(_isBluetoothEnabled);
+            _settingsCard.AddView(_isBluetoothEnabledCheckBox);
         }
         private void OnScrollViewTouch(object? sender, View.TouchEventArgs e)
         {
