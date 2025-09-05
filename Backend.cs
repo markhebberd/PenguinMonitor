@@ -60,6 +60,7 @@ namespace SmtpAuthenticator
                 using (TcpClient client = new TcpClient(licenceServerIP, licenceServerPort))
                 using (NetworkStream stream = client.GetStream())
                 {
+                    client.ReceiveTimeout = client.SendTimeout = 2000;         
                     using (StreamReader reader = new StreamReader(stream))
                     using (StreamWriter writer = new StreamWriter(stream))
                     {
