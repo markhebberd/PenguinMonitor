@@ -99,7 +99,7 @@ namespace BluePenguinMonitoring
         private CheckBox? _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int version = 18;
+        private static int version = 19;
         private static int numberMonitorBoxes = 156;
 
         //multibox View
@@ -1374,9 +1374,7 @@ namespace BluePenguinMonitoring
                     for (int i = 0; i < _topButtonLayout.ChildCount; i++)
                     {
                         Button child = (Button) _topButtonLayout.GetChildAt(i);
-
                         SetEnabledRecursive(child, _isBoxLocked, _isBoxLocked ? 1.0f : 0.5f);
-
                         if (_isBoxLocked && child.Text.Equals("Clear All") && _monitoredBoxDataDB.Count == 0)
                             SetEnabledRecursive(child, false, 0.5f);
                         else if (_isBoxLocked && child.Text.Equals("Clear Box") && !_monitoredBoxDataDB.ContainsKey(_currentBox))
