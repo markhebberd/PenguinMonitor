@@ -11,13 +11,12 @@ namespace BluePenguinMonitoring.UI.Factories
         private readonly Context _context;
         
         // Color constants
-        public static readonly Color PRIMARY_COLOR = Color.ParseColor("#2196F3");
-        public static readonly Color PRIMARY_DARK = Color.ParseColor("#1976D2");
-        public static readonly Color SUCCESS_COLOR = Color.ParseColor("#4CAF50");   // green
-        public static readonly Color WARNING_COLOR = Color.ParseColor("#FF9800");   // yellow orange
-        public static readonly Color DANGER_COLOR = Color.ParseColor("#F44336");    // red
-        public static readonly Color TEXT_FIELD_BACKGROUND_COLOR = Color.ParseColor("#F0F0F0");
-        public static readonly Color BACKGROUND_COLOR = Color.LightGray;
+        public static readonly Color PRIMARY_BLUE = Color.ParseColor("#2196F3");   // selectBox bo
+        public static readonly Color SUCCESS_GREEN = Color.ParseColor("#4CAF50");   // green
+        public static readonly Color WARNING_YELLOW = Color.ParseColor("#FF9800");   // yellow orange
+        public static readonly Color DANGER_RED = Color.ParseColor("#F44336");    // red
+        public static readonly Color LIGHTER_GRAY = Color.ParseColor("#F0F0F0");
+        public static readonly Color LIGHT_GRAY = Color.ParseColor("#F0F0F0");
         public static readonly Color BORDER_COLOUR = Color.ParseColor("#E0E0E0");
         public static readonly Color CARD_COLOR = Color.White;
         public static readonly Color TEXT_PRIMARY = Color.ParseColor("#212121");
@@ -124,7 +123,7 @@ namespace BluePenguinMonitoring.UI.Factories
             editText.SetTextColor(TEXT_PRIMARY);
             editText.SetTextSize(Android.Util.ComplexUnitType.Sp, 16);
             editText.SetPadding(16, 20, 16, 20);
-            editText.Background = CreateRoundedBackground(TEXT_FIELD_BACKGROUND_COLOR, 8);
+            editText.Background = CreateRoundedBackground(LIGHTER_GRAY, 8);
 
             var layoutParams = (LinearLayout.LayoutParams)editText.LayoutParameters;
             layoutParams.SetMargins(4, 0, 4, 0);
@@ -135,7 +134,7 @@ namespace BluePenguinMonitoring.UI.Factories
         {
             var spinner = new Spinner(_context);
             spinner.SetPadding(16, 20, 16, 20);
-            spinner.Background = CreateRoundedBackground(TEXT_FIELD_BACKGROUND_COLOR, 8);
+            spinner.Background = CreateRoundedBackground(LIGHTER_GRAY, 8);
             
             // Create options with actual values (empty string, "gate up", "regate")
             // but display custom text in dropdown for the first option

@@ -99,7 +99,7 @@ namespace BluePenguinMonitoring
         private CheckBox? _isBluetoothEnabled;
 
         //Lazy versioning.
-        private static int version = 17;
+        private static int version = 18;
         private static int numberMonitorBoxes = 156;
 
         //multibox View
@@ -319,9 +319,9 @@ namespace BluePenguinMonitoring
 
                     // Update status color based on connection state
                     if (btStatus.Contains("Connected") && _gpsAccuracy > 0)
-                        _statusText.SetTextColor(UIFactory.SUCCESS_COLOR);
+                        _statusText.SetTextColor(UIFactory.SUCCESS_GREEN);
                     else if (btStatus.Contains("Connected"))
-                        _statusText.SetTextColor(UIFactory.WARNING_COLOR);
+                        _statusText.SetTextColor(UIFactory.WARNING_YELLOW);
                     else
                         _statusText.SetTextColor(UIFactory.TEXT_SECONDARY);
                 }
@@ -660,7 +660,7 @@ namespace BluePenguinMonitoring
             {
                 _isDownloadingCsvData = true;
                 clickedButton.Text = "Loading data";
-                clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.WARNING_COLOR, 8);
+                clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.WARNING_YELLOW, 8);
 
                 _ = Task.Run(async () =>
                 {
@@ -671,7 +671,7 @@ namespace BluePenguinMonitoring
                     {
                         _isDownloadingCsvData = false;
                         clickedButton.Text = "Bird Stats";
-                        clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_DARK, 8);
+                        clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_BLUE, 8);
                         DrawPageLayouts();
                     });
                 });
@@ -682,7 +682,7 @@ namespace BluePenguinMonitoring
             selectedPage = UIFactory.selectedPage.BoxDataSingle;
             _isBoxLocked = true;
             _rootScrollView = new ScrollView(this);
-            _rootScrollView.SetBackgroundColor(UIFactory.BACKGROUND_COLOR);
+            _rootScrollView.SetBackgroundColor(UIFactory.LIGHT_GRAY);
 
             // Initialize gesture detector and apply to ScrollView
             _gestureDetector = new GestureDetector(this, new SwipeGestureDetector(this));
@@ -725,7 +725,7 @@ namespace BluePenguinMonitoring
                 Gravity = GravityFlags.Center
             };
             titleText.SetPadding(0, 0, 0, 0);
-            titleText.SetTextColor(UIFactory.PRIMARY_COLOR);
+            titleText.SetTextColor(UIFactory.PRIMARY_BLUE);
             titleText.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
             titleCard.AddView(titleText);
             _statusText = new TextView(this)
@@ -749,10 +749,10 @@ namespace BluePenguinMonitoring
 
             // Action buttons
             _topButtonLayout = CreateStyledButtonLayout(
-                ("Clear All", OnClearBoxesClick, UIFactory.DANGER_COLOR),
-                ("Clear Box", OnClearBoxClick, UIFactory.WARNING_COLOR),
-                ("Bird Stats", OnDownloadCsvClick, UIFactory.PRIMARY_DARK),
-                ("Save/Load", OnDataClick, UIFactory.SUCCESS_COLOR)
+                ("Clear All", OnClearBoxesClick, UIFactory.DANGER_RED),
+                ("Clear Box", OnClearBoxClick, UIFactory.WARNING_YELLOW),
+                ("Bird Stats", OnDownloadCsvClick, UIFactory.PRIMARY_BLUE),
+                ("Save/Load", OnDataClick, UIFactory.SUCCESS_GREEN)
             );
             _topButtonLayout.LayoutParameters = statusParams;
             headerCard.AddView(_topButtonLayout);
@@ -1051,7 +1051,7 @@ namespace BluePenguinMonitoring
                 Orientation = Android.Widget.Orientation.Vertical
             };
             card.SetPadding(10, 10, 10, 10);
-            card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, UIFactory.WARNING_COLOR);
+            card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, UIFactory.WARNING_YELLOW);
 
             var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent, 1f);
             cardParams.SetMargins(8, 0, 8, 0);
@@ -1100,7 +1100,7 @@ namespace BluePenguinMonitoring
                 || thisRemoteBoxData?.breedingLikelyhoodText != "BR" && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
             {
                 differenceFound = true;
-                card.Background = _uiFactory.CreateCardBackground(borderWidth: 6, borderColour: UIFactory.SUCCESS_COLOR);
+                card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.PRIMARY_BLUE);
             }
             else
             {
@@ -1242,7 +1242,7 @@ namespace BluePenguinMonitoring
                 Orientation = Android.Widget.Orientation.Horizontal
             };
 
-            _prevBoxButton = _uiFactory.CreateStyledButton("← Prev box", UIFactory.PRIMARY_COLOR);
+            _prevBoxButton = _uiFactory.CreateStyledButton("← Prev box", UIFactory.PRIMARY_BLUE);
             _prevBoxButton.Click += OnPrevBoxClick;
             var prevParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             _prevBoxButton.LayoutParameters = prevParams;
@@ -1257,13 +1257,13 @@ namespace BluePenguinMonitoring
             _selectBoxButton.SetTextColor(Color.White);
             _selectBoxButton.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
             _selectBoxButton.SetPadding(16, 24, 16, 24);
-            _selectBoxButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_COLOR, 8);
+            _selectBoxButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_BLUE, 8);
             _selectBoxButton.Click += OnBoxNumberClick;
             var boxParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             boxParams.SetMargins(8, 0, 8, 0);
             _selectBoxButton.LayoutParameters = boxParams;
 
-            _nextBoxButton = _uiFactory.CreateStyledButton("Next box →", UIFactory.PRIMARY_COLOR);
+            _nextBoxButton = _uiFactory.CreateStyledButton("Next box →", UIFactory.PRIMARY_BLUE);
             _nextBoxButton.Click += OnNextBoxClick;
             var nextParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             _nextBoxButton.LayoutParameters = nextParams;
@@ -1302,7 +1302,7 @@ namespace BluePenguinMonitoring
                         _lockIconView.SetImageResource(Resource.Drawable.locked_yellow);
                         _lockIconView.SetColorFilter(
                             new Android.Graphics.PorterDuffColorFilter(
-                                UIFactory.WARNING_COLOR, // yellow
+                                UIFactory.WARNING_YELLOW, // yellow
                                 Android.Graphics.PorterDuff.Mode.SrcIn));
                     }
                     else if (_isBoxLocked)
@@ -1310,7 +1310,7 @@ namespace BluePenguinMonitoring
                         _lockIconView.SetImageResource(Resource.Drawable.locked_green);
                         _lockIconView.SetColorFilter(
                             new Android.Graphics.PorterDuffColorFilter(
-                                UIFactory.SUCCESS_COLOR,     // green
+                                UIFactory.SUCCESS_GREEN,     // green
                                 Android.Graphics.PorterDuff.Mode.SrcIn));
                     }
                     else
@@ -1318,7 +1318,7 @@ namespace BluePenguinMonitoring
                         _lockIconView.SetImageResource(Resource.Drawable.unlocked_red);
                         _lockIconView.SetColorFilter(
                             new Android.Graphics.PorterDuffColorFilter(
-                                UIFactory.DANGER_COLOR,     // red
+                                UIFactory.DANGER_RED,     // red
                                 Android.Graphics.PorterDuff.Mode.SrcIn));
                     }
 
@@ -1334,8 +1334,8 @@ namespace BluePenguinMonitoring
                     _interestingBoxTextView.Text = "💡 Note: " + _remoteBoxData[_currentBox].PersistentNotes;
                     _interestingBoxTextView.Visibility = ViewStates.Visible;
                     _interestingBoxTextView.Gravity = GravityFlags.Center;
-                    _interestingBoxTextView.SetBackgroundColor(UIFactory.BACKGROUND_COLOR);
-                    _interestingBoxTextView.SetTextColor(UIFactory.PRIMARY_DARK);
+                    _interestingBoxTextView.SetBackgroundColor(UIFactory.LIGHT_GRAY);
+                    _interestingBoxTextView.SetTextColor(UIFactory.PRIMARY_BLUE);
                 }
 
                 var editTexts = new[] { _adultsEditText, _eggsEditText, _chicksEditText, _notesEditText };
@@ -1503,7 +1503,7 @@ namespace BluePenguinMonitoring
                 Orientation = Android.Widget.Orientation.Vertical
             };
             _scannedIdsLayout.SetPadding(16, 16, 16, 16);
-            _scannedIdsLayout.Background = _uiFactory.CreateRoundedBackground(UIFactory.TEXT_FIELD_BACKGROUND_COLOR, 8);
+            _scannedIdsLayout.Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
             var idsParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             idsParams.SetMargins(0, 0, 0, 16);
             _scannedIdsLayout.LayoutParameters = idsParams;
@@ -1599,7 +1599,7 @@ namespace BluePenguinMonitoring
             _notesEditText.SetTextColor(UIFactory.TEXT_PRIMARY);
             _notesEditText.SetHintTextColor(UIFactory.TEXT_SECONDARY);
             _notesEditText.SetPadding(16, 16, 16, 16);
-            _notesEditText.Background = _uiFactory.CreateRoundedBackground(UIFactory.TEXT_FIELD_BACKGROUND_COLOR, 8);
+            _notesEditText.Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
             var notesEditParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             notesEditParams.SetMargins(0, 0, 0, 8);
             _notesEditText.LayoutParameters = notesEditParams;
@@ -1887,7 +1887,7 @@ namespace BluePenguinMonitoring
             addButton.SetTextColor(Color.White);
             addButton.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
             addButton.SetPadding(16, 12, 16, 12); 
-            addButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.SUCCESS_COLOR, 8);
+            addButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.SUCCESS_GREEN, 8);
             addButton.SetAllCaps(false);
 
             var addButtonParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
@@ -1968,7 +1968,7 @@ namespace BluePenguinMonitoring
             moveButton.SetTextColor(Color.White);
             moveButton.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal); 
             moveButton.SetPadding(12, 8, 12, 8);
-            moveButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_COLOR, 8);
+            moveButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_BLUE, 8);
             moveButton.SetAllCaps(false);
 
             var moveButtonParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
@@ -1989,7 +1989,7 @@ namespace BluePenguinMonitoring
             deleteButton.SetTextColor(Color.White);
             deleteButton.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal); 
             deleteButton.SetPadding(12, 8, 12, 8);
-            deleteButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.DANGER_COLOR, 8);
+            deleteButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.DANGER_RED, 8);
             deleteButton.SetAllCaps(false);
 
             var deleteButtonParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
@@ -2324,7 +2324,7 @@ namespace BluePenguinMonitoring
             };
             input.SetTextColor(UIFactory.TEXT_PRIMARY);
             input.SetPadding(16, 16, 16, 16);
-            input.Background = _uiFactory.CreateRoundedBackground(UIFactory.TEXT_FIELD_BACKGROUND_COLOR, 8);
+            input.Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
 
             var alertDialog = new AlertDialog.Builder(this)
                 .SetTitle("Save Data File")
