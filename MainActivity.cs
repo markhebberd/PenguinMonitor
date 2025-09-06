@@ -1490,11 +1490,11 @@ namespace BluePenguinMonitoring
             _dataCardTitleLayout.Click += (sender, e) =>
             {
                 _isBoxLocked = !_isBoxLocked;
-                if (!_isBoxLocked) 
+                if (!_isBoxLocked)
                 {
                     DrawPageLayouts();
                 }
-                else 
+                else
                 {
                     if (!_monitoredBoxDataDB.ContainsKey(_currentBox) && dataCardHasZeroData())
                     {
@@ -1512,7 +1512,6 @@ namespace BluePenguinMonitoring
                         SaveCurrentBoxData();
                         DrawPageLayouts();
                     }
-                    //Toast.MakeText(this, "🔒 Box locked", ToastLength.Short)?.Show();
                 }
             };
 
@@ -1872,8 +1871,9 @@ namespace BluePenguinMonitoring
             if (boxData.ToString() != boxDataString)
             {
                 boxData.whenDataCollectedUtc = DateTime.UtcNow; // Update timestamp if data changed
+                _monitoredBoxDataDB[_currentBox] = boxData;
+                SaveToAppDataDir();
             }
-            SaveToAppDataDir();
         }
         private void buildScannedIdsLayout(List<ScanRecord> scans)
         {
