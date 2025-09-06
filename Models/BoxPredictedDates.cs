@@ -17,23 +17,23 @@
                     ;
                 DateTime estHatch = DateTime.Parse(estHatchDate);
                 if (estHatch.AddDays(3) > DateTime.Now)
-                    return "Hatch " + getDateString(estHatch);
+                    return "Hatch" + getDateString(estHatch);
 
                 DateTime estPG = DateTime.Parse(estHatchDate);
                 if (estPG.AddDays(3) > DateTime.Now)
-                    return "PG " + getDateString(estPG);
+                    return "PG" + getDateString(estPG);
 
                 DateTime estFledge = DateTime.Parse(estFledgeDate);
                 if (estFledge.AddDays(3) > DateTime.Now)
-                    return "Fledge " + getDateString(estFledge);
+                    return "Fledge" + getDateString(estFledge);
 
                 DateTime chipStart = DateTime.Parse(chipWindowStart);
                 if (chipStart.AddDays(3) > DateTime.Now)
-                    return "ChipStart " + getDateString(chipStart);
+                    return "Chip" + getDateString(chipStart);
 
                 DateTime chipFinish = DateTime.Parse(chipWindowFinish);
                 if (chipFinish.AddDays(3) > DateTime.Now)
-                    return "ChipFin " + getDateString(chipFinish);
+                    return "ChipFin" + getDateString(chipFinish);
             }
             catch
             {
@@ -47,21 +47,21 @@
             DateTime today = DateTime.Today;
             if (expectedDate.Date.Equals(today))
             {
-                return "today";
+                return " today";
             }
             if ((expectedDate.Date - today).TotalDays == 1)
             {
-                return "tomorrow";
+                return " tomorrow";
             }
             if ((expectedDate.Date - today).TotalDays == -1)
             {
-                return "yesterday";
+                return " yesterday";
             }
             if (expectedDate > today)
             {
-                return "in " + Math.Ceiling((expectedDate - DateTime.Now).TotalDays) + " days";
+                return " in " + Math.Ceiling((expectedDate - DateTime.Now).TotalDays) + " days";
             }
-            return Math.Ceiling((DateTime.Now - expectedDate).TotalDays) + " days ago";
+            return " " + Math.Ceiling((DateTime.Now - expectedDate).TotalDays) + " days ago";
         }
     }
 }

@@ -637,8 +637,8 @@ namespace BluePenguinMonitoring
                 _remotePenguinData.ContainsKey(id.BirdId) && _remotePenguinData[id.BirdId].Sex.Equals("F", StringComparison.OrdinalIgnoreCase)));
             var totalEggs = _monitoredBoxDataDB.Values.Sum(box => box.Eggs);
             var totalChicks = _monitoredBoxDataDB.Values.Sum(box => box.Chicks);
-            var gateUpCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "gate up");
-            var regateCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "regate");
+            var gateUpCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "Gate up");
+            var regateCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "Regate");
 
             var summary = $"📊 Data Summary:\n\n" +
                          $"📦 {_monitoredBoxDataDB.Count} boxes with data\n" +
@@ -988,7 +988,7 @@ namespace BluePenguinMonitoring
             _multiBoxViewCard.AddView(_multiboxBoxFilterCard);
             _multiboxBoxFilterCard.Visibility = _showMultiboxFilterCard ? ViewStates.Visible : ViewStates.Gone;
 
-            int boxesPerRow = 3;
+            int boxesPerRow = 2;
             LinearLayout? currentRow = null;
 
             int visibleBoxCount = 0;
@@ -1565,7 +1565,7 @@ namespace BluePenguinMonitoring
             _gateStatusSpinner.ItemSelected += (sender, e) =>
             {
                 string status = _gateStatusSpinner.SelectedItem.ToString();
-                if (status.Equals("gate up") || status.Equals("regate"))
+                if (status.Equals("Gate up") || status.Equals("Regate"))
                 {
                     if (!_monitoredBoxDataDB.ContainsKey(_currentBox))
                     {
@@ -1721,8 +1721,8 @@ namespace BluePenguinMonitoring
             var totalChicks = _monitoredBoxDataDB.Values.Sum(box => box.Chicks);
             
             // Only count actual gate status values - ignore nulls
-            var gateUpCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "gate up");
-            var regateCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "regate");
+            var gateUpCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "Gate up");
+            var regateCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "Regate");
 
             ShowConfirmationDialog(
                 "Save All Data",
