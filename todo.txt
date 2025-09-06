@@ -1,5 +1,9 @@
 TODO
 
+all entries should be on same date. 
+entry date should be in box data header. 
+int & single egg row NO/No DCM
+
 penguin reporting under specific name to seperate britta from alternate locations
 clicking on a scan entry should 
 	show all known data about the bird 

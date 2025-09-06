@@ -140,7 +140,7 @@ namespace BluePenguinMonitoring.UI.Factories
             
             // Create options with actual values (empty string, "gate up", "regate")
             // but display custom text in dropdown for the first option
-            var gateStatusOptions = new string[] { "", "gate up", "regate" };
+            var gateStatusOptions = new string[] { "", "Gate up", "Regate" };
             var adapter = new CustomSpinnerAdapter(_context, Android.Resource.Layout.SimpleSpinnerItem, gateStatusOptions);
             adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
             spinner.Adapter = adapter;

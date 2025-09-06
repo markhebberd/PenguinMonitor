@@ -101,8 +101,8 @@ namespace BluePenguinMonitoring
         private CheckBox? _isBluetoothEnabledCheckBox;
 
         //Lazy versioning.
-        private static int version = 25;
-        private static int numberMonitorBoxes = 156;
+        private static int version = 26;
+        private static int numberMonitorBoxes = 150;
 
         //multibox View
         private LinearLayout? _multiBoxViewCard;
@@ -656,6 +656,9 @@ namespace BluePenguinMonitoring
             );
         }
         private bool _isDownloadingCsvData = false;
+        private bool _showNoBoxesInMultiBoxView;
+        private bool _hideDCMInMultiBoxView;
+
         private void OnDownloadCsvClick(object? sender, EventArgs e)
         {
             if (sender is Button clickedButton && _isDownloadingCsvData == false)
@@ -698,7 +701,7 @@ namespace BluePenguinMonitoring
             };
 
             // App header
-            var headerCard = _uiFactory.CreateCard();
+            var headerCard = _uiFactory.CreateCard(borderWidth: 0);
             var menuButton = new ImageButton(this)
             {
                 LayoutParameters = new LinearLayout.LayoutParams(
@@ -710,7 +713,7 @@ namespace BluePenguinMonitoring
             menuButton.SetBackgroundColor(Color.Transparent); // No background
             menuButton.Click += hamburgerButtonClick;
 
-            var titleCard = _uiFactory.CreateCard(Android.Widget.Orientation.Horizontal, padding: 0);
+            var titleCard = _uiFactory.CreateCard(Android.Widget.Orientation.Horizontal, padding: 0, borderWidth: 0);
             titleCard.SetGravity(GravityFlags.Center);
 
             // Add to headerCard before titleText
@@ -740,12 +743,12 @@ namespace BluePenguinMonitoring
             };
             _statusText.SetTextColor(UIFactory.TEXT_SECONDARY);
             var statusParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
-            statusParams.SetMargins(0, 20, 0, 0);
+            statusParams.SetMargins(0, 0, 0, 0);
             _statusText.LayoutParameters = statusParams;
             var titleAndStatusCard = _uiFactory.CreateCard(padding: 5);
             titleAndStatusCard.AddView(titleCard);
             titleAndStatusCard.AddView(_statusText);
-            titleAndStatusCard.Background = _uiFactory.CreateCardBackground(borderWidth: 3);
+            titleAndStatusCard.Background = _uiFactory.CreateCardBackground(borderWidth: 0);
 
             headerCard.AddView(titleAndStatusCard);
 
@@ -758,6 +761,7 @@ namespace BluePenguinMonitoring
                 ("Bird Stats", OnDownloadCsvClick, UIFactory.PRIMARY_BLUE),
                 ("Save/Load", OnDataClick, UIFactory.SUCCESS_GREEN)
             );
+            statusParams.SetMargins(0, 0, 0, 10);
             _topButtonLayout.LayoutParameters = statusParams;
             headerCard.AddView(_topButtonLayout);
 
@@ -895,23 +899,52 @@ namespace BluePenguinMonitoring
             {
                 Text = "With data",
                 Checked = _showBoxesWithDataInMultiBoxView
-                
+
             };
             showBoxesWithDataInMultiboxView.SetTextColor(Color.Black);
             showBoxesWithDataInMultiboxView.Click += (s, e) =>
             {
                 _showBoxesWithDataInMultiBoxView = showBoxesWithDataInMultiboxView.Checked;
-                if(_showBoxesWithDataInMultiBoxView) _showAllBoxesInMultiBoxView = false;
+                if (_showBoxesWithDataInMultiBoxView) _showAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
             allAndDataFiltersLayout.AddView(showBoxesWithDataInMultiboxView);
+
+            CheckBox hideDCMInMultiboxView = new CheckBox(this)
+            {
+                Text = "Hide DCM",
+                Checked = _hideDCMInMultiBoxView
+            };
+            hideDCMInMultiboxView.SetTextColor(Color.Black);
+            hideDCMInMultiboxView.Click += (s, e) =>
+            {
+                _hideDCMInMultiBoxView = hideDCMInMultiboxView.Checked;
+                DrawPageLayouts();
+            };
+            allAndDataFiltersLayout.AddView(hideDCMInMultiboxView);
+
             _multiboxBoxFilterCard.AddView(allAndDataFiltersLayout);
+
 
 
             var breedingChanceFilterLayout= new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Horizontal
             };
+            CheckBox showNoBoxesInMultiboxView = new CheckBox(this)
+            {
+                Text = "No",
+                Checked = _showNoBoxesInMultiBoxView,
+            };
+            showNoBoxesInMultiboxView.SetTextColor(Color.Black);
+            showNoBoxesInMultiboxView.Click += (s, e) =>
+            {
+                _showNoBoxesInMultiBoxView = showNoBoxesInMultiboxView.Checked;
+                if (_showNoBoxesInMultiBoxView) _showAllBoxesInMultiBoxView = false;
+                DrawPageLayouts();
+            };
+            breedingChanceFilterLayout.AddView(showNoBoxesInMultiboxView);
+
             CheckBox showUnlikelyBoxesInMultiboxView = new CheckBox(this)
             {
                 Text = "Unlikely",
@@ -921,6 +954,7 @@ namespace BluePenguinMonitoring
             showUnlikelyBoxesInMultiboxView.Click += (s, e) =>
             {
                 _showUnlikleyBoxesInMultiBoxView = showUnlikelyBoxesInMultiboxView.Checked;
+                if (_showUnlikleyBoxesInMultiBoxView) _showAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
             breedingChanceFilterLayout.AddView(showUnlikelyBoxesInMultiboxView);
@@ -934,6 +968,7 @@ namespace BluePenguinMonitoring
             showPotentialBoxesInMultiboxView.Click += (s, e) =>
             {
                 _showPotentialBoxesInMultiBoxView = showPotentialBoxesInMultiboxView.Checked;
+                if (_showPotentialBoxesInMultiBoxView) _showAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
             breedingChanceFilterLayout.AddView(showPotentialBoxesInMultiboxView);
@@ -947,48 +982,56 @@ namespace BluePenguinMonitoring
             showConfidentBoxesInMultiboxView.Click += (s, e) =>
             {
                 _showConfidentBoxesInMultiBoxView = showConfidentBoxesInMultiboxView.Checked;
+                if (_showConfidentBoxesInMultiBoxView) _showAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
             breedingChanceFilterLayout.AddView(showConfidentBoxesInMultiboxView);
             _multiboxBoxFilterCard.AddView(breedingChanceFilterLayout);
 
+
+
+            var specialBoxFilterLayout = new LinearLayout(this)
+            {
+                Orientation = Android.Widget.Orientation.Horizontal
+            };
             var interestingFilterLayout = new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Horizontal
             };
-            CheckBox showInterestingBoxesInMultiboxView = new CheckBox(this)
+            CheckBox showSpecialBoxesInMultiboxView = new CheckBox(this)
             {
-                Text = "Interesting",
+                Text = "Special",
                 Checked = _showInterestingBoxesInMultiBoxView
             };
-            showInterestingBoxesInMultiboxView.SetTextColor(Color.Black);
-            showInterestingBoxesInMultiboxView.Click += (s, e) =>
+            showSpecialBoxesInMultiboxView.SetTextColor(Color.Black);
+            showSpecialBoxesInMultiboxView.Click += (s, e) =>
             {
-                _showInterestingBoxesInMultiBoxView = showInterestingBoxesInMultiboxView.Checked;
+                _showInterestingBoxesInMultiBoxView = showSpecialBoxesInMultiboxView.Checked;
+                if (_showInterestingBoxesInMultiBoxView) _showAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
-            allAndDataFiltersLayout.AddView(showInterestingBoxesInMultiboxView);
+            specialBoxFilterLayout.AddView(showSpecialBoxesInMultiboxView);
 
             CheckBox showSingleEggBoxesInMultiboxView = new CheckBox(this)
             {
                 Text = "Single egg",
                 Checked = _showSingleEggBoxesInMultiboxView
             };
-            showSingleEggBoxesInMultiboxView.SetPadding(0, 0, 0, 40);
+            showSingleEggBoxesInMultiboxView.SetPadding(0, 0, 0, 0);
             showSingleEggBoxesInMultiboxView.SetTextColor(Color.Black);
             showSingleEggBoxesInMultiboxView.Click += (s, e) =>
             {
                 _showSingleEggBoxesInMultiboxView = showSingleEggBoxesInMultiboxView.Checked;
+                if (_showSingleEggBoxesInMultiboxView) _showAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
-            allAndDataFiltersLayout.AddView(showSingleEggBoxesInMultiboxView);
-
-            _multiboxBoxFilterCard.AddView(interestingFilterLayout);    
+            specialBoxFilterLayout.AddView(showSingleEggBoxesInMultiboxView);
+            _multiboxBoxFilterCard.AddView(specialBoxFilterLayout);    
 
             _multiBoxViewCard.AddView(_multiboxBoxFilterCard);
             _multiboxBoxFilterCard.Visibility = _showMultiboxFilterCard ? ViewStates.Visible : ViewStates.Gone;
 
-            int boxesPerRow = 2;
+            int boxesPerRow = 3;
             LinearLayout? currentRow = null;
 
             int visibleBoxCount = 0;
@@ -1006,6 +1049,7 @@ namespace BluePenguinMonitoring
                         ViewGroup.LayoutParams.MatchParent,
                         ViewGroup.LayoutParams.WrapContent);
                     currentRow.LayoutParameters = rowParams;
+                    currentRow.SetGravity(GravityFlags.Center);
 
                     _multiBoxViewCard.AddView(currentRow);
                 }
@@ -1014,16 +1058,16 @@ namespace BluePenguinMonitoring
                     var card = CreateBoxSummaryCard(boxNumber, _monitoredBoxDataDB[boxNumber], boxNumber == _currentBox);
                     currentRow?.AddView(card);
                     visibleBoxCount++;
-                    currentRow.SetPadding(0, 0, 0, 10);
                 }
                 else
                 {
                     if (_remoteBoxData != null &&  _remoteBoxData.ContainsKey(boxNumber))
                     {
-                        bool showBox = _showAllBoxesInMultiBoxView
+                        bool showBox = _showAllBoxesInMultiBoxView && (!_hideDCMInMultiBoxView || _remoteBoxData[boxNumber].breedingLikelyhoodText != "DCM")
                                         || _showConfidentBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON"
                                         || _showPotentialBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "POT"
                                         || _showUnlikleyBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL"
+                                        || _showNoBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO"
                                         || _showInterestingBoxesInMultiBoxView && !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes)
                                         || _showSingleEggBoxesInMultiboxView && _remoteBoxData[boxNumber].numEggs() ==1;
                         if(showBox)
@@ -1034,7 +1078,6 @@ namespace BluePenguinMonitoring
                             else
                                 card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber], boxNumber == _currentBox);
                             currentRow?.AddView(card);
-                            currentRow.SetPadding(0, 0, 0, 10);
                             visibleBoxCount++;
                         }
                     }
@@ -1052,18 +1095,18 @@ namespace BluePenguinMonitoring
             {
                 Orientation = Android.Widget.Orientation.Vertical
             };
-            card.SetPadding(10, 10, 10, 10);
+            card.SetPadding(5, 5, 5, 5);
             card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, UIFactory.WARNING_YELLOW, backgroundColor: selected?UIFactory.WARNING_YELLOW:null);
 
             var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent, 1f);
-            cardParams.SetMargins(8, 0, 8, 0);
+            cardParams.SetMargins(5,5,5,5);
             card.LayoutParameters = cardParams;
 
             var title = new TextView(this)
             {
                 Text = $"Box {boxNumber}",
                 Gravity = GravityFlags.Center,
-                TextSize = 16
+                TextSize = 18
             };
             title.SetTypeface(Typeface.DefaultBold, TypefaceStyle.Normal);
             title.SetTextColor(Color.Black);
@@ -1095,9 +1138,9 @@ namespace BluePenguinMonitoring
             {
                 Orientation = Android.Widget.Orientation.Vertical
             };
-            card.SetPadding(10, 10, 10, 10);
+            card.SetPadding(5, 5, 5, 5);
             var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent, 1f);
-            cardParams.SetMargins(8, 0, 8, 0);
+            cardParams.SetMargins(5, 5, 5, 5);
             card.LayoutParameters = cardParams;
             bool gotRemoteBoxData = _remoteBoxData.TryGetValue(boxNumber, out var thisRemoteBoxData);
             bool differenceFound = false;
@@ -1117,7 +1160,7 @@ namespace BluePenguinMonitoring
             {
                 Text = $"Box {boxNumber}",
                 Gravity = GravityFlags.Center,
-                TextSize = 16
+                TextSize = 18
             };
             title.SetTypeface(Typeface.DefaultBold, TypefaceStyle.Normal);
             title.SetTextColor(Color.Black);
@@ -1615,7 +1658,6 @@ namespace BluePenguinMonitoring
                 Hint = "Enter any additional notes...",
                 Gravity = Android.Views.GravityFlags.Top | Android.Views.GravityFlags.Start
             };
-            _notesEditText.SetLines(3);
             _notesEditText.SetTextColor(UIFactory.TEXT_PRIMARY);
             _notesEditText.SetHintTextColor(UIFactory.TEXT_SECONDARY);
             _notesEditText.SetPadding(16, 16, 16, 16);
@@ -2302,14 +2344,21 @@ namespace BluePenguinMonitoring
                         if (penguin.LastKnownLifeStage == LifeStage.Adult || 
                             penguin.LastKnownLifeStage == LifeStage.Returnee)
                         {
-                            toastMessage += $" (+1 Adult)";
                             _adultsEditText.Text = (int.Parse(_adultsEditText.Text ?? "0") + 1).ToString();
                             SaveCurrentBoxData();
+                            if (!penguin.Sex.Equals("f", StringComparison.OrdinalIgnoreCase) && !penguin.Sex.Equals("m", StringComparison.OrdinalIgnoreCase))
+                            {
+                                triggerAlertAsync();
+                                toastMessage += $" unsexed";
+                            }
+                            else
+                                toastMessage += $" (+1 Adult)";
                         }
                         else if (penguin.LastKnownLifeStage == LifeStage.Chick)
                         {
                             _chicksEditText.Text = (int.Parse(_chicksEditText.Text ?? "0") + 1).ToString();
                             SaveCurrentBoxData();
+                            triggerAlertAsync();
                             toastMessage += $" (+1 Chick)";
                         }
                         else

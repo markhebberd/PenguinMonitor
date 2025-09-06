@@ -133,6 +133,10 @@ namespace BluePenguinMonitoring.Services
                                 {
                                     lifeStage = parsedLifeStage;
                                 }
+                                else
+                                {
+                                    throw new Exception("Unknown life stage: " + row.LastKnownLifeStage);
+                                }
                             }
                             var penguinData = new PenguinData
                             {

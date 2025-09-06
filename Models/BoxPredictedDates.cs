@@ -23,17 +23,13 @@
                 if (estPG.AddDays(3) > DateTime.Now)
                     return "PG" + getDateString(estPG);
 
-                DateTime estFledge = DateTime.Parse(estFledgeDate);
-                if (estFledge.AddDays(3) > DateTime.Now)
-                    return "Fledge" + getDateString(estFledge);
-
                 DateTime chipStart = DateTime.Parse(chipWindowStart);
                 if (chipStart.AddDays(3) > DateTime.Now)
                     return "Chip" + getDateString(chipStart);
 
-                DateTime chipFinish = DateTime.Parse(chipWindowFinish);
-                if (chipFinish.AddDays(3) > DateTime.Now)
-                    return "ChipFin" + getDateString(chipFinish);
+                DateTime estFledge = DateTime.Parse(estFledgeDate);
+                if (estFledge.AddDays(3) > DateTime.Now)
+                    return "Fledge" + getDateString(estFledge);
             }
             catch
             {

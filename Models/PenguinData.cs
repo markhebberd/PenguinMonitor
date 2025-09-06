@@ -4,7 +4,8 @@ namespace BluePenguinMonitoring.Models
     {
         Adult,
         Chick,
-        Returnee
+        Returnee,
+        Dead
     }
 
     public class PenguinData
