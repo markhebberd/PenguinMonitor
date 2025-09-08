@@ -532,7 +532,11 @@ namespace BluePenguinMonitoring
                                 Chicks = dataNode["Chicks"]?.Value<int>() ?? 0,
                                 GateStatus = (dataNode["GateStatus"]?.Value<string>() ?? "").Replace("gate up", "Gate up").Replace("regate", "Regate"),
                                 Notes = dataNode["Notes"]?.Value<string>() ?? "",
-                                whenDataCollectedUtc = DateTime.TryParse(dataNode["whenDataCollectedUtc"]?.Value<string>() ?? "", out DateTime whenCollected) ? whenCollected.ToUniversalTime() : DateTime.MinValue,
+                                whenDataCollectedUtc = DateTime.TryParseExact(dataNode["whenDataCollectedUtc"]?.Value<string>() ?? "",
+                                "yyyy-MM-ddTHH:mm:ssZ",
+                                System.Globalization.CultureInfo.InvariantCulture,
+                                System.Globalization.DateTimeStyles.RoundtripKind,
+                                out DateTime whenCollected) ? whenCollected.ToUniversalTime() : DateTime.MinValue.ToUniversalTime(),
                             };
                             // Load scanned IDs
                             var scannedIdsNode = dataNode["ScannedIds"];
@@ -575,7 +579,11 @@ namespace BluePenguinMonitoring
                             Chicks = dataNode["Chicks"]?.Value<int>() ?? 0,
                             GateStatus = (dataNode["GateStatus"]?.Value<string>() ?? "").Replace("gate up", "Gate up").Replace("regate", "Regate"),
                             Notes = dataNode["Notes"]?.Value<string>() ?? "",
-                            whenDataCollectedUtc = DateTime.TryParse(dataNode["whenDataCollectedUtc"]?.Value<string>() ?? "", out DateTime whenCollected) ? whenCollected.ToUniversalTime() : DateTime.MinValue,
+                            whenDataCollectedUtc = DateTime.TryParseExact(dataNode["whenDataCollectedUtc"]?.Value<string>() ?? "",
+                                "yyyy-MM-ddTHH:mm:ssZ",
+                                System.Globalization.CultureInfo.InvariantCulture,
+                                System.Globalization.DateTimeStyles.RoundtripKind,
+                                out DateTime whenCollected) ? whenCollected.ToUniversalTime() : DateTime.MinValue.ToUniversalTime(),
                         };
                         // Load scanned IDs
                         var scannedIdsNode = dataNode["ScannedIds"];
@@ -836,34 +844,63 @@ namespace BluePenguinMonitoring
             {
                 _multiBoxViewCard.RemoveAllViews();
             }
-            var headerCard = _uiFactory.CreateCard(Android.Widget.Orientation.Horizontal);
-
-            var menuButton = new ImageButton(this)
-            {
-                LayoutParameters = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WrapContent,
-                    ViewGroup.LayoutParams.WrapContent)
-            };
-            menuButton.SetPadding(0, 0, 0, 0);
-            menuButton.SetImageResource(Android.Resource.Drawable.IcMenuManage); // Use built-in menu icon
-            menuButton.SetBackgroundColor(Color.Transparent); // No background
-            menuButton.Click += (sender, e) =>
+            var headerCard = _uiFactory.CreateCard(Android.Widget.Orientation.Horizontal, borderWidth:4);
+            headerCard.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+            
+            var showFiltersButton = new ImageButton(this);
+            showFiltersButton.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
+            showFiltersButton.SetPadding(0, 0, 0, 0);
+            showFiltersButton.SetImageResource(Android.Resource.Drawable.IcMenuManage); // Use built-in menu icon
+            showFiltersButton.SetBackgroundColor(Color.Transparent); // No background
+            showFiltersButton.Click += (sender, e) =>
             {
                 _showMultiboxFilterCard = !_showMultiboxFilterCard;
                 DrawPageLayouts();
             };
-            headerCard.AddView(menuButton);
+            headerCard.AddView(showFiltersButton);
 
             TextView multiBoxTitle = new TextView(this)
             {
                 Text = "📦 Box Overview",
                 TextSize = 30,
-                Gravity = GravityFlags.Center
+                Gravity = GravityFlags.Left
             };
+            multiBoxTitle.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
             multiBoxTitle.SetTextColor(Color.Black);
-            multiBoxTitle.SetPadding(10, 10, 10, 20);
-
+            multiBoxTitle.SetPadding(0, 0, 0, 0);
             headerCard.AddView(multiBoxTitle);
+
+            // Add a spacer that expands to fill available space
+            var spacer = new View(this);
+            spacer.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
+            headerCard.AddView(spacer);
+
+            TextView timeTV = new TextView(this)
+            {
+                TextSize = 14,
+            };
+            bool timeFound = false;
+            foreach (BoxData box in _monitoredBoxDataDB.Values)
+            {
+                foreach (ScanRecord sc in box.ScannedIds)
+                {
+                    timeTV.Text = sc.Timestamp.ToLocalTime().ToString("d MMM yy");
+                    timeFound = true;
+                    break;
+                }
+                if (box.whenDataCollectedUtc.Year > 2015)
+                {
+                    timeTV.Text = box.whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy");
+                    timeFound = true;
+                }
+                if (timeFound) break;
+            }
+            timeTV.SetTextColor(Color.Black);
+            timeTV.SetPadding(0,0,0,0);
+            timeTV.Gravity = GravityFlags.Right | GravityFlags.Bottom;
+            timeTV.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.MatchParent);
+            headerCard.AddView(timeTV);
+
             _multiBoxViewCard.AddView(headerCard);
 
             _multiboxBoxFilterCard = _uiFactory.CreateCard(padding: 0, borderWidth: 4);
@@ -1255,7 +1292,6 @@ namespace BluePenguinMonitoring
                 }
                 else
                 {
-                    _bluetoothManager?.Disconnect();
                     _bluetoothManager?.Dispose();
                     _bluetoothManager = null;
                     UpdateStatusText("Bluetooth Disabled");
@@ -2011,7 +2047,7 @@ namespace BluePenguinMonitoring
             scanLayout.SetPadding(12, 8, 12, 8);
 
             // Scan info text with additional penguin information
-            var timeStr = scan.Timestamp.ToString("MMM dd, HH:mm");
+            var timeStr = scan.Timestamp.ToLocalTime().ToString("MMM dd, HH:mm");
             var scanText = new TextView(this)
             {
                 Text = $"• {scan.BirdId}{additionalInfo} at {timeStr}",
@@ -2440,17 +2476,17 @@ namespace BluePenguinMonitoring
         {
             try
             {
-                var exportData = new
-                {
-                    ExportTimestamp = DateTime.UtcNow,
-                    TotalBoxes = _monitoredBoxDataDB.Count,
-                    TotalBirds = _monitoredBoxDataDB.Values.Sum(box => box.ScannedIds.Count),
-                    Boxes = _monitoredBoxDataDB.Select(kvp => new
-                    {
-                        BoxNumber = kvp.Key,
-                        Data = kvp.Value
-                    }).OrderBy(b => b.BoxNumber).ToList()
-                };
+                //var exportData = new
+                //{
+                //    ExportTimestamp = DateTime.UtcNow,
+                //    TotalBoxes = _monitoredBoxDataDB.Count,
+                //    TotalBirds = _monitoredBoxDataDB.Values.Sum(box => box.ScannedIds.Count),
+                //    Boxes = _monitoredBoxDataDB.Select(kvp => new
+                //    {
+                //        BoxNumber = kvp.Key,
+                //        Data = kvp.Value
+                //    }).OrderBy(b => b.BoxNumber).ToList()
+                //};
 
                 var appState = new AppDataState
                 {

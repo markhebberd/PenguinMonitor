@@ -61,7 +61,7 @@ namespace BluePenguinMonitoring.UI.Factories
             var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             cardParams.SetMargins(0, 0, 0, 10);
             card.LayoutParameters = cardParams;
-            card.SetGravity( GravityFlags.Center);
+            card.SetGravity(GravityFlags.Center);
 
             return card;
         }
