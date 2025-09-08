@@ -530,10 +530,10 @@ namespace BluePenguinMonitoring
                                 Adults = dataNode["Adults"]?.Value<int>() ?? 0,
                                 Eggs = dataNode["Eggs"]?.Value<int>() ?? 0,
                                 Chicks = dataNode["Chicks"]?.Value<int>() ?? 0,
-                                GateStatus = dataNode["GateStatus"]?.Value<string>(),
-                                Notes = dataNode["Notes"]?.Value<string>() ?? ""
+                                GateStatus = (dataNode["GateStatus"]?.Value<string>() ?? "").Replace("gate up", "Gate up").Replace("regate", "Regate"),
+                                Notes = dataNode["Notes"]?.Value<string>() ?? "",
+                                whenDataCollectedUtc = DateTime.TryParse(dataNode["whenDataCollectedUtc"]?.Value<string>() ?? "", out DateTime whenCollected) ? whenCollected.ToUniversalTime() : DateTime.MinValue,
                             };
-
                             // Load scanned IDs
                             var scannedIdsNode = dataNode["ScannedIds"];
                             if (scannedIdsNode != null)
@@ -543,7 +543,7 @@ namespace BluePenguinMonitoring
                                     var scanRecord = new ScanRecord
                                     {
                                         BirdId = scanItem?["BirdId"]?.Value<string>() ?? "",
-                                        Timestamp = scanItem?["Timestamp"]?.Value<DateTime>() ?? DateTime.Now,
+                                        Timestamp = scanItem?["Timestamp"]?.Value<DateTime>() ?? DateTime.UtcNow,
                                         Latitude = scanItem?["Latitude"]?.Value<double>() ?? 0,
                                         Longitude = scanItem?["Longitude"]?.Value<double>() ?? 0,
                                         Accuracy = scanItem?["Accuracy"]?.Value<float>() ?? -1
@@ -573,8 +573,9 @@ namespace BluePenguinMonitoring
                             Adults = dataNode["Adults"]?.Value<int>() ?? 0,
                             Eggs = dataNode["Eggs"]?.Value<int>() ?? 0,
                             Chicks = dataNode["Chicks"]?.Value<int>() ?? 0,
-                            GateStatus = dataNode["GateStatus"]?.Value<string>(),
-                            Notes = dataNode["Notes"]?.Value<string>() ?? ""
+                            GateStatus = (dataNode["GateStatus"]?.Value<string>() ?? "").Replace("gate up", "Gate up").Replace("regate", "Regate"),
+                            Notes = dataNode["Notes"]?.Value<string>() ?? "",
+                            whenDataCollectedUtc = DateTime.TryParse(dataNode["whenDataCollectedUtc"]?.Value<string>() ?? "", out DateTime whenCollected) ? whenCollected.ToUniversalTime() : DateTime.MinValue,
                         };
                         // Load scanned IDs
                         var scannedIdsNode = dataNode["ScannedIds"];
@@ -585,7 +586,7 @@ namespace BluePenguinMonitoring
                                 var scanRecord = new ScanRecord
                                 {
                                     BirdId = scanItem?["BirdId"]?.Value<string>() ?? "",
-                                    Timestamp = scanItem?["Timestamp"]?.Value<DateTime>() ?? DateTime.Now,
+                                    Timestamp = scanItem?["Timestamp"]?.Value<DateTime>() ?? DateTime.UtcNow,
                                     Latitude = scanItem?["Latitude"]?.Value<double>() ?? 0,
                                     Longitude = scanItem?["Longitude"]?.Value<double>() ?? 0,
                                     Accuracy = scanItem?["Accuracy"]?.Value<float>() ?? -1
@@ -2244,7 +2245,7 @@ namespace BluePenguinMonitoring
             var appState = new AppDataState
             {
                 CurrentBox = _currentBox,
-                LastSaved = DateTime.Now,
+                LastSaved = DateTime.UtcNow,
                 BoxData = _monitoredBoxDataDB
             };
             _dataStorageService.SaveDataToInternalStorage(FilesDir?.AbsolutePath ?? "", appState, this, reportHome: reportHome);
@@ -2326,7 +2327,7 @@ namespace BluePenguinMonitoring
                 var scanRecord = new ScanRecord
                 {
                     BirdId = shortId,
-                    Timestamp = DateTime.Now,
+                    Timestamp = DateTime.UtcNow,
                     Latitude = _currentLocation?.Latitude ?? 0,
                     Longitude = _currentLocation?.Longitude ?? 0,
                     Accuracy = _currentLocation?.Accuracy ?? -1
@@ -2441,7 +2442,7 @@ namespace BluePenguinMonitoring
             {
                 var exportData = new
                 {
-                    ExportTimestamp = DateTime.Now,
+                    ExportTimestamp = DateTime.UtcNow,
                     TotalBoxes = _monitoredBoxDataDB.Count,
                     TotalBirds = _monitoredBoxDataDB.Values.Sum(box => box.ScannedIds.Count),
                     Boxes = _monitoredBoxDataDB.Select(kvp => new
@@ -2454,7 +2455,7 @@ namespace BluePenguinMonitoring
                 var appState = new AppDataState
                 {
                     CurrentBox = _currentBox,
-                    LastSaved = DateTime.Now,
+                    LastSaved = DateTime.UtcNow,
                     BoxData = _monitoredBoxDataDB
                 };
 

@@ -13,8 +13,6 @@
         {
             try
             {
-                if (boxNumber == 18)
-                    ;
                 DateTime estHatch = DateTime.Parse(estHatchDate);
                 if (estHatch.AddDays(3) > DateTime.Now)
                     return "Hatch" + getDateString(estHatch);
