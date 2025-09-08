@@ -101,7 +101,7 @@ namespace BluePenguinMonitoring
         private CheckBox? _isBluetoothEnabledCheckBox;
 
         //Lazy versioning.
-        private static int version = 26;
+        private static int version = 28;
         private static int numberMonitorBoxes = 150;
 
         //multibox View
