@@ -30,7 +30,7 @@
             }
             catch
             {
-                return "BreedingDateError";
+                return $"Box{boxNumber}: Error parsing breeding date";
             }
         }
 
