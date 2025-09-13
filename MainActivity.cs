@@ -109,7 +109,8 @@ namespace BluePenguinMonitoring
         private LinearLayout? _multiboxBoxFilterCard;
         private bool _showMultiboxFilterCard;
         private bool _showAllBoxesInMultiBoxView;
-        private bool _showBoxesWithNoDataInMultiBoxView;
+        private bool _showBoxesWithDataInMultiBoxView;
+        private bool _hideBoxesWithDataInMultiBoxView;
         private bool _showUnlikleyBoxesInMultiBoxView;
         private bool _showPotentialBoxesInMultiBoxView;
         private bool _showConfidentBoxesInMultiBoxView;
@@ -464,6 +465,19 @@ namespace BluePenguinMonitoring
                 System.Diagnostics.Debug.WriteLine($"LoadJsonDataFromFile error: {ex}");
             }
         }
+        private void SendJsonDataToServer()
+        {
+            try
+            {
+                string jsonReply = Backend.RequestServerResponse("PenguinReportConfirmedData:");
+                Toast.MakeText(this, jsonReply, ToastLength.Short)?.Show();
+            }
+            catch (Exception ex)
+            {
+                Toast.MakeText(this, $"❌ Failed to download from Marks Sever: {ex.Message}", ToastLength.Long)?.Show();
+                System.Diagnostics.Debug.WriteLine($"LoadJsonDataFromFile error: {ex}");
+            }
+        }
         private void ShowFileSelectionDialog(string[] files)
         {
             var fileNames = files.Select(f => 
@@ -786,7 +800,7 @@ namespace BluePenguinMonitoring
 
             //Create Multi box view card
             _showMultiboxFilterCard = false;
-            _showBoxesWithNoDataInMultiBoxView = true;
+            // _hideBoxesWithDataInMultiBoxView = false;
             createMultiBoxViewCard();
 
             parentLinearLayout.AddView(_settingsCard);
@@ -935,32 +949,32 @@ namespace BluePenguinMonitoring
             CheckBox showBoxesWithDataInMultiboxView = new CheckBox(this)
             {
                 Text = "With data",
-                Checked = _showBoxesWithNoDataInMultiBoxView
+                Checked = _showBoxesWithDataInMultiBoxView
 
             };
             showBoxesWithDataInMultiboxView.SetTextColor(Color.Black);
             showBoxesWithDataInMultiboxView.Click += (s, e) =>
             {
-                _showBoxesWithNoDataInMultiBoxView = showBoxesWithDataInMultiboxView.Checked;
-                if (_showBoxesWithNoDataInMultiBoxView) _showAllBoxesInMultiBoxView = false;
+                _showBoxesWithDataInMultiBoxView = showBoxesWithDataInMultiboxView.Checked;
+                if (_showBoxesWithDataInMultiBoxView) _hideBoxesWithDataInMultiBoxView = false;
                 DrawPageLayouts();
             };
             allAndDataFiltersLayout.AddView(showBoxesWithDataInMultiboxView);
 
-            CheckBox showBoxesWithNoDataInMultiboxView = new CheckBox(this)
+            CheckBox hideBoxesWithNoDataInMultiboxView = new CheckBox(this)
             {
-                Text = "No data",
-                Checked = _showBoxesWithNoDataInMultiBoxView
+                Text = "Hide data",
+                Checked = _hideBoxesWithDataInMultiBoxView
 
             };
-            showBoxesWithNoDataInMultiboxView.SetTextColor(Color.Black);
-            showBoxesWithNoDataInMultiboxView.Click += (s, e) =>
+            hideBoxesWithNoDataInMultiboxView.SetTextColor(Color.Black);
+            hideBoxesWithNoDataInMultiboxView.Click += (s, e) =>
             {
-                _showBoxesWithNoDataInMultiBoxView = showBoxesWithNoDataInMultiboxView.Checked;
-                if (_showBoxesWithNoDataInMultiBoxView) _showBoxesWithNoDataInMultiBoxView = false;
+                _hideBoxesWithDataInMultiBoxView = hideBoxesWithNoDataInMultiboxView.Checked;
+                if (_hideBoxesWithDataInMultiBoxView) _showBoxesWithDataInMultiBoxView = false;
                 DrawPageLayouts();
             };
-            allAndDataFiltersLayout.AddView(showBoxesWithNoDataInMultiboxView);
+            allAndDataFiltersLayout.AddView(hideBoxesWithNoDataInMultiboxView);
 
 
             CheckBox hideDCMInMultiboxView = new CheckBox(this)
@@ -1106,34 +1120,29 @@ namespace BluePenguinMonitoring
 
                     _multiBoxViewCard.AddView(currentRow);
                 }
-                if (_monitoredBoxDataDB.ContainsKey(boxNumber) && (_showBoxesWithNoDataInMultiBoxView || _showAllBoxesInMultiBoxView))
+                if (_remoteBoxData != null && _remoteBoxData.ContainsKey(boxNumber))
                 {
-                    var card = CreateBoxSummaryCard(boxNumber, _monitoredBoxDataDB[boxNumber], boxNumber == _currentBox);
-                    currentRow?.AddView(card);
-                    visibleBoxCount++;
-                }
-                else
-                {
-                    if (_remoteBoxData != null &&  _remoteBoxData.ContainsKey(boxNumber))
+                    bool showBox = _monitoredBoxDataDB.ContainsKey(boxNumber) && _showBoxesWithDataInMultiBoxView
+                                    || _showAllBoxesInMultiBoxView
+                                    || _showConfidentBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON"
+                                    || _showPotentialBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "POT"
+                                    || _showUnlikleyBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL"
+                                    || _showNoBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO"
+                                    || _showInterestingBoxesInMultiBoxView && !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes)
+                                    || _showSingleEggBoxesInMultiboxView && _remoteBoxData[boxNumber].numEggs() == 1;
+
+                    bool hideBoxWithData = _hideBoxesWithDataInMultiBoxView && _monitoredBoxDataDB.ContainsKey(boxNumber);
+                    bool hideDCM = _hideDCMInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "DCM";
+
+                    if (showBox && !hideBoxWithData && !hideDCM)
                     {
-                        bool showBox = _showAllBoxesInMultiBoxView && (!_hideDCMInMultiBoxView || _remoteBoxData[boxNumber].breedingLikelyhoodText != "DCM")
-                                        || _showConfidentBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON"
-                                        || _showPotentialBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "POT"
-                                        || _showUnlikleyBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL"
-                                        || _showNoBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO"
-                                        || _showInterestingBoxesInMultiBoxView && !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes)
-                                        || _showSingleEggBoxesInMultiboxView && _remoteBoxData[boxNumber].numEggs() == 1
-                                        || _showBoxesWithNoDataInMultiBoxView && !_monitoredBoxDataDB.ContainsKey(boxNumber);
-                        if (showBox)
-                        {
-                            View? card;
-                            if (_monitoredBoxDataDB.ContainsKey(boxNumber))
-                                card = CreateBoxSummaryCard(boxNumber, _monitoredBoxDataDB[boxNumber], boxNumber==_currentBox);
-                            else
-                                card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber], boxNumber == _currentBox);
-                            currentRow?.AddView(card);
-                            visibleBoxCount++;
-                        }
+                        View? card;
+                        if (_monitoredBoxDataDB.ContainsKey(boxNumber))
+                            card = CreateBoxSummaryCard(boxNumber, _monitoredBoxDataDB[boxNumber], boxNumber == _currentBox);
+                        else
+                            card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber], boxNumber == _currentBox);
+                        currentRow?.AddView(card);
+                        visibleBoxCount++;
                     }
                 }
             }
@@ -2756,7 +2765,8 @@ namespace BluePenguinMonitoring
                 "📊 Data overview",
                 "💾 Save to file", 
                 "📂 Load from file",
-                "📂 Load from server"
+                "📂 Load from server",
+                "🔒 Confirm data to server"
             };
 
             var builder = new AlertDialog.Builder(this);
@@ -2769,14 +2779,17 @@ namespace BluePenguinMonitoring
                     case 0: // Summary
                         ShowBoxDataSummary();
                         break;
-                    case 1: // Save Data
+                    case 1: // Save data
                         OnSaveDataClick(null, EventArgs.Empty);
                         break;
-                    case 2: // Load Data
+                    case 2: // Load data
                         LoadJsonDataFromFile();
                         break;
-                    case 3: // Load Data
+                    case 3: // Load data
                         LoadJsonDataFromServer();
+                        break;
+                    case 4: // Send data to server
+                        SendJsonDataToServer();
                         break;
                 }
             });

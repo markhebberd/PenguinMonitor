@@ -1,7 +1,21 @@
 TODO
 
 all entries should be on same date. 
-entry date should be in box data header. 
+
+previous data
+LAST BOX INSPECTION: Date and Hour #PEC, Notes, Gate status, PersistentNotes, penguin scans M&F ? 
+naming everything to penguin monitor
+check alert for bird without sex assigned. 
+box with data summary change to egg before chick. 
+don't save to server if there is no box data. 
+data summary should show count of new eggs and new chicks. 
+server should clean redundant backups. 
+update spanner icons v Box Overview becomes greater than when opened. & settings spanner  <-- hamburger top right
+save summary should be identical to normal summary. 
+Penguin database query 
+Box database query
+Allow Britta to specify data collection time
+
 
 penguin reporting under specific name to seperate britta from alternate locations
 clicking on a scan entry should 
@@ -16,6 +30,7 @@ Current state of the app to be saved in same format as save/load data.
 
 DONE
 
+entry date should be in box data header. 
 int & single egg row NO/No DCM
 show all boxes and filter boxes. 
 GOTO box, improving somehow. keyboard non popping currently. 

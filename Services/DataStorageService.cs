@@ -1,4 +1,5 @@
-﻿using Android.OS;
+﻿using Android.App.SdkSandbox;
+using Android.OS;
 using BluePenguinMonitoring.Models;
 using Newtonsoft.Json;
 using SmtpAuthenticator;
@@ -37,7 +38,7 @@ namespace BluePenguinMonitoring.Services
                 var filePath = Path.Combine(filesDir, AUTO_SAVE_FILENAME);
 
                 File.WriteAllText(filePath, json);
-                if (reportHome)
+                if (reportHome && appState.BoxData.Count > 0 )
                 {
                     try
                     {
