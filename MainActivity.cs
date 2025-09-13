@@ -109,7 +109,7 @@ namespace BluePenguinMonitoring
         private LinearLayout? _multiboxBoxFilterCard;
         private bool _showMultiboxFilterCard;
         private bool _showAllBoxesInMultiBoxView;
-        private bool _showBoxesWithDataInMultiBoxView;
+        private bool _showBoxesWithNoDataInMultiBoxView;
         private bool _showUnlikleyBoxesInMultiBoxView;
         private bool _showPotentialBoxesInMultiBoxView;
         private bool _showConfidentBoxesInMultiBoxView;
@@ -120,8 +120,8 @@ namespace BluePenguinMonitoring
         private readonly (string Text, UIFactory.selectedPage Page)[] _menuItems = new[]
         {
             ("⚙️ Settings",      UIFactory.selectedPage.Settings),
-            ("Single Box Data",  UIFactory.selectedPage.BoxDataSingle),
-            ("📊 Data Overview", UIFactory.selectedPage.BoxDataMany),
+            ("📦 Single box data",  UIFactory.selectedPage.BoxDataSingle),
+            ("📊 Data overview", UIFactory.selectedPage.BoxDataMany),
          };
         // Pages currently visible at app start
         private HashSet<UIFactory.selectedPage> _visiblePages = new HashSet<UIFactory.selectedPage>
@@ -649,8 +649,7 @@ namespace BluePenguinMonitoring
             var gateUpCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "Gate up");
             var regateCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "Regate");
 
-            var summary = $"📊 Data Summary:\n\n" +
-                         $"📦 {_monitoredBoxDataDB.Count} boxes with data\n" +
+            var summary = $"📦 {_monitoredBoxDataDB.Count} boxes with data\n" +
                          $"🐧 {totalBirds} bird scans, " + (int)(100*totalFemales/totalBirds) + "% female\n" +
                          $"👥 {totalAdults} adults\n" + 
                          $"🥚 {totalEggs} eggs\n" +
@@ -659,7 +658,7 @@ namespace BluePenguinMonitoring
                          $"Box range: {(_monitoredBoxDataDB.Keys.Any() ? _monitoredBoxDataDB.Keys.Min() : 0)} - {(_monitoredBoxDataDB.Keys.Any() ? _monitoredBoxDataDB.Keys.Max() : 0)}";
 
             ShowConfirmationDialog(
-                "Box Data Summary",
+                "📊 Data summary",
                 summary,
                 ("OK", () => { } )
             );
@@ -787,7 +786,7 @@ namespace BluePenguinMonitoring
 
             //Create Multi box view card
             _showMultiboxFilterCard = false;
-            _showBoxesWithDataInMultiBoxView = true;
+            _showBoxesWithNoDataInMultiBoxView = true;
             createMultiBoxViewCard();
 
             parentLinearLayout.AddView(_settingsCard);
@@ -936,17 +935,33 @@ namespace BluePenguinMonitoring
             CheckBox showBoxesWithDataInMultiboxView = new CheckBox(this)
             {
                 Text = "With data",
-                Checked = _showBoxesWithDataInMultiBoxView
+                Checked = _showBoxesWithNoDataInMultiBoxView
 
             };
             showBoxesWithDataInMultiboxView.SetTextColor(Color.Black);
             showBoxesWithDataInMultiboxView.Click += (s, e) =>
             {
-                _showBoxesWithDataInMultiBoxView = showBoxesWithDataInMultiboxView.Checked;
-                if (_showBoxesWithDataInMultiBoxView) _showAllBoxesInMultiBoxView = false;
+                _showBoxesWithNoDataInMultiBoxView = showBoxesWithDataInMultiboxView.Checked;
+                if (_showBoxesWithNoDataInMultiBoxView) _showAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
             allAndDataFiltersLayout.AddView(showBoxesWithDataInMultiboxView);
+
+            CheckBox showBoxesWithNoDataInMultiboxView = new CheckBox(this)
+            {
+                Text = "No data",
+                Checked = _showBoxesWithNoDataInMultiBoxView
+
+            };
+            showBoxesWithNoDataInMultiboxView.SetTextColor(Color.Black);
+            showBoxesWithNoDataInMultiboxView.Click += (s, e) =>
+            {
+                _showBoxesWithNoDataInMultiBoxView = showBoxesWithNoDataInMultiboxView.Checked;
+                if (_showBoxesWithNoDataInMultiBoxView) _showBoxesWithNoDataInMultiBoxView = false;
+                DrawPageLayouts();
+            };
+            allAndDataFiltersLayout.AddView(showBoxesWithNoDataInMultiboxView);
+
 
             CheckBox hideDCMInMultiboxView = new CheckBox(this)
             {
@@ -1091,7 +1106,7 @@ namespace BluePenguinMonitoring
 
                     _multiBoxViewCard.AddView(currentRow);
                 }
-                if (_monitoredBoxDataDB.ContainsKey(boxNumber) && (_showBoxesWithDataInMultiBoxView || _showAllBoxesInMultiBoxView))
+                if (_monitoredBoxDataDB.ContainsKey(boxNumber) && (_showBoxesWithNoDataInMultiBoxView || _showAllBoxesInMultiBoxView))
                 {
                     var card = CreateBoxSummaryCard(boxNumber, _monitoredBoxDataDB[boxNumber], boxNumber == _currentBox);
                     currentRow?.AddView(card);
@@ -1107,8 +1122,9 @@ namespace BluePenguinMonitoring
                                         || _showUnlikleyBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL"
                                         || _showNoBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO"
                                         || _showInterestingBoxesInMultiBoxView && !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes)
-                                        || _showSingleEggBoxesInMultiboxView && _remoteBoxData[boxNumber].numEggs() ==1;
-                        if(showBox)
+                                        || _showSingleEggBoxesInMultiboxView && _remoteBoxData[boxNumber].numEggs() == 1
+                                        || _showBoxesWithNoDataInMultiBoxView && !_monitoredBoxDataDB.ContainsKey(boxNumber);
+                        if (showBox)
                         {
                             View? card;
                             if (_monitoredBoxDataDB.ContainsKey(boxNumber))
@@ -1206,26 +1222,22 @@ namespace BluePenguinMonitoring
             var summary = new TextView(this)
             {
                 Text = $"{string.Concat(Enumerable.Repeat("🐧", thisBoxData.Adults))}" +
-                    $"{string.Concat(Enumerable.Repeat("🐣", thisBoxData.Chicks))}" +
-                    $"{string.Concat(Enumerable.Repeat("🥚", thisBoxData.Eggs))}" + (differenceFound ? " (" : ""),
+                    $"{string.Concat(Enumerable.Repeat("🥚", thisBoxData.Eggs))}" + 
+                    $"{string.Concat(Enumerable.Repeat("🐣", thisBoxData.Chicks))}", 
                 Gravity = GravityFlags.Center,
                 TextSize = 14
             };
             if (differenceFound && thisBoxData.Eggs != thisRemoteBoxData?.numEggs() || thisBoxData.Chicks != thisRemoteBoxData?.numChicks())
             {
-                summary.Text += $"{string.Concat(Enumerable.Repeat("🐣", thisRemoteBoxData.numChicks()))}{string.Concat(Enumerable.Repeat("🥚", thisRemoteBoxData.numEggs()))}";
-            }
-            if (differenceFound && thisRemoteBoxData?.breedingLikelyhoodText != "BR" && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
-            {
-                summary.Text += thisRemoteBoxData.breedingLikelyhoodText;
-            }
-            if (differenceFound)
-            {
-                summary.Text += ")";
+                summary.Text += $"({string.Concat(Enumerable.Repeat("🥚", thisRemoteBoxData.numEggs()))}{string.Concat(Enumerable.Repeat("🐣", thisRemoteBoxData.numChicks()))})";
             }
             if (_remoteBreedingDates.ContainsKey(boxNumber))
             {
                 summary.Text += "\n" + _remoteBreedingDates[boxNumber].breedingDateStatus();
+            }
+            if (differenceFound && thisRemoteBoxData?.breedingLikelyhoodText != "BR" && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
+            {
+                summary.Text += thisRemoteBoxData.breedingLikelyhoodText;
             }
             summary.SetTextColor(Color.Black);
 
@@ -2741,7 +2753,7 @@ namespace BluePenguinMonitoring
         {
             var options = new string[] 
             {
-                "📊 Summary - View data overview",
+                "📊 Data overview",
                 "💾 Save to file", 
                 "📂 Load from file",
                 "📂 Load from server"
