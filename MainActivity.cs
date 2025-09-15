@@ -31,6 +31,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
+using static Android.Icu.Text.CaseMap;
 
 namespace BluePenguinMonitoring
 {
@@ -461,20 +462,7 @@ namespace BluePenguinMonitoring
             }
             catch (Exception ex)
             {
-                Toast.MakeText(this, $"❌ Failed to download from Marks Sever: {ex.Message}", ToastLength.Long)?.Show();
-                System.Diagnostics.Debug.WriteLine($"LoadJsonDataFromFile error: {ex}");
-            }
-        }
-        private void SendJsonDataToServer()
-        {
-            try
-            {
-                string jsonReply = Backend.RequestServerResponse("PenguinReportConfirmedData:");
-                Toast.MakeText(this, jsonReply, ToastLength.Short)?.Show();
-            }
-            catch (Exception ex)
-            {
-                Toast.MakeText(this, $"❌ Failed to download from Marks Sever: {ex.Message}", ToastLength.Long)?.Show();
+                Toast.MakeText(this, $"❌ Failed: {ex.Message}", ToastLength.Long)?.Show();
                 System.Diagnostics.Debug.WriteLine($"LoadJsonDataFromFile error: {ex}");
             }
         }
@@ -513,9 +501,9 @@ namespace BluePenguinMonitoring
         private void LoadJsonFileData(string filePath)
         {
             var json = File.ReadAllText(filePath);
-            LoadJsonData(json);
+            LoadJsonData(json, System.IO.Path.GetFileName(filePath));
         }
-        private void LoadJsonData(string json)
+        private void LoadJsonData(string json, string filename)
         {
             try
             {         
@@ -654,29 +642,37 @@ namespace BluePenguinMonitoring
                 return;
             }
 
+            string summary = GetMonitorSummaryText();
+
+            ShowConfirmationDialog(
+                "📊 Data summary",
+                summary,
+                ("OK", () => { }
+            )
+            );
+        }
+
+        private string GetMonitorSummaryText()
+        {
             var totalBirds = _monitoredBoxDataDB.Values.Sum(box => box.ScannedIds.Count);
             var totalAdults = _monitoredBoxDataDB.Values.Sum(box => box.Adults);
-            var totalFemales = _monitoredBoxDataDB.Values.Sum(box => box.ScannedIds.Count(id => 
+            var totalFemales = _monitoredBoxDataDB.Values.Sum(box => box.ScannedIds.Count(id =>
                 _remotePenguinData.ContainsKey(id.BirdId) && _remotePenguinData[id.BirdId].Sex.Equals("F", StringComparison.OrdinalIgnoreCase)));
             var totalEggs = _monitoredBoxDataDB.Values.Sum(box => box.Eggs);
             var totalChicks = _monitoredBoxDataDB.Values.Sum(box => box.Chicks);
             var gateUpCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "Gate up");
             var regateCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "Regate");
 
-            var summary = $"📦 {_monitoredBoxDataDB.Count} boxes with data\n" +
-                         $"🐧 {totalBirds} bird scans, " + (int)(100*totalFemales/totalBirds) + "% female\n" +
-                         $"👥 {totalAdults} adults\n" + 
+            string summary = $"📦 {_monitoredBoxDataDB.Count} boxes with data\n" +
+                         $"🐧 {totalBirds} bird scans, " + (int)(100 * totalFemales / totalBirds) + "% female\n" +
+                         $"👥 {totalAdults} adults\n" +
                          $"🥚 {totalEggs} eggs\n" +
                          $"🐣 {totalChicks} chicks\n" +
                          $"🚪 Gate: {gateUpCount} up, {regateCount} regate\n\n" +
                          $"Box range: {(_monitoredBoxDataDB.Keys.Any() ? _monitoredBoxDataDB.Keys.Min() : 0)} - {(_monitoredBoxDataDB.Keys.Any() ? _monitoredBoxDataDB.Keys.Max() : 0)}";
-
-            ShowConfirmationDialog(
-                "📊 Data summary",
-                summary,
-                ("OK", () => { } )
-            );
+            return summary;
         }
+
         private bool _isDownloadingCsvData = false;
         private bool _showNoBoxesInMultiBoxView;
         private bool _hideDCMInMultiBoxView;
@@ -961,37 +957,7 @@ namespace BluePenguinMonitoring
             };
             allAndDataFiltersLayout.AddView(showBoxesWithDataInMultiboxView);
 
-            CheckBox hideBoxesWithNoDataInMultiboxView = new CheckBox(this)
-            {
-                Text = "Hide data",
-                Checked = _hideBoxesWithDataInMultiBoxView
-
-            };
-            hideBoxesWithNoDataInMultiboxView.SetTextColor(Color.Black);
-            hideBoxesWithNoDataInMultiboxView.Click += (s, e) =>
-            {
-                _hideBoxesWithDataInMultiBoxView = hideBoxesWithNoDataInMultiboxView.Checked;
-                if (_hideBoxesWithDataInMultiBoxView) _showBoxesWithDataInMultiBoxView = false;
-                DrawPageLayouts();
-            };
-            allAndDataFiltersLayout.AddView(hideBoxesWithNoDataInMultiboxView);
-
-
-            CheckBox hideDCMInMultiboxView = new CheckBox(this)
-            {
-                Text = "Hide DCM",
-                Checked = _hideDCMInMultiBoxView
-            };
-            hideDCMInMultiboxView.SetTextColor(Color.Black);
-            hideDCMInMultiboxView.Click += (s, e) =>
-            {
-                _hideDCMInMultiBoxView = hideDCMInMultiboxView.Checked;
-                DrawPageLayouts();
-            };
-            allAndDataFiltersLayout.AddView(hideDCMInMultiboxView);
-
             _multiboxBoxFilterCard.AddView(allAndDataFiltersLayout);
-
 
 
             var breedingChanceFilterLayout= new LinearLayout(this)
@@ -1055,13 +1021,7 @@ namespace BluePenguinMonitoring
             breedingChanceFilterLayout.AddView(showConfidentBoxesInMultiboxView);
             _multiboxBoxFilterCard.AddView(breedingChanceFilterLayout);
 
-
-
             var specialBoxFilterLayout = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Horizontal
-            };
-            var interestingFilterLayout = new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Horizontal
             };
@@ -1093,7 +1053,96 @@ namespace BluePenguinMonitoring
                 DrawPageLayouts();
             };
             specialBoxFilterLayout.AddView(showSingleEggBoxesInMultiboxView);
-            _multiboxBoxFilterCard.AddView(specialBoxFilterLayout);    
+            _multiboxBoxFilterCard.AddView(specialBoxFilterLayout);
+
+
+            TextView hideFiltersTitle = new TextView(this)
+            {
+                Text = "Hide Boxes",
+                TextSize = 16,
+                Gravity = GravityFlags.Center,
+
+            };
+            hideFiltersTitle.SetTypeface(null, TypefaceStyle.Bold);
+            hideFiltersTitle.SetTextColor(Color.Black);
+            _multiboxBoxFilterCard.AddView(hideFiltersTitle);
+
+            var hideBoxesLayout = new LinearLayout(this)
+            {
+                Orientation = Android.Widget.Orientation.Horizontal
+            };
+            CheckBox hideBoxesWithNoDataInMultiboxView = new CheckBox(this)
+            {
+                Text = "With data",
+                Checked = _hideBoxesWithDataInMultiBoxView
+
+            };
+            hideBoxesWithNoDataInMultiboxView.SetTextColor(Color.Black);
+            hideBoxesWithNoDataInMultiboxView.Click += (s, e) =>
+            {
+                _hideBoxesWithDataInMultiBoxView = hideBoxesWithNoDataInMultiboxView.Checked;
+                if (_hideBoxesWithDataInMultiBoxView) _showBoxesWithDataInMultiBoxView = false;
+                DrawPageLayouts();
+            };
+            hideBoxesLayout.AddView(hideBoxesWithNoDataInMultiboxView);
+
+            CheckBox hideDCMInMultiboxView = new CheckBox(this)
+            {
+                Text = "Decomissioned",
+                Checked = _hideDCMInMultiBoxView
+            };
+            hideDCMInMultiboxView.SetTextColor(Color.Black);
+            hideDCMInMultiboxView.Click += (s, e) =>
+            {
+                _hideDCMInMultiBoxView = hideDCMInMultiboxView.Checked;
+                DrawPageLayouts();
+            };
+            hideBoxesLayout.AddView(hideDCMInMultiboxView);
+            _multiboxBoxFilterCard.AddView(hideBoxesLayout);
+
+
+
+            TextView browseDataTitle = new TextView(this)
+            {
+                Text = "Browse Data",
+                TextSize = 16,
+                Gravity = GravityFlags.Center,
+
+            };
+            browseDataTitle.SetTypeface(null, TypefaceStyle.Bold);
+            browseDataTitle.SetTextColor(Color.Black);
+            _multiboxBoxFilterCard.AddView(browseDataTitle);
+
+
+            var browseOtherDataButtonLayout = new LinearLayout(this)
+            {
+                Orientation = Android.Widget.Orientation.Horizontal
+            };
+            var buttonParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
+            buttonParams.SetMargins(8, 0, 8, 8);
+
+            Button gotoPreviousData = _uiFactory.CreateStyledButton("← Show previous", UIFactory.PRIMARY_BLUE);
+            gotoPreviousData.LayoutParameters = buttonParams;
+            gotoPreviousData.Click += (s, e) =>
+            {
+            };
+            browseOtherDataButtonLayout.AddView(gotoPreviousData);
+
+            Button gotoNextData = _uiFactory.CreateStyledButton("Show next →", UIFactory.PRIMARY_BLUE);
+            gotoNextData.LayoutParameters = buttonParams;
+            gotoNextData.Click += (s, e) =>
+            {
+            };
+            browseOtherDataButtonLayout.AddView(gotoNextData);
+
+            Button showCurrentData = _uiFactory.CreateStyledButton("Show current →", UIFactory.PRIMARY_BLUE);
+            showCurrentData.LayoutParameters = buttonParams;
+            gotoNextData.Click += (s, e) =>
+            {
+            };
+            browseOtherDataButtonLayout.AddView(showCurrentData);
+
+            _multiboxBoxFilterCard.AddView(browseOtherDataButtonLayout);
 
             _multiBoxViewCard.AddView(_multiboxBoxFilterCard);
             _multiboxBoxFilterCard.Visibility = _showMultiboxFilterCard ? ViewStates.Visible : ViewStates.Gone;
@@ -1363,7 +1412,6 @@ namespace BluePenguinMonitoring
             _selectBoxButton = new Button(this)
             {
                 Text = "Select Box",
-                Gravity = GravityFlags.Center,
                 Clickable = true,
                 Focusable = true
             };
@@ -1813,22 +1861,26 @@ namespace BluePenguinMonitoring
         }
         private void ShowSaveConfirmation()
         {
-            var totalBoxes = _monitoredBoxDataDB.Count;
-            var totalBirds = _monitoredBoxDataDB.Values.Sum(box => box.ScannedIds.Count);
-            var totalAdults = _monitoredBoxDataDB.Values.Sum(box => box.Adults);
-            var totalEggs = _monitoredBoxDataDB.Values.Sum(box => box.Eggs);
-            var totalChicks = _monitoredBoxDataDB.Values.Sum(box => box.Chicks);
-            
-            // Only count actual gate status values - ignore nulls
-            var gateUpCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "Gate up");
-            var regateCount = _monitoredBoxDataDB.Values.Count(box => box.GateStatus == "Regate");
+            //ShowConfirmationDialog(
+            //    "Save All Data",
+            //    GetMonitorSummaryText(),
+            //    ("Save", SaveAllData),
+            //    ("Cancel", () => { } )
+            //);
 
-            ShowConfirmationDialog(
-                "Save All Data",
-                $"Save data to Downloads folder?\n\n📦 {totalBoxes} boxes\n🐧 {totalBirds} bird scans\n👥 {totalAdults} adults\n🥚 {totalEggs} eggs\n🐣 {totalChicks} chicks\n🚪 Gate: {gateUpCount} up, {regateCount} regate",
-                ("Save", SaveAllData),
-                ("Cancel", () => { } )
-            );
+
+            var alertDialog = new AlertDialog.Builder(this)
+                .SetTitle("Save data")
+                .SetMessage(GetMonitorSummaryText())
+                .SetPositiveButton("Save", (s, e) => SaveAllData())
+                .SetNeutralButton("Save & upload", (s,e)=> SaveAllData(true))
+                .SetNegativeButton("Cancel", (s, e) => { })
+                .SetCancelable(true)
+                .Create();
+
+            alertDialog?.Show();
+
+
         }
         private void ShowConfirmationDialog(string title, string message, (string text, Action action) positiveButton)
         {
@@ -2299,7 +2351,7 @@ namespace BluePenguinMonitoring
         }
         private void SaveToAppDataDir(bool reportHome = true)
         {
-            var appState = new AppDataState
+            var appState = new MonitorDetails
             {
                 CurrentBox = _currentBox,
                 LastSaved = DateTime.UtcNow,
@@ -2435,14 +2487,14 @@ namespace BluePenguinMonitoring
                 });
             }
         }
-        private void SaveAllData()
+        private void SaveAllData(bool upload= false)
         {
-            ShowSaveFilenameDialog();
+            ShowSaveFilenameDialog(upload);
         }
-        private void ShowSaveFilenameDialog()
+        private void ShowSaveFilenameDialog(bool upload = false)
         {
-            var now = DateTime.Now;
-            var defaultFileName = $"PenguinMonitoring {now:yyMMdd HHmmss}";
+            var now = DateTime.UtcNow;
+            var defaultFileName = $"PenguinMonitor {now:yyMMdd HHmmss}";
 
             var input = new EditText(this)
             {
@@ -2479,8 +2531,7 @@ namespace BluePenguinMonitoring
                     {
                         fileName += ".json";
                     }
-
-                    SaveDataWithFilename(fileName);
+                    SaveDataWithFilename(fileName, upload);
                 })
                 .SetNegativeButton("Cancel", (s, e) => { })
                 .Create();
@@ -2493,30 +2544,20 @@ namespace BluePenguinMonitoring
             var inputMethodManager = (Android.Views.InputMethods.InputMethodManager?)GetSystemService(InputMethodService);
             inputMethodManager?.ShowSoftInput(input, Android.Views.InputMethods.ShowFlags.Implicit);
         }
-        private void SaveDataWithFilename(string fileName)
+        private void SaveDataWithFilename(string fileName, bool upload)
         {
             try
             {
-                //var exportData = new
-                //{
-                //    ExportTimestamp = DateTime.UtcNow,
-                //    TotalBoxes = _monitoredBoxDataDB.Count,
-                //    TotalBirds = _monitoredBoxDataDB.Values.Sum(box => box.ScannedIds.Count),
-                //    Boxes = _monitoredBoxDataDB.Select(kvp => new
-                //    {
-                //        BoxNumber = kvp.Key,
-                //        Data = kvp.Value
-                //    }).OrderBy(b => b.BoxNumber).ToList()
-                //};
 
-                var appState = new AppDataState
+                var monitorDetails = new MonitorDetails
                 {
                     CurrentBox = _currentBox,
                     LastSaved = DateTime.UtcNow,
+                    MonitorNameString = fileName,
                     BoxData = _monitoredBoxDataDB
                 };
 
-                var json = JsonConvert.SerializeObject(appState, Formatting.Indented);
+                var jsonContents = JsonConvert.SerializeObject(monitorDetails, Formatting.Indented);
                 var downloadsPath = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads)?.AbsolutePath;
 
                 if (string.IsNullOrEmpty(downloadsPath))
@@ -2533,13 +2574,13 @@ namespace BluePenguinMonitoring
                     ShowConfirmationDialog(
                         "File Exists",
                         $"A file named '{fileName}' already exists. Do you want to overwrite it?",
-                        ("Overwrite", () => SaveFileToPath(filePath, json, fileName)),
+                        ("Overwrite", () => SaveFileToPath(filePath, jsonContents)),
                         ("Cancel", () => ShowSaveFilenameDialog()) // Go back to filename dialog
                     );
                 }
                 else
                 {
-                    SaveFileToPath(filePath, json, fileName);
+                    SaveFileToPath(filePath, jsonContents);
                 }
             }
             catch (Exception ex)
@@ -2547,10 +2588,11 @@ namespace BluePenguinMonitoring
                 Toast.MakeText(this, $"❌ Export failed: {ex.Message}", ToastLength.Short)?.Show();
             }
         }
-        private void SaveFileToPath(string filePath, string json, string fileName)
+        private void SaveFileToPath(string filePath, string json )
         {
             try
             {
+                string fileName = System.IO.Path.GetFileName(filePath);
                 File.WriteAllText(filePath, json);
 
                 var totalBoxes = _monitoredBoxDataDB.Count;
@@ -2766,7 +2808,6 @@ namespace BluePenguinMonitoring
                 "💾 Save to file", 
                 "📂 Load from file",
                 "📂 Load from server",
-                "🔒 Confirm data to server"
             };
 
             var builder = new AlertDialog.Builder(this);
@@ -2787,9 +2828,6 @@ namespace BluePenguinMonitoring
                         break;
                     case 3: // Load data
                         LoadJsonDataFromServer();
-                        break;
-                    case 4: // Send data to server
-                        SendJsonDataToServer();
                         break;
                 }
             });

@@ -27,7 +27,7 @@ namespace BluePenguinMonitoring.Services
         internal const string BOX_STATUS_URL = "https://docs.google.com/spreadsheets/d/1B-jWzxb4PhbMerWD36jO3TysTCbNsZ9Lo0gldgYreLc";
         internal const string BREEDING_DATES_URL = "https://docs.google.com/spreadsheets/d/1OZMPnmEm2YAGx8M9Ha_qKoB3KJgSQ4qw";
 
-        public void SaveDataToInternalStorage(string filesDir, AppDataState appState, Android.Content.Context context, bool reportHome = true)
+        public void SaveDataToInternalStorage(string filesDir, MonitorDetails appState, Android.Content.Context context, bool reportHome = true)
         {
             try
             {
@@ -73,7 +73,7 @@ namespace BluePenguinMonitoring.Services
                 System.Diagnostics.Debug.WriteLine($"Auto-save failed: {ex.Message}");
             }
         }
-        public AppDataState? LoadFromAppDataDir(string filesDir)
+        public MonitorDetails? LoadFromAppDataDir(string filesDir)
         {
             try
             {
@@ -85,7 +85,7 @@ namespace BluePenguinMonitoring.Services
                     return null;
 
                 var json = File.ReadAllText(filePath);
-                return Newtonsoft.Json.JsonConvert.DeserializeObject<AppDataState>(json);
+                return Newtonsoft.Json.JsonConvert.DeserializeObject<MonitorDetails>(json);
             }
             catch (Exception ex)
             {
