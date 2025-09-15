@@ -803,20 +803,18 @@ namespace BluePenguinMonitoring
                      .Select(m => _appSettings.VisiblePages.Contains(m.Page))
                      .ToArray();
 
-            // Collect changes temporarily before applying
-            var tempVisible = new HashSet<UIFactory.selectedPage>(_appSettings.VisiblePages);
-
             var builder = new AlertDialog.Builder(this);
             builder.SetTitle("Menu");
 
-            // Multi-choice (checkboxes)
+            // Collect changes temporarily before applying
+            var tempVisible = new HashSet<UIFactory.selectedPage>(_appSettings.VisiblePages);
+            //Multi - choice(checkboxes)
             builder.SetMultiChoiceItems(labels, checkedItems, (s, args) =>
             {
                 var page = _menuItems[args.Which].Page;
                 if (args.IsChecked) tempVisible.Add(page);
                 else tempVisible.Remove(page);
             });
-
             builder.SetPositiveButton("Apply", (s, args) =>
             {
                 if (tempVisible.Count == 0)
@@ -824,7 +822,8 @@ namespace BluePenguinMonitoring
                     Toast.MakeText(this, "At least one page must be visible", ToastLength.Short)?.Show();
                     return;
                 }
-                _appSettings.AddVisiblePage(UIFactory.selectedPage.BoxOverview);
+                _appSettings.VisiblePages.ToList().ForEach(p => _appSettings.RemovePage(p));
+                _appSettings.SetVisiblePages(tempVisible);
                 DrawPageLayouts();
             });
             builder.Show();

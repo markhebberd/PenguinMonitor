@@ -206,11 +206,7 @@ namespace BluePenguinMonitoring.Models
                 }
             }
         }
-        private HashSet<UIFactory.selectedPage> visiblePages = new HashSet<UIFactory.selectedPage>
-        {
-            UIFactory.selectedPage.BoxDataSingle,
-            UIFactory.selectedPage.BoxOverview
-        };
+        private HashSet<UIFactory.selectedPage> visiblePages = new HashSet<UIFactory.selectedPage>();
         public IEnumerable<UIFactory.selectedPage> VisiblePages => visiblePages;
         public bool AddVisiblePage(UIFactory.selectedPage page)
         {
@@ -220,6 +216,19 @@ namespace BluePenguinMonitoring.Models
                 return true;
             }
             return false;
+        }
+        public void SetVisiblePages(IEnumerable<UIFactory.selectedPage> pages)
+        {
+            var newPages = new HashSet<UIFactory.selectedPage>(pages);
+            if (!visiblePages.SetEquals(newPages))
+            {
+                visiblePages.Clear();
+                foreach (var page in newPages)
+                {
+                    visiblePages.Add(page);
+                }
+                OnAnyPropertyChanged();
+            }
         }
         public bool RemovePage(UIFactory.selectedPage page)
         {

@@ -29,7 +29,6 @@ namespace BluePenguinMonitoring.Services
         internal const string BOX_STATUS_URL = "https://docs.google.com/spreadsheets/d/1B-jWzxb4PhbMerWD36jO3TysTCbNsZ9Lo0gldgYreLc";
         internal const string BREEDING_DATES_URL = "https://docs.google.com/spreadsheets/d/1OZMPnmEm2YAGx8M9Ha_qKoB3KJgSQ4qw";
 
-
         public void uploadCurrentMonitorDetailsToServer(string currentDataJson)
         {
             try
