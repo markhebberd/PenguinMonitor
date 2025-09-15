@@ -1,4 +1,5 @@
 ﻿using Android.App.SdkSandbox;
+using Android.Content;
 using Android.OS;
 using BluePenguinMonitoring.Models;
 using Newtonsoft.Json;
@@ -14,6 +15,7 @@ namespace BluePenguinMonitoring.Services
 {
     public class DataStorageService
     {
+        private const string APP_SETTINGS_FILENAME = "app_settings.json";
         private const string AUTO_SAVE_FILENAME = "penguin_data_autosave.json";
         internal const string REMOTE_BIRD_DATA_FILENAME = "remotePenguinData.json";
         internal const string REMOTE_BOX_DATA_FILENAME = "remoteBoxData.json";
@@ -47,7 +49,7 @@ namespace BluePenguinMonitoring.Services
             catch { }
         }
 
-        public Dictionary<int, MonitorDetails> requestPastMonitorDetailsFromServer(Android.Content.Context context, Dictionary<int, MonitorDetails> _allMonitorData)
+        public Dictionary<int, MonitorDetails> requestPastMonitorDetailsFromServer(Dictionary<int, MonitorDetails> _allMonitorData)
         {
             try
             {
@@ -78,8 +80,6 @@ namespace BluePenguinMonitoring.Services
             catch { }
             return _allMonitorData;
         }
-
-
         public void SaveDataToInternalStorage(string filesDir, Dictionary<int, MonitorDetails> _allMonitorData, Android.Content.Context context, bool reportHome = true)
         {
             try
@@ -209,7 +209,6 @@ namespace BluePenguinMonitoring.Services
                 var birdJson = JsonConvert.SerializeObject(remotePenguinData, Formatting.Indented);
                 File.WriteAllText(Path.Combine(context.FilesDir?.AbsolutePath, REMOTE_BIRD_DATA_FILENAME), birdJson);
 
-
                 responseBoxes.EnsureSuccessStatusCode();
                 var csvContent = await responseBoxes.Content.ReadAsStringAsync();
                 List<BoxRemoteData> parsedData = _csvDataService.ParseBoxCsvData(csvContent);
@@ -252,6 +251,23 @@ namespace BluePenguinMonitoring.Services
                   {
                       Toast.MakeText(context, $"❌ Download failed: {ex.Message}", ToastLength.Long)?.Show();
                   });
+            }
+        }
+        public static void saveApplicationSettings(string filesDir, AppSettings appSettings)
+        {
+            var appSettingsJson = JsonConvert.SerializeObject(appSettings, Formatting.Indented);
+            File.WriteAllText(Path.Combine(filesDir, APP_SETTINGS_FILENAME), appSettingsJson);
+        }
+        public static AppSettings loadAppSettingsFromDir(string filesDir)
+        {
+            string appSettingsPath = Path.Combine(filesDir, APP_SETTINGS_FILENAME);
+            try
+            {
+                return JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(appSettingsPath));
+            }
+            catch
+            {
+                return new AppSettings(filesDir);
             }
         }
         public async Task<Dictionary<string, PenguinData>?> loadRemotePengInfoFromAppDataDir(Android.Content.Context? context)

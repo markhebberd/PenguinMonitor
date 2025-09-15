@@ -40,7 +40,7 @@ namespace BluePenguinMonitoring.UI.Factories
         {
             Settings,
             BoxDataSingle,
-            BoxDataMany
+            BoxOverview
         }
 
         public LinearLayout CreateCard(Orientation orientation = Orientation.Vertical, int? padding = null, int borderWidth = 1, Color? borderColour = null)

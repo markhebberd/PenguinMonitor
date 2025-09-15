@@ -66,8 +66,25 @@ namespace BluePenguinMonitoring
         private Spinner? _breedingChanceSpinner; 
         private EditText? _notesEditText;
         private EditText? _manualScanEditText;
+        // Add a field for the data card title so it can be updated dynamically
+        private TextView? _dataCardTitleText;
+        private LinearLayout? _dataCardTitleLayout;
+        private ImageView? _lockIconView;
+        private bool _isBoxLocked;
+        private ScrollView? _rootScrollView;
+        private LinearLayout? _topButtonLayout;
+        private LinearLayout? _settingsCard;
+        private CheckBox? _isBluetoothEnabledCheckBox;
+        private TextView? _interestingBoxTextView;
 
         private UIFactory.selectedPage selectedPage;
+        // ===== Multi-page menu state =====
+        private readonly (string Text, UIFactory.selectedPage Page)[] _menuItems = new[]
+        {
+            ("⚙️ Settings",      UIFactory.selectedPage.Settings),
+            ("📦 Single box data",  UIFactory.selectedPage.BoxDataSingle),
+            ("📊 Data overview", UIFactory.selectedPage.BoxOverview),
+         };
 
         // Add gesture detection components
         private GestureDetector? _gestureDetector;
@@ -79,10 +96,7 @@ namespace BluePenguinMonitoring
 
         // Data storage
         Dictionary<int, MonitorDetails> _allMonitorData = new Dictionary<int, MonitorDetails>();
-        int currentlyVisibleMonitor = 0;
-        DateTime _activeSessionLocalTimeStamp = DateTime.Now;
-        bool _activeSessionTimeStampActive = false;
-
+        private AppSettings _appSettings;
         private Dictionary<string, PenguinData>? _remotePenguinData ;
         private Dictionary<int, BoxRemoteData>? _remoteBoxData;
         private Dictionary<int, BoxPredictedDates>? _remoteBreedingDates;
@@ -95,16 +109,6 @@ namespace BluePenguinMonitoring
         private Vibrator? _vibrator;
         private MediaPlayer? _alertMediaPlayer;
 
-        // Add a field for the data card title so it can be updated dynamically
-        private TextView? _dataCardTitleText;
-        private LinearLayout? _dataCardTitleLayout;
-        private ImageView? _lockIconView;
-        private bool _isBoxLocked;
-        private ScrollView? _rootScrollView;
-        private LinearLayout? _topButtonLayout;
-        private LinearLayout? _settingsCard;
-        private CheckBox? _isBluetoothEnabledCheckBox;
-
         //Lazy versioning.
         private static int version = 29;
         private static int numberMonitorBoxes = 150;
@@ -112,30 +116,6 @@ namespace BluePenguinMonitoring
         //multibox View
         private LinearLayout? _multiBoxViewCard;
         private LinearLayout? _multiboxBoxFilterCard;
-        private bool _showMultiboxFilterCard;
-        private bool _showAllBoxesInMultiBoxView;
-        private bool _showBoxesWithDataInMultiBoxView;
-        private bool _hideBoxesWithDataInMultiBoxView;
-        private bool _showUnlikleyBoxesInMultiBoxView;
-        private bool _showPotentialBoxesInMultiBoxView;
-        private bool _showConfidentBoxesInMultiBoxView;
-        private bool _showInterestingBoxesInMultiBoxView;
-        private bool _showSingleEggBoxesInMultiboxView;
-
-        // ===== Multi-page menu state =====
-        private readonly (string Text, UIFactory.selectedPage Page)[] _menuItems = new[]
-        {
-            ("⚙️ Settings",      UIFactory.selectedPage.Settings),
-            ("📦 Single box data",  UIFactory.selectedPage.BoxDataSingle),
-            ("📊 Data overview", UIFactory.selectedPage.BoxDataMany),
-         };
-        // Pages currently visible at app start
-        private HashSet<UIFactory.selectedPage> _visiblePages = new HashSet<UIFactory.selectedPage>
-        {
-            UIFactory.selectedPage.BoxDataSingle,
-            UIFactory.selectedPage.BoxDataMany
-        };
-        private TextView? _interestingBoxTextView;
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
@@ -679,9 +659,6 @@ namespace BluePenguinMonitoring
         }
 
         private bool _isDownloadingCsvData = false;
-        private bool _showNoBoxesInMultiBoxView;
-        private bool _hideDCMInMultiBoxView;
-
         private void OnDownloadCsvClick(object? sender, EventArgs e)
         {
             if (sender is Button clickedButton && _isDownloadingCsvData == false)
@@ -690,8 +667,7 @@ namespace BluePenguinMonitoring
                 clickedButton.Text = "Loading data";
                 clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.WARNING_YELLOW, 8);
 
-
-                _allMonitorData = _dataStorageService.requestPastMonitorDetailsFromServer(this, _allMonitorData);
+                _allMonitorData = _dataStorageService.requestPastMonitorDetailsFromServer(_allMonitorData);
 
                 _ = Task.Run(async () =>
                 {
@@ -704,8 +680,8 @@ namespace BluePenguinMonitoring
                         _isDownloadingCsvData = false;
                         clickedButton.Text = "Bird Stats";
                         clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_BLUE, 8);
-                        if (!_allMonitorData.ContainsKey(currentlyVisibleMonitor))
-                            currentlyVisibleMonitor = 0;
+                        if (!_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
+                            _appSettings.CurrentlyVisibleMonitor = 0;
                         DrawPageLayouts();
                     });
                 });
@@ -805,7 +781,7 @@ namespace BluePenguinMonitoring
             CreateBoxDataCard();
 
             //Create Multi box view card
-            _showMultiboxFilterCard = false;
+            _appSettings.ShowMultiboxFilterCard = false;
             // _hideBoxesWithDataInMultiBoxView = false;
             createMultiBoxViewCard();
 
@@ -824,11 +800,11 @@ namespace BluePenguinMonitoring
             var labels = _menuItems.Select(m => m.Text).ToArray();
             // Seed check state from currently visible pages
             var checkedItems = _menuItems
-                     .Select(m => _visiblePages.Contains(m.Page))
+                     .Select(m => _appSettings.VisiblePages.Contains(m.Page))
                      .ToArray();
 
             // Collect changes temporarily before applying
-            var tempVisible = new HashSet<UIFactory.selectedPage>(_visiblePages);
+            var tempVisible = new HashSet<UIFactory.selectedPage>(_appSettings.VisiblePages);
 
             var builder = new AlertDialog.Builder(this);
             builder.SetTitle("Menu");
@@ -848,7 +824,7 @@ namespace BluePenguinMonitoring
                     Toast.MakeText(this, "At least one page must be visible", ToastLength.Short)?.Show();
                     return;
                 }
-                _visiblePages = tempVisible;
+                _appSettings.AddVisiblePage(UIFactory.selectedPage.BoxOverview);
                 DrawPageLayouts();
             });
             builder.Show();
@@ -873,7 +849,7 @@ namespace BluePenguinMonitoring
             showFiltersButton.SetBackgroundColor(Color.Transparent); // No background
             showFiltersButton.Click += (sender, e) =>
             {
-                _showMultiboxFilterCard = !_showMultiboxFilterCard;
+                _appSettings.ShowMultiboxFilterCard = !_appSettings.ShowMultiboxFilterCard;
                 DrawPageLayouts();
             };
             headerCard.AddView(showFiltersButton);
@@ -900,13 +876,13 @@ namespace BluePenguinMonitoring
             };
 
 
-            if (currentlyVisibleMonitor == 0)
+            if (_appSettings.CurrentlyVisibleMonitor == 0)
                 timeTV.Text = "Data is local only";
             else
-                timeTV.Text = _allMonitorData[currentlyVisibleMonitor].filename; // + timeTV.Text).Trim();
+                timeTV.Text = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename; // + timeTV.Text).Trim();
 
             bool timeFound = false;
-            foreach (BoxData box in _allMonitorData[currentlyVisibleMonitor].BoxData.Values)
+            foreach (BoxData box in _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Values)
             {
                 foreach (ScanRecord sc in box.ScannedIds)
                 {
@@ -952,12 +928,12 @@ namespace BluePenguinMonitoring
             CheckBox showAllBoxesInMultiBoxView = new CheckBox(this)
             {
                 Text = "All",
-                Checked = _showAllBoxesInMultiBoxView
+                Checked = _appSettings.ShowAllBoxesInMultiBoxView
             };
             showAllBoxesInMultiBoxView.SetTextColor(Color.Black);
             showAllBoxesInMultiBoxView.Click += (s, e) =>
             {
-                _showAllBoxesInMultiBoxView = showAllBoxesInMultiBoxView.Checked;
+                _appSettings.ShowAllBoxesInMultiBoxView = showAllBoxesInMultiBoxView.Checked;
                 DrawPageLayouts();
             };
             allAndDataFiltersLayout.AddView(showAllBoxesInMultiBoxView);
@@ -965,14 +941,14 @@ namespace BluePenguinMonitoring
             CheckBox showBoxesWithDataInMultiboxView = new CheckBox(this)
             {
                 Text = "With data",
-                Checked = _showBoxesWithDataInMultiBoxView
+                Checked = _appSettings.ShowBoxesWithDataInMultiBoxView
 
             };
             showBoxesWithDataInMultiboxView.SetTextColor(Color.Black);
             showBoxesWithDataInMultiboxView.Click += (s, e) =>
             {
-                _showBoxesWithDataInMultiBoxView = showBoxesWithDataInMultiboxView.Checked;
-                if (_showBoxesWithDataInMultiBoxView) _hideBoxesWithDataInMultiBoxView = false;
+                _appSettings.ShowBoxesWithDataInMultiBoxView = showBoxesWithDataInMultiboxView.Checked;
+                if (_appSettings.ShowBoxesWithDataInMultiBoxView) _appSettings.HideBoxesWithDataInMultiBoxView = false;
                 DrawPageLayouts();
             };
             allAndDataFiltersLayout.AddView(showBoxesWithDataInMultiboxView);
@@ -987,13 +963,13 @@ namespace BluePenguinMonitoring
             CheckBox showNoBoxesInMultiboxView = new CheckBox(this)
             {
                 Text = "No",
-                Checked = _showNoBoxesInMultiBoxView,
+                Checked = _appSettings.ShowNoBoxesInMultiBoxView,
             };
             showNoBoxesInMultiboxView.SetTextColor(Color.Black);
             showNoBoxesInMultiboxView.Click += (s, e) =>
             {
-                _showNoBoxesInMultiBoxView = showNoBoxesInMultiboxView.Checked;
-                if (_showNoBoxesInMultiBoxView) _showAllBoxesInMultiBoxView = false;
+                _appSettings.ShowNoBoxesInMultiBoxView = showNoBoxesInMultiboxView.Checked;
+                if (_appSettings.ShowNoBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
             breedingChanceFilterLayout.AddView(showNoBoxesInMultiboxView);
@@ -1001,13 +977,13 @@ namespace BluePenguinMonitoring
             CheckBox showUnlikelyBoxesInMultiboxView = new CheckBox(this)
             {
                 Text = "Unlikely",
-                Checked = _showUnlikleyBoxesInMultiBoxView,
+                Checked = _appSettings.ShowUnlikleyBoxesInMultiBoxView,
             };
             showUnlikelyBoxesInMultiboxView.SetTextColor(Color.Black);
             showUnlikelyBoxesInMultiboxView.Click += (s, e) =>
             {
-                _showUnlikleyBoxesInMultiBoxView = showUnlikelyBoxesInMultiboxView.Checked;
-                if (_showUnlikleyBoxesInMultiBoxView) _showAllBoxesInMultiBoxView = false;
+                _appSettings.ShowUnlikleyBoxesInMultiBoxView = showUnlikelyBoxesInMultiboxView.Checked;
+                if (_appSettings.ShowUnlikleyBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
             breedingChanceFilterLayout.AddView(showUnlikelyBoxesInMultiboxView);
@@ -1015,13 +991,13 @@ namespace BluePenguinMonitoring
             CheckBox showPotentialBoxesInMultiboxView = new CheckBox(this)
             {
                 Text = "Potential",
-                Checked = _showPotentialBoxesInMultiBoxView,
+                Checked = _appSettings.ShowPotentialBoxesInMultiBoxView,
             };
             showPotentialBoxesInMultiboxView.SetTextColor(Color.Black);
             showPotentialBoxesInMultiboxView.Click += (s, e) =>
             {
-                _showPotentialBoxesInMultiBoxView = showPotentialBoxesInMultiboxView.Checked;
-                if (_showPotentialBoxesInMultiBoxView) _showAllBoxesInMultiBoxView = false;
+                _appSettings.ShowPotentialBoxesInMultiBoxView = showPotentialBoxesInMultiboxView.Checked;
+                if (_appSettings.ShowPotentialBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
             breedingChanceFilterLayout.AddView(showPotentialBoxesInMultiboxView);
@@ -1029,13 +1005,13 @@ namespace BluePenguinMonitoring
             CheckBox showConfidentBoxesInMultiboxView = new CheckBox(this)
             {
                 Text = "Confident",
-                Checked = _showConfidentBoxesInMultiBoxView,
+                Checked = _appSettings.ShowConfidentBoxesInMultiBoxView,
             };
             showConfidentBoxesInMultiboxView.SetTextColor(Color.Black);
             showConfidentBoxesInMultiboxView.Click += (s, e) =>
             {
-                _showConfidentBoxesInMultiBoxView = showConfidentBoxesInMultiboxView.Checked;
-                if (_showConfidentBoxesInMultiBoxView) _showAllBoxesInMultiBoxView = false;
+                _appSettings.ShowConfidentBoxesInMultiBoxView = showConfidentBoxesInMultiboxView.Checked;
+                if (_appSettings.ShowConfidentBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
             breedingChanceFilterLayout.AddView(showConfidentBoxesInMultiboxView);
@@ -1048,13 +1024,13 @@ namespace BluePenguinMonitoring
             CheckBox showSpecialBoxesInMultiboxView = new CheckBox(this)
             {
                 Text = "Special",
-                Checked = _showInterestingBoxesInMultiBoxView
+                Checked = _appSettings.ShowInterestingBoxesInMultiBoxView
             };
             showSpecialBoxesInMultiboxView.SetTextColor(Color.Black);
             showSpecialBoxesInMultiboxView.Click += (s, e) =>
             {
-                _showInterestingBoxesInMultiBoxView = showSpecialBoxesInMultiboxView.Checked;
-                if (_showInterestingBoxesInMultiBoxView) _showAllBoxesInMultiBoxView = false;
+                _appSettings.ShowInterestingBoxesInMultiBoxView = showSpecialBoxesInMultiboxView.Checked;
+                if (_appSettings.ShowInterestingBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
             specialBoxFilterLayout.AddView(showSpecialBoxesInMultiboxView);
@@ -1062,14 +1038,14 @@ namespace BluePenguinMonitoring
             CheckBox showSingleEggBoxesInMultiboxView = new CheckBox(this)
             {
                 Text = "Single egg",
-                Checked = _showSingleEggBoxesInMultiboxView
+                Checked = _appSettings.ShowSingleEggBoxesInMultiboxView
             };
             showSingleEggBoxesInMultiboxView.SetPadding(0, 0, 0, 0);
             showSingleEggBoxesInMultiboxView.SetTextColor(Color.Black);
             showSingleEggBoxesInMultiboxView.Click += (s, e) =>
             {
-                _showSingleEggBoxesInMultiboxView = showSingleEggBoxesInMultiboxView.Checked;
-                if (_showSingleEggBoxesInMultiboxView) _showAllBoxesInMultiBoxView = false;
+                _appSettings.ShowSingleEggBoxesInMultiboxView = showSingleEggBoxesInMultiboxView.Checked;
+                if (_appSettings.ShowSingleEggBoxesInMultiboxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
                 DrawPageLayouts();
             };
             specialBoxFilterLayout.AddView(showSingleEggBoxesInMultiboxView);
@@ -1094,14 +1070,14 @@ namespace BluePenguinMonitoring
             CheckBox hideBoxesWithNoDataInMultiboxView = new CheckBox(this)
             {
                 Text = "With data",
-                Checked = _hideBoxesWithDataInMultiBoxView
+                Checked = _appSettings.HideBoxesWithDataInMultiBoxView
 
             };
             hideBoxesWithNoDataInMultiboxView.SetTextColor(Color.Black);
             hideBoxesWithNoDataInMultiboxView.Click += (s, e) =>
             {
-                _hideBoxesWithDataInMultiBoxView = hideBoxesWithNoDataInMultiboxView.Checked;
-                if (_hideBoxesWithDataInMultiBoxView) _showBoxesWithDataInMultiBoxView = false;
+                _appSettings.HideBoxesWithDataInMultiBoxView = hideBoxesWithNoDataInMultiboxView.Checked;
+                if (_appSettings.HideBoxesWithDataInMultiBoxView) _appSettings.ShowBoxesWithDataInMultiBoxView = false;
                 DrawPageLayouts();
             };
             hideBoxesLayout.AddView(hideBoxesWithNoDataInMultiboxView);
@@ -1109,12 +1085,12 @@ namespace BluePenguinMonitoring
             CheckBox hideDCMInMultiboxView = new CheckBox(this)
             {
                 Text = "Decomissioned",
-                Checked = _hideDCMInMultiBoxView
+                Checked = _appSettings.HideDCMInMultiBoxView
             };
             hideDCMInMultiboxView.SetTextColor(Color.Black);
             hideDCMInMultiboxView.Click += (s, e) =>
             {
-                _hideDCMInMultiBoxView = hideDCMInMultiboxView.Checked;
+                _appSettings.HideDCMInMultiBoxView = hideDCMInMultiboxView.Checked;
                 DrawPageLayouts();
             };
             hideBoxesLayout.AddView(hideDCMInMultiboxView);
@@ -1143,13 +1119,13 @@ namespace BluePenguinMonitoring
 
             Button gotoPreviousData = _uiFactory.CreateStyledButton("← Show previous", UIFactory.PRIMARY_BLUE);
             gotoPreviousData.LayoutParameters = outsideButtonParams;
-            bool olderAvailable = _allMonitorData.Count > currentlyVisibleMonitor + 1;
+            bool olderAvailable = _allMonitorData.Count > _appSettings.CurrentlyVisibleMonitor + 1;
             SetEnabledRecursive(gotoPreviousData, olderAvailable, olderAvailable ? 1.0f: 0.5f);
             gotoPreviousData.Click += (s, e) =>
             {
-                currentlyVisibleMonitor++;
-                _activeSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[currentlyVisibleMonitor]);
-                _activeSessionTimeStampActive = true;
+                _appSettings.CurrentlyVisibleMonitor++;
+                _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
+                _appSettings.ActiveSessionTimeStampActive = true;
                 DrawPageLayouts();
             };
             browseOtherDataButtonLayout.AddView(gotoPreviousData);
@@ -1158,13 +1134,13 @@ namespace BluePenguinMonitoring
             var gotoNextButtonParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             gotoNextButtonParams.SetMargins(0, 0, 0, 0);
             gotoNextData.LayoutParameters = gotoNextButtonParams;
-            bool newerAvailable = currentlyVisibleMonitor != 0;
+            bool newerAvailable = _appSettings.CurrentlyVisibleMonitor != 0;
             SetEnabledRecursive(gotoNextData, newerAvailable, newerAvailable ? 1.0f : 0.5f);
             gotoNextData.Click += (s, e) =>
             {
-                currentlyVisibleMonitor--;
-                _activeSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[currentlyVisibleMonitor]);
-                _activeSessionTimeStampActive = currentlyVisibleMonitor != 0;
+                _appSettings.CurrentlyVisibleMonitor--;
+                _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
+                _appSettings.ActiveSessionTimeStampActive = _appSettings.CurrentlyVisibleMonitor != 0;
                 DrawPageLayouts();
             };
             browseOtherDataButtonLayout.AddView(gotoNextData);
@@ -1175,8 +1151,8 @@ namespace BluePenguinMonitoring
             SetEnabledRecursive(showLatestDataButton, newerAvailable, newerAvailable ? 1.0f : 0.5f);
             showLatestDataButton.Click += (s, e) =>
             {
-                currentlyVisibleMonitor = 0;
-                _activeSessionTimeStampActive = false;
+                _appSettings.CurrentlyVisibleMonitor = 0;
+                _appSettings.ActiveSessionTimeStampActive = false;
                 DrawPageLayouts();
             };
             browseOtherDataButtonLayout.AddView(showLatestDataButton);
@@ -1184,7 +1160,7 @@ namespace BluePenguinMonitoring
             _multiboxBoxFilterCard.AddView(browseOtherDataButtonLayout);
 
             _multiBoxViewCard.AddView(_multiboxBoxFilterCard);
-            _multiboxBoxFilterCard.Visibility = _showMultiboxFilterCard ? ViewStates.Visible : ViewStates.Gone;
+            _multiboxBoxFilterCard.Visibility = _appSettings.ShowMultiboxFilterCard ? ViewStates.Visible : ViewStates.Gone;
 
             int boxesPerRow = 3;
             LinearLayout? currentRow = null;
@@ -1210,23 +1186,23 @@ namespace BluePenguinMonitoring
                 }
                 if (_remoteBoxData != null && _remoteBoxData.ContainsKey(boxNumber))
                 {
-                    bool showBox = _allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(boxNumber) && _showBoxesWithDataInMultiBoxView
-                                    || _showAllBoxesInMultiBoxView
-                                    || _showConfidentBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON"
-                                    || _showPotentialBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "POT"
-                                    || _showUnlikleyBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL"
-                                    || _showNoBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO"
-                                    || _showInterestingBoxesInMultiBoxView && !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes)
-                                    || _showSingleEggBoxesInMultiboxView && _remoteBoxData[boxNumber].numEggs() == 1;
+                    bool showBox = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber) && _appSettings.ShowBoxesWithDataInMultiBoxView
+                                    || _appSettings.ShowAllBoxesInMultiBoxView
+                                    || _appSettings.ShowConfidentBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON"
+                                    || _appSettings.ShowPotentialBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "POT"
+                                    || _appSettings.ShowUnlikleyBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL"
+                                    || _appSettings.ShowNoBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO"
+                                    || _appSettings.ShowInterestingBoxesInMultiBoxView && !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes)
+                                    || _appSettings.ShowSingleEggBoxesInMultiboxView && _remoteBoxData[boxNumber].numEggs() == 1;
 
-                    bool hideBoxWithData = _hideBoxesWithDataInMultiBoxView && _allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(boxNumber);
-                    bool hideDCM = _hideDCMInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "DCM";
+                    bool hideBoxWithData = _appSettings.HideBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber);
+                    bool hideDCM = _appSettings.HideDCMInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "DCM";
 
                     if (showBox && !hideBoxWithData && !hideDCM)
                     {
                         View? card;
-                        if (_allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(boxNumber))
-                            card = CreateBoxSummaryCard(boxNumber, _allMonitorData[currentlyVisibleMonitor].BoxData[boxNumber], boxNumber == _currentBox);
+                        if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber))
+                            card = CreateBoxSummaryCard(boxNumber, _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[boxNumber], boxNumber == _currentBox);
                         else
                             card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber], boxNumber == _currentBox);
                         currentRow?.AddView(card);
@@ -1240,7 +1216,6 @@ namespace BluePenguinMonitoring
                 _multiBoxViewCard.AddView(empty);
             }
         }
-
         private DateTime getLocalDateTime(MonitorDetails monitorDetails)
         {
             foreach (var boxData in monitorDetails.BoxData.Values)
@@ -1429,34 +1404,34 @@ namespace BluePenguinMonitoring
             CheckBox setTimeActiveSessionPicker = new CheckBox(this)
             {
                 Text = "Set time for active session",
-                Checked = _activeSessionTimeStampActive
+                Checked = _appSettings.ActiveSessionTimeStampActive
             };
             setTimeActiveSessionPicker.SetTextColor(Color.Black);
             setTimeActiveSessionPicker.SetPadding(0, 0, 0, 0);
             setTimeActiveSessionPicker.CheckedChange += (s, e) =>
             {
-                _activeSessionTimeStampActive = setTimeActiveSessionPicker.Checked;
+                _appSettings.ActiveSessionTimeStampActive = setTimeActiveSessionPicker.Checked;
                 if (setTimeActiveSessionPicker.Checked)
                 {
                     var timePicker = new TimePickerDialog(this,
                         (sender, e) =>
                         {
-                            _activeSessionLocalTimeStamp = _activeSessionLocalTimeStamp.Date.AddHours(e.HourOfDay).AddMinutes(e.Minute);
+                            _appSettings.ActiveSessionLocalTimeStamp = _appSettings.ActiveSessionLocalTimeStamp.Date.AddHours(e.HourOfDay).AddMinutes(e.Minute);
                         },
-                        _activeSessionLocalTimeStamp.Hour,
-                        _activeSessionLocalTimeStamp.Minute,
+                        _appSettings.ActiveSessionLocalTimeStamp.Hour,
+                        _appSettings.ActiveSessionLocalTimeStamp.Minute,
                         true); // true = 24 hour format
 
                     var datePicker = new DatePickerDialog(this, (sender, e) =>
                     {
-                        _activeSessionLocalTimeStamp = e.Date + _activeSessionLocalTimeStamp.TimeOfDay;
+                        _appSettings.ActiveSessionLocalTimeStamp = e.Date + _appSettings.ActiveSessionLocalTimeStamp.TimeOfDay;
                         // e.Date is the selected date
                         Toast.MakeText(this, $"Date picked: {e.Date.ToShortDateString()}", ToastLength.Short).Show();
                         timePicker.Show();
                     },
-                    _activeSessionLocalTimeStamp.Year,
-                    _activeSessionLocalTimeStamp.Month - 1, // Month is 0-based in Android
-                    _activeSessionLocalTimeStamp.Day);
+                    _appSettings.ActiveSessionLocalTimeStamp.Year,
+                    _appSettings.ActiveSessionLocalTimeStamp.Month - 1, // Month is 0-based in Android
+                    _appSettings.ActiveSessionLocalTimeStamp.Day);
                     datePicker.Show();
                 }
             };
@@ -1536,9 +1511,9 @@ namespace BluePenguinMonitoring
             new Handler(Looper.MainLooper).Post(() =>
                 {
                     // Allow multiple pages visible at once
-                    bool showSingle = _visiblePages.Contains(UIFactory.selectedPage.BoxDataSingle);
-                    bool showSettings = _visiblePages.Contains(UIFactory.selectedPage.Settings);
-                    bool showOverview = _visiblePages.Contains(UIFactory.selectedPage.BoxDataMany);
+                    bool showSingle = _appSettings.VisiblePages.Contains(UIFactory.selectedPage.BoxDataSingle);
+                    bool showSettings = _appSettings.VisiblePages.Contains(UIFactory.selectedPage.Settings);
+                    bool showOverview = _appSettings.VisiblePages.Contains(UIFactory.selectedPage.BoxOverview);
 
                     _dataCard.Visibility = showSingle ? ViewStates.Visible : ViewStates.Gone;
                     _settingsCard.Visibility = showSettings ? ViewStates.Visible : ViewStates.Gone;
@@ -1551,7 +1526,7 @@ namespace BluePenguinMonitoring
                     if (_lockIconView != null)
                     {
                         _lockIconView.SetColorFilter(null);
-                        if (!_allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) && _isBoxLocked)
+                        if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) && _isBoxLocked)
                         {
                             _lockIconView.SetImageResource(Resource.Drawable.locked_yellow);
                             _lockIconView.SetColorFilter(
@@ -1598,9 +1573,9 @@ namespace BluePenguinMonitoring
                         if (editText != null) editText.TextChanged -= OnDataChanged;
                     }
 
-                    if (_allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+                    if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
                     {
-                        var boxData = _allMonitorData[currentlyVisibleMonitor].BoxData[_currentBox];
+                        var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox];
                         if (_adultsEditText != null) _adultsEditText.Text = boxData.Adults.ToString();
                         if (_eggsEditText != null) _eggsEditText.Text = boxData.Eggs.ToString();
                         if (_chicksEditText != null) _chicksEditText.Text = boxData.Chicks.ToString();
@@ -1630,9 +1605,9 @@ namespace BluePenguinMonitoring
                     {
                         Button child = (Button) _topButtonLayout.GetChildAt(i);
                         SetEnabledRecursive(child, _isBoxLocked, _isBoxLocked ? 1.0f : 0.5f);
-                        if (currentlyVisibleMonitor == 0 &&   _isBoxLocked && child.Text.Equals("Clear All") && _allMonitorData[0].BoxData.Count == 0)
+                        if (_appSettings.CurrentlyVisibleMonitor == 0 &&   _isBoxLocked && child.Text.Equals("Clear All") && _allMonitorData[0].BoxData.Count == 0)
                             SetEnabledRecursive(child, false, 0.5f);
-                        else if ( _isBoxLocked && child.Text.Equals("Clear Box") && !_allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+                        else if ( _isBoxLocked && child.Text.Equals("Clear Box") && !_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
                             SetEnabledRecursive(child, false, 0.5f);
                     }
 
@@ -1705,7 +1680,7 @@ namespace BluePenguinMonitoring
                 }
                 else
                 {
-                    if (!_allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) && dataCardHasZeroData())
+                    if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) && dataCardHasZeroData())
                     {
                         ShowEmptyBoxDialog(() =>
                         {
@@ -1828,7 +1803,7 @@ namespace BluePenguinMonitoring
             adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
             _breedingChanceSpinner.Adapter = adapter;
             string? breedingChanceString = "";
-            try { breedingChanceString = _allMonitorData[currentlyVisibleMonitor].BoxData[_currentBox].BreedingChance; }
+            try { breedingChanceString = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].BreedingChance; }
             catch { }
             int breedingPercentageIndex = 0;
             if (breedingChanceString != null)
@@ -1839,9 +1814,9 @@ namespace BluePenguinMonitoring
             {
                 string selectedItem = items[e.Position];
                 string status = _breedingChanceSpinner.SelectedItem.ToString();
-                if (!_allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
-                    _allMonitorData[currentlyVisibleMonitor].BoxData.Add(_currentBox, new BoxData());
-                _allMonitorData[currentlyVisibleMonitor].BoxData[_currentBox].BreedingChance = status;
+                if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Add(_currentBox, new BoxData());
+                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].BreedingChance = status;
             };
 
             _gateStatusSpinner = _uiFactory.CreateGateStatusSpinner();
@@ -1850,10 +1825,10 @@ namespace BluePenguinMonitoring
                 string status = _gateStatusSpinner.SelectedItem.ToString();
                 if (status.Equals("Gate up") || status.Equals("Regate"))
                 {
-                    if (!_allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+                    if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
                     {
-                        _allMonitorData[currentlyVisibleMonitor].BoxData.Add(_currentBox, new BoxData());
-                        _allMonitorData[currentlyVisibleMonitor].BoxData[_currentBox].GateStatus = status;
+                        _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Add(_currentBox, new BoxData());
+                        _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].GateStatus = status;
                         SaveToAppDataDir();
                         _isBoxLocked = true;
                         DrawPageLayouts();
@@ -1967,7 +1942,7 @@ namespace BluePenguinMonitoring
                 "Are you sure you want to clear data for box " + _currentBox + "?",
                 ("Yes", () =>
                 {
-                    _allMonitorData[currentlyVisibleMonitor].BoxData.Remove(_currentBox);
+                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Remove(_currentBox);
                     DrawPageLayouts();
                 }
             ),
@@ -2086,13 +2061,13 @@ namespace BluePenguinMonitoring
         }
         private void SaveCurrentBoxData()
         {
-            if (!_allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+            if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
             {
-                _allMonitorData[currentlyVisibleMonitor].BoxData[_currentBox] = new BoxData();
-                _allMonitorData[currentlyVisibleMonitor].BoxData[_currentBox].whenDataCollectedUtc = DateTime.UtcNow;
+                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox] = new BoxData();
+                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].whenDataCollectedUtc = DateTime.UtcNow;
             }
 
-            var boxData = _allMonitorData[currentlyVisibleMonitor].BoxData[_currentBox];
+            var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox];
             string boxDataString = boxData.ToString();
             
             int adults, eggs, chicks;
@@ -2109,7 +2084,7 @@ namespace BluePenguinMonitoring
             if (boxData.ToString() != boxDataString)
             {
                 boxData.whenDataCollectedUtc = DateTime.UtcNow; // Update timestamp if data changed
-                _allMonitorData[currentlyVisibleMonitor].BoxData[_currentBox] = boxData;
+                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox] = boxData;
                 SaveToAppDataDir();
             }
         }
@@ -2310,9 +2285,9 @@ namespace BluePenguinMonitoring
                 $"Are you sure you want to delete the scan for bird {scanToDelete.BirdId}?",
                 ("Yes, Delete", () =>
                 {
-                    if (_allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+                    if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
                     {
-                        var boxData = _allMonitorData[currentlyVisibleMonitor].BoxData[_currentBox];
+                        var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox];
                         var scanToRemove = boxData.ScannedIds.FirstOrDefault(s =>
                             s.BirdId == scanToDelete.BirdId &&
                             s.Timestamp == scanToDelete.Timestamp);
@@ -2399,15 +2374,15 @@ namespace BluePenguinMonitoring
                 ("Yes, Move", () =>
                 {
                     // Remove from current box
-                    if (_allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+                    if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
                     {
-                        var currentBoxData = _allMonitorData[currentlyVisibleMonitor].BoxData[_currentBox];
+                        var currentBoxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox];
                         var scanToRemove = currentBoxData.ScannedIds.FirstOrDefault(s =>
                             s.BirdId == scanToMove.BirdId &&
                             s.Timestamp == scanToMove.Timestamp);
 
-                        if (_allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(targetBox) 
-                        && _allMonitorData[currentlyVisibleMonitor].BoxData[targetBox].ScannedIds.Any(s => s.BirdId == scanToMove.BirdId))
+                        if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(targetBox) 
+                        && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].ScannedIds.Any(s => s.BirdId == scanToMove.BirdId))
                         {
                             Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} exists already in Box {targetBox}", ToastLength.Long)?.Show();
                         }
@@ -2416,22 +2391,22 @@ namespace BluePenguinMonitoring
                             currentBoxData.ScannedIds.Remove(scanToRemove);
 
                             // Add to target box
-                            if (!_allMonitorData[currentlyVisibleMonitor].BoxData.ContainsKey(targetBox))
-                                _allMonitorData[currentlyVisibleMonitor].BoxData[targetBox] = new BoxData();
+                            if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(targetBox))
+                                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox] = new BoxData();
 
-                            var targetBoxData = _allMonitorData[currentlyVisibleMonitor].BoxData[targetBox];
+                            var targetBoxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox];
                             targetBoxData.ScannedIds.Add(scanToMove);
 
                             _remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData);
                             if (LifeStage.Adult == penguinData.LastKnownLifeStage)
                             {
                                 _adultsEditText.Text = "" + Math.Max(0, int.Parse(_adultsEditText.Text ?? "0") - 1);
-                                _allMonitorData[currentlyVisibleMonitor].BoxData[targetBox].Adults++;
+                                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Adults++;
                             }
                             else if (LifeStage.Chick == penguinData.LastKnownLifeStage)
                             {
                                 _chicksEditText.Text = "" + Math.Max(0, int.Parse(_chicksEditText.Text ?? "0") - 1);
-                                _allMonitorData[currentlyVisibleMonitor].BoxData[targetBox].Adults++;
+                                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Adults++;
                             }
                             SaveCurrentBoxData();
                             buildScannedIdsLayout(currentBoxData.ScannedIds);
@@ -2446,9 +2421,11 @@ namespace BluePenguinMonitoring
         {
             try
             {
-                var internalPath = FilesDir?.AbsolutePath;
+                var internalPath = this.FilesDir?.AbsolutePath;
                 if (string.IsNullOrEmpty(internalPath))
-                    return;
+                    throw new Exception();
+                _appSettings = DataStorageService.loadAppSettingsFromDir(internalPath);
+                _appSettings.filesDir = internalPath;
 
                 // Load remote penguin data.
                 _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
@@ -2666,8 +2643,8 @@ namespace BluePenguinMonitoring
         {
             try
             {
-                _allMonitorData[currentlyVisibleMonitor].filename = fileName;
-                var jsonContents = JsonConvert.SerializeObject(_allMonitorData[currentlyVisibleMonitor], Formatting.Indented);
+                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename = fileName;
+                var jsonContents = JsonConvert.SerializeObject(_allMonitorData[_appSettings.CurrentlyVisibleMonitor], Formatting.Indented);
                 var downloadsPath = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads)?.AbsolutePath;
 
                 if (string.IsNullOrEmpty(downloadsPath))
@@ -2712,8 +2689,8 @@ namespace BluePenguinMonitoring
                 string fileName = System.IO.Path.GetFileName(filePath);
                 File.WriteAllText(filePath, json);
 
-                var totalBoxes = _allMonitorData[currentlyVisibleMonitor].BoxData.Count;
-                var totalBirds = _allMonitorData[currentlyVisibleMonitor].BoxData.Values.Sum(box => box.ScannedIds.Count);
+                var totalBoxes = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Count;
+                var totalBirds = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Values.Sum(box => box.ScannedIds.Count);
 
                 Toast.MakeText(this, $"💾 Data saved!\n📂 {fileName}\n📦 {totalBoxes} boxes, 🐧 {totalBirds} birds", ToastLength.Short)?.Show();
             }
@@ -2862,8 +2839,8 @@ namespace BluePenguinMonitoring
                 Toast.MakeText(this, $"Cannot change box while current box is unlocked.", ToastLength.Short)?.Show();
                 return;
             }
-            if (!_visiblePages.Contains(UIFactory.selectedPage.BoxDataSingle))
-                _visiblePages.Add(UIFactory.selectedPage.BoxDataSingle);
+            if (!_appSettings.VisiblePages.Contains(UIFactory.selectedPage.BoxDataSingle))
+                _appSettings.AddVisiblePage(UIFactory.selectedPage.BoxDataSingle);
             _currentBox = targetBox;
             DrawPageLayouts();
         }
@@ -2911,7 +2888,7 @@ namespace BluePenguinMonitoring
                 _manualScanEditText.RequestFocus();
                 return;
             }
-            AddScannedId(cleanInput, currentlyVisibleMonitor);
+            AddScannedId(cleanInput, _appSettings.CurrentlyVisibleMonitor);
         }
         private void OnDataClick(object? sender, EventArgs e)
         {
@@ -2935,7 +2912,7 @@ namespace BluePenguinMonitoring
                 switch (args.Which)
                 {
                     case 0: // Summary
-                        ShowBoxDataSummary(currentlyVisibleMonitor);
+                        ShowBoxDataSummary(_appSettings.CurrentlyVisibleMonitor);
                         break;
                     case 1: // Save data
                         OnSaveDataClick(null, EventArgs.Empty);
