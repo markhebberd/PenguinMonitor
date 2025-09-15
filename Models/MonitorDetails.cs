@@ -5,9 +5,9 @@ namespace BluePenguinMonitoring.Models
 {
     public class MonitorDetails
     {
-        public int CurrentBox { get; set; } = 1;
+        public bool IsDeleted { get; set; } = false;
         public DateTime LastSaved { get; set; }
-        public string MonitorNameString { get; set; } 
+        public string filename { get; set; } 
         public Dictionary<int, BoxData> BoxData { get; set; } = new Dictionary<int, BoxData>();
     }
 }

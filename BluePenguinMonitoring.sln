@@ -7,16 +7,16 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BluePenguinMonitoring", "Bl
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|ARM64 = Debug|ARM64
-		Release|ARM64 = Release|ARM64
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{3D575309-A76D-4508-8974-3867516CE0ED}.Debug|ARM64.ActiveCfg = Debug|ARM64
-		{3D575309-A76D-4508-8974-3867516CE0ED}.Debug|ARM64.Build.0 = Debug|ARM64
-		{3D575309-A76D-4508-8974-3867516CE0ED}.Debug|ARM64.Deploy.0 = Debug|ARM64
-		{3D575309-A76D-4508-8974-3867516CE0ED}.Release|ARM64.ActiveCfg = Release|ARM64
-		{3D575309-A76D-4508-8974-3867516CE0ED}.Release|ARM64.Build.0 = Release|ARM64
-		{3D575309-A76D-4508-8974-3867516CE0ED}.Release|ARM64.Deploy.0 = Release|ARM64
+		{3D575309-A76D-4508-8974-3867516CE0ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D575309-A76D-4508-8974-3867516CE0ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D575309-A76D-4508-8974-3867516CE0ED}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{3D575309-A76D-4508-8974-3867516CE0ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D575309-A76D-4508-8974-3867516CE0ED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3D575309-A76D-4508-8974-3867516CE0ED}.Release|Any CPU.Deploy.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

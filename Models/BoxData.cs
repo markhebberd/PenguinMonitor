@@ -12,6 +12,8 @@ namespace BluePenguinMonitoring.Models
         public string? GateStatus { get; set; } = null;
         public string Notes { get; set; } = "";
         public DateTime whenDataCollectedUtc { get; set; }
+        public string BreedingChance { get; internal set; }
+
         public BoxData()
         {
             this.whenDataCollectedUtc = DateTime.UtcNow;

@@ -27,26 +27,82 @@ namespace BluePenguinMonitoring.Services
         internal const string BOX_STATUS_URL = "https://docs.google.com/spreadsheets/d/1B-jWzxb4PhbMerWD36jO3TysTCbNsZ9Lo0gldgYreLc";
         internal const string BREEDING_DATES_URL = "https://docs.google.com/spreadsheets/d/1OZMPnmEm2YAGx8M9Ha_qKoB3KJgSQ4qw";
 
-        public void SaveDataToInternalStorage(string filesDir, MonitorDetails appState, Android.Content.Context context, bool reportHome = true)
+
+        public void uploadCurrentMonitorDetailsToServer(string currentDataJson)
+        {
+            try
+            {
+                string response = "No Response";
+                BackgroundWorker bw = new BackgroundWorker();
+                bw.DoWork += (sender, e) =>
+                {
+                    response = Backend.RequestServerResponse("PenguinReport-Saved:" + currentDataJson.ToString());
+                };
+                bw.RunWorkerCompleted += (sender, e) =>
+                {
+                    
+                };
+                bw.RunWorkerAsync();
+            }
+            catch { }
+        }
+
+        public Dictionary<int, MonitorDetails> requestPastMonitorDetailsFromServer(Android.Content.Context context, Dictionary<int, MonitorDetails> _allMonitorData)
+        {
+            try
+            {
+                MonitorDetails temp = _allMonitorData[0];
+                _allMonitorData.Clear();
+                _allMonitorData.Add(0, temp);
+
+                string response = "No Response";
+                BackgroundWorker bw = new BackgroundWorker();
+                bw.DoWork += (sender, e) =>
+                {
+                    response = Backend.RequestServerResponse("PenguinRequest-Saved" );
+                };
+                bw.RunWorkerCompleted += (sender, e) =>
+                {
+                    try
+                    {
+                        foreach (string json in response.Split("~~~~", StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            MonitorDetails monitor = Newtonsoft.Json.JsonConvert.DeserializeObject<MonitorDetails>(json);
+                            _allMonitorData.Add(_allMonitorData.Count, monitor);
+                        }
+                    }
+                    catch { }
+                };
+                bw.RunWorkerAsync();
+            }
+            catch { }
+            return _allMonitorData;
+        }
+
+
+        public void SaveDataToInternalStorage(string filesDir, Dictionary<int, MonitorDetails> _allMonitorData, Android.Content.Context context, bool reportHome = true)
         {
             try
             {
                 if (string.IsNullOrEmpty(filesDir))
                     return;
 
-                var json = JsonConvert.SerializeObject(appState, Formatting.Indented);
+                var allMonitorDataJson = JsonConvert.SerializeObject(_allMonitorData, Formatting.Indented);
                 var filePath = Path.Combine(filesDir, AUTO_SAVE_FILENAME);
 
-                File.WriteAllText(filePath, json);
-                if (reportHome && appState.BoxData.Count > 0 )
+                File.WriteAllText(filePath, allMonitorDataJson);
+
+                if (reportHome && _allMonitorData[0].BoxData.Count > 0 )
                 {
                     try
                     {
+                        var currentDataJson = JsonConvert.SerializeObject(_allMonitorData[0], Formatting.Indented);
+
                         string response = "No Response";
                         BackgroundWorker bw = new BackgroundWorker();
                         bw.DoWork += (sender, e) =>
                         {
-                            response = Backend.RequestServerResponse("PenguinReport:" + json.ToString());
+                            response = Backend.RequestServerResponse("PenguinReport:" + currentDataJson.ToString());
                         };
                         bw.RunWorkerCompleted += (sender, e) =>
                         {
@@ -73,7 +129,7 @@ namespace BluePenguinMonitoring.Services
                 System.Diagnostics.Debug.WriteLine($"Auto-save failed: {ex.Message}");
             }
         }
-        public MonitorDetails? LoadFromAppDataDir(string filesDir)
+        public Dictionary<int, MonitorDetails>? LoadFromAppDataDir(string filesDir)
         {
             try
             {
@@ -85,7 +141,7 @@ namespace BluePenguinMonitoring.Services
                     return null;
 
                 var json = File.ReadAllText(filePath);
-                return Newtonsoft.Json.JsonConvert.DeserializeObject<MonitorDetails>(json);
+                return Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<int, MonitorDetails>>(json);
             }
             catch (Exception ex)
             {
