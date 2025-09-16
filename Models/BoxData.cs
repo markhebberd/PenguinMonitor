@@ -25,7 +25,7 @@ namespace BluePenguinMonitoring.Models
             {
                 scannedIDs += id + ".";
             }
-            return $"BoxData: ScannedIds={scannedIDs}, Adults={Adults}, Eggs={Eggs}, Chicks={Chicks}, GateStatus={GateStatus}, Notes={Notes}, whenDataCollected={whenDataCollectedUtc}";
+            return $"ScannedIds={scannedIDs}, Adults={Adults}, Eggs={Eggs}, Chicks={Chicks}, GateStatus={GateStatus}, BreedingChance={BreedingChance}, Notes={Notes}, whenDataCollected={whenDataCollectedUtc}";
         }
     }
 }

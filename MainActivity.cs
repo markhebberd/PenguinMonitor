@@ -27,6 +27,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection.Emit;
+using System.Runtime.Intrinsics.Arm;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -110,7 +111,7 @@ namespace BluePenguinMonitoring
         private MediaPlayer? _alertMediaPlayer;
 
         //Lazy versioning.
-        private static int version = 29;
+        private static int version = 30;
         private static int numberMonitorBoxes = 150;
 
         //multibox View
@@ -670,7 +671,6 @@ namespace BluePenguinMonitoring
                 clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.WARNING_YELLOW, 8);
 
                 _allMonitorData = _dataStorageService.requestPastMonitorDetailsFromServer(_allMonitorData);
-
                 _ = Task.Run(async () =>
                 {
                     await _dataStorageService.DownloadCsvDataAsync(this);
@@ -1653,7 +1653,7 @@ namespace BluePenguinMonitoring
             int.TryParse(_eggsEditText?.Text ?? "0", out int eggs);
             int.TryParse(_chicksEditText?.Text ?? "0", out int chicks);
 
-            string? gate = GetSelectedGateStatus(_gateStatusSpinner); // returns null for blank
+            string? gate = GetSelectedStatus(_gateStatusSpinner); // returns null for blank
             bool noGate = string.IsNullOrEmpty(gate);
             bool noNotes = string.IsNullOrWhiteSpace(_notesEditText?.Text);
 
@@ -1821,11 +1821,7 @@ namespace BluePenguinMonitoring
             {
                 string selectedItem = items[e.Position];
                 string status = _breedingChanceSpinner.SelectedItem.ToString();
-                if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
-                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Add(_currentBox, new BoxData());
-                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].BreedingChance = status;
             };
-
             _gateStatusSpinner = _uiFactory.CreateGateStatusSpinner();
             _gateStatusSpinner.ItemSelected += (s, e) => 
             {
@@ -2071,9 +2067,7 @@ namespace BluePenguinMonitoring
             if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
             {
                 _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox] = new BoxData();
-                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].whenDataCollectedUtc = DateTime.UtcNow;
             }
-
             var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox];
             string boxDataString = boxData.ToString();
             
@@ -2085,12 +2079,16 @@ namespace BluePenguinMonitoring
             boxData.Adults = adults;
             boxData.Eggs = eggs;
             boxData.Chicks = chicks;
-            boxData.GateStatus = GetSelectedGateStatus(_gateStatusSpinner);
+            boxData.GateStatus = GetSelectedStatus(_gateStatusSpinner);
+            boxData.BreedingChance = GetSelectedStatus(_breedingChanceSpinner);
             boxData.Notes = _notesEditText?.Text ?? "";
 
             if (boxData.ToString() != boxDataString)
             {
-                boxData.whenDataCollectedUtc = DateTime.UtcNow; // Update timestamp if data changed
+                if (_appSettings.ActiveSessionTimeStampActive)
+                    boxData.whenDataCollectedUtc = _appSettings.ActiveSessionLocalTimeStamp.ToUniversalTime();
+                else
+                    boxData.whenDataCollectedUtc = DateTime.UtcNow; 
                 _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox] = boxData;
                 SaveToAppDataDir();
             }
@@ -2851,7 +2849,7 @@ namespace BluePenguinMonitoring
             _currentBox = targetBox;
             DrawPageLayouts();
         }
-        private string? GetSelectedGateStatus(Spinner spinner)
+        private string? GetSelectedStatus(Spinner spinner)
         {
             if (spinner?.SelectedItem != null)
             {
