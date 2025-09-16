@@ -7,7 +7,6 @@ namespace BluePenguinMonitoring.Models
         Returnee,
         Dead
     }
-
     public class PenguinData
     {
         public string ScannedId { get; set; } = "";

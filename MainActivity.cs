@@ -32,6 +32,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace BluePenguinMonitoring
 {
@@ -124,10 +125,10 @@ namespace BluePenguinMonitoring
             RequestPermissions();
             LoadFromAppDataDir();
             CreateDataRecordingUI();
-            InitializeVibrationAndSound();
         }
         private void RequestPermissions()
         {
+            InitializeVibrationAndSound();
             var permissions = new List<string>();
 
             // Always request READ_EXTERNAL_STORAGE for Android 6-12 (API 23-32)
@@ -430,7 +431,6 @@ namespace BluePenguinMonitoring
                     Toast.MakeText(this, message, ToastLength.Long)?.Show();
                     return;
                 }
-
                 // Show file selection dialog
                 ShowFileSelectionDialog(files);
             }
@@ -661,6 +661,7 @@ namespace BluePenguinMonitoring
 
         private bool _isDownloadingCsvData = false;
         private CheckBox _setTimeActiveSessionCheckBox;
+        private TextView _boxSavedTimeTextView;
 
         private void OnDownloadCsvClick(object? sender, EventArgs e)
         {
@@ -763,9 +764,9 @@ namespace BluePenguinMonitoring
 
             // Action buttons
             _topButtonLayout = CreateStyledButtonLayout(
-                ("Clear All", OnClearBoxesClick, UIFactory.DANGER_RED),
-                ("Clear Box", OnClearBoxClick, UIFactory.WARNING_YELLOW),
-                ("Bird Stats", OnDownloadCsvClick, UIFactory.PRIMARY_BLUE),
+                ("Clear all", OnClearBoxesClick, UIFactory.DANGER_RED),
+                ("Clear box", OnClearBoxClick, UIFactory.WARNING_YELLOW),
+                ("Bird stats", OnDownloadCsvClick, UIFactory.PRIMARY_BLUE),
                 ("Save/Load", OnDataClick, UIFactory.SUCCESS_GREEN)
             );
             statusParams.SetMargins(0, 0, 0, 10);
@@ -784,11 +785,11 @@ namespace BluePenguinMonitoring
             CreateBoxDataCard();
 
             //Create Multi box view card
-            //createMultiBoxViewCard();
+            _multiBoxViewCard = _uiFactory.CreateCard();
 
             parentLinearLayout.AddView(_settingsCard);
             parentLinearLayout.AddView(_dataCard);
-            //parentLinearLayout.AddView(_multiBoxViewCard);
+            parentLinearLayout.AddView(_multiBoxViewCard);
 
             DrawPageLayouts();
             _rootScrollView.AddView(parentLinearLayout);
@@ -831,14 +832,7 @@ namespace BluePenguinMonitoring
         }
         private void createMultiBoxViewCard()
         {
-            if (_multiBoxViewCard == null)
-            {
-                _multiBoxViewCard = _uiFactory.CreateCard();
-            }
-            else
-            {
-                _multiBoxViewCard.RemoveAllViews();
-            }
+            _multiBoxViewCard.RemoveAllViews();
 
             var headerCard = _uiFactory.CreateCard(
                 Android.Widget.Orientation.Horizontal,
@@ -1497,7 +1491,7 @@ namespace BluePenguinMonitoring
 
             _selectBoxButton = new Button(this)
             {
-                Text = "Select Box",
+                Text = "Select box",
                 Clickable = true,
                 Focusable = true
             };
@@ -1570,6 +1564,11 @@ namespace BluePenguinMonitoring
 
                     if (_dataCardTitleText != null)
                         _dataCardTitleText.Text = $"Box {_currentBox}";
+
+                    _boxSavedTimeTextView.Text = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) ?
+                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy\nHH:mm") : "";
+                    _boxSavedTimeTextView.SetTextColor(Color.Black);
+                    _boxSavedTimeTextView.Gravity = GravityFlags.Right;
 
                     _interestingBoxTextView.Visibility = ViewStates.Gone;
                     if (null != _remoteBoxData && _remoteBoxData.ContainsKey(_currentBox) && !string.IsNullOrWhiteSpace(_remoteBoxData[_currentBox].PersistentNotes))
@@ -1714,6 +1713,11 @@ namespace BluePenguinMonitoring
                 }
             };
 
+            // Add a spacer that expands to fill available space
+            var spacer = new View(this);
+            spacer.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
+            _dataCardTitleLayout.AddView(spacer);
+
             // Box title text
             _dataCardTitleText = new TextView(this)
             {
@@ -1749,23 +1753,15 @@ namespace BluePenguinMonitoring
             _dataCardTitleLayout.AddView(_lockIconView);
 
             // Add a spacer that expands to fill available space
-            var spacer = new View(this);
-            spacer.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
-            _dataCardTitleLayout.AddView(spacer);
+            var spacer1 = new View(this);
+            spacer1.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
+            _dataCardTitleLayout.AddView(spacer1);
 
-            TextView cardSavedTime = new TextView(this)
-            {
-                Text = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].whenDataCollectedUtc.Year > 2010 ?
-                    "Last saved: " + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].whenDataCollectedUtc.ToLocalTime().ToString("g") : "Not yet saved",
-                Gravity = GravityFlags.Top | GravityFlags.Right,
-            };
-            _dataCardTitleLayout.AddView(cardSavedTime);
+            _boxSavedTimeTextView = new TextView(this);
+            _dataCardTitleLayout.AddView(_boxSavedTimeTextView);
             _dataCard.AddView(_dataCardTitleLayout);
 
-            _interestingBoxTextView = new TextView(this)
-            {
-                //Text = _remoteBoxData[_currentBox].PersistentNotes
-            };
+            _interestingBoxTextView = new TextView(this);
             _interestingBoxTextView.Visibility = ViewStates.Gone;
             _dataCard.AddView(_interestingBoxTextView);
 
@@ -1824,7 +1820,8 @@ namespace BluePenguinMonitoring
             var spinnerParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             spinnerParams.SetMargins(4, 0, 4, 0);
             _breedingChanceSpinner.LayoutParameters = spinnerParams;
-            List<string> items = new List<string> { "", "NO", "UNL", "POT", "CON", "BR" };
+            _breedingChanceSpinner.SetGravity(GravityFlags.Center);
+            List<string> items = new List<string> { "", "DCM", "NO", "UNL", "POT", "CON", "BR" };
             ArrayAdapter<string> adapter = new(this, Android.Resource.Layout.SimpleSpinnerItem, items);
             adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
             _breedingChanceSpinner.Adapter = adapter;
@@ -1957,8 +1954,8 @@ namespace BluePenguinMonitoring
             ShowConfirmationDialog(
                 "Empty Box Confirmation",
                 "Please confirm this box has been inspected and is empty",
-                ("Confirm Empty", onConfirm),
-                ("Cancel", onCancel)
+                ("Confirm empty", onConfirm),
+                ("Lock without saving", onCancel)
             );
         }
         private void OnClearBoxClick(object? sender, EventArgs e)
@@ -1969,12 +1966,10 @@ namespace BluePenguinMonitoring
                 ("Yes", () =>
                 {
                     _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Remove(_currentBox);
+                    SaveToAppDataDir();
                     DrawPageLayouts();
-                }
-            ),
-                ("No", () => { }
-            )
-            );
+                }),
+                ("No", () => { } ));
         }
         private void OnClearBoxesClick(object? sender, EventArgs e)
         {
@@ -2470,7 +2465,10 @@ namespace BluePenguinMonitoring
                 if (string.IsNullOrEmpty(internalPath))
                     throw new Exception();
                 _appSettings = DataStorageService.loadAppSettingsFromDir(internalPath);
-                _appSettings.filesDir = internalPath;
+                _appSettings.PropertyChanged += (s, e) =>
+                {
+                    DataStorageService.saveApplicationSettings(_appSettings);
+                };
 
                 // Load remote penguin data.
                 _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);

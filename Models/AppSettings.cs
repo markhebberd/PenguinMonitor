@@ -8,15 +8,17 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using static Android.Renderscripts.Sampler;
+using Newtonsoft.Json;
+
 
 namespace BluePenguinMonitoring.Models
 {
     public class AppSettings : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
-        private void OnAnyPropertyChanged()
+        protected void OnAnyPropertyChanged()
         {
-            DataStorageService.saveApplicationSettings(filesDir, this);
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(""));
         }
         public string filesDir;
         public AppSettings(string filesDir)

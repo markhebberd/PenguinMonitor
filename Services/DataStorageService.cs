@@ -252,12 +252,21 @@ namespace BluePenguinMonitoring.Services
                   });
             }
         }
-        public static void saveApplicationSettings(string filesDir, AppSettings appSettings)
+        public static void saveApplicationSettings(AppSettings appSettings)
         {
             try
             {
+                string saveTo = Path.Combine(appSettings.filesDir, APP_SETTINGS_FILENAME);
+                string tempFile = saveTo + ".tmp";
                 var appSettingsJson = JsonConvert.SerializeObject(appSettings, Formatting.Indented);
-                File.WriteAllText(Path.Combine(filesDir, APP_SETTINGS_FILENAME), appSettingsJson);
+                File.Delete(tempFile);
+                File.WriteAllText(tempFile, appSettingsJson);
+                AppSettings g = JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(tempFile));
+                if (g.IsBlueToothEnabled != null && g.VisiblePages != null)
+                {
+                    File.Move(tempFile, saveTo, true);
+                    return;
+                }
             }
             catch { }
         }
