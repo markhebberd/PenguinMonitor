@@ -1199,10 +1199,10 @@ namespace BluePenguinMonitoring
                     BoxData olderBoxData = olderBoxDatas.First();
                     bool showBox = _appSettings.ShowAllBoxesInMultiBoxView
                                 || _appSettings.ShowBoxesWithDataInMultiBoxView && (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber))
-                                || _appSettings.ShowConfidentBoxesInMultiBoxView && (olderBoxData.BreedingChance.Equals("CON") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON")
-                                || _appSettings.ShowPotentialBoxesInMultiBoxView && (olderBoxData.BreedingChance.Equals("POT") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "POT")
-                                || _appSettings.ShowUnlikleyBoxesInMultiBoxView && (olderBoxData.BreedingChance.Equals("UNL") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL")
-                                || _appSettings.ShowNoBoxesInMultiBoxView && (olderBoxData.BreedingChance.Equals("NO") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO")
+                                || _appSettings.ShowConfidentBoxesInMultiBoxView && (olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("CON") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON")
+                                || _appSettings.ShowPotentialBoxesInMultiBoxView && (olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("POT") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "POT")
+                                || _appSettings.ShowUnlikleyBoxesInMultiBoxView && (olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("UNL") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL")
+                                || _appSettings.ShowNoBoxesInMultiBoxView && (olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("NO") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO")
                                 || _appSettings.ShowInterestingBoxesInMultiBoxView && (olderBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes))
                                 || _appSettings.ShowSingleEggBoxesInMultiboxView && (olderBoxData.Eggs == 1);
 
