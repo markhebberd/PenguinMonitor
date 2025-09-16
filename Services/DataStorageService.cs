@@ -41,7 +41,7 @@ namespace BluePenguinMonitoring.Services
                 };
                 bw.RunWorkerCompleted += (sender, e) =>
                 {
-                    
+
                 };
                 bw.RunWorkerAsync();
             }
@@ -60,7 +60,7 @@ namespace BluePenguinMonitoring.Services
                 BackgroundWorker bw = new BackgroundWorker();
                 bw.DoWork += (sender, e) =>
                 {
-                    response = Backend.RequestServerResponse("PenguinRequest-Saved" );
+                    response = Backend.RequestServerResponse("PenguinRequest-Saved");
                 };
                 bw.RunWorkerCompleted += (sender, e) =>
                 {
@@ -91,7 +91,7 @@ namespace BluePenguinMonitoring.Services
 
                 File.WriteAllText(filePath, allMonitorDataJson);
 
-                if (reportHome && _allMonitorData[0].BoxData.Count > 0 )
+                if (reportHome && _allMonitorData[0].BoxData.Count > 0)
                 {
                     try
                     {
@@ -152,12 +152,12 @@ namespace BluePenguinMonitoring.Services
         {
             try
             {
-                Task<HttpResponseMessage> responseBirdsTask = 
+                Task<HttpResponseMessage> responseBirdsTask =
                      _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(ALL_PENGS_URL));
                 Task<HttpResponseMessage> responseBoxesTask =
                     _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(BOX_STATUS_URL));
                 Task<HttpResponseMessage> responseBreedingDatesTask =
-                    _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(BREEDING_DATES_URL)); 
+                    _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(BREEDING_DATES_URL));
                 ;
                 // Await them in parallel
                 await Task.WhenAll(responseBirdsTask, responseBoxesTask, responseBreedingDatesTask);
@@ -215,7 +215,7 @@ namespace BluePenguinMonitoring.Services
                 Dictionary<int, BoxRemoteData> remoteBoxData = new Dictionary<int, BoxRemoteData>();
                 foreach (var row in parsedData)
                 {
-                    if ( row.boxNumber != null)
+                    if (row.boxNumber != null)
                     {
                         remoteBoxData.Add(row.boxNumber, row);
                     }
@@ -344,6 +344,15 @@ namespace BluePenguinMonitoring.Services
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to clear auto-save file: {ex.Message}");
             }
+        }
+
+        internal static List<BoxData> getOlderBoxDatas(Dictionary<int, MonitorDetails> allMonitorData, int currentlyVisibleMonitor, int boxNumber)
+        {
+            List<BoxData> olderBoxDatas = new List<BoxData>();
+            for (int i = currentlyVisibleMonitor +0; i < allMonitorData.Count; i++)
+                if (allMonitorData[i].BoxData.ContainsKey(boxNumber) )
+                    olderBoxDatas.Add(allMonitorData[i].BoxData[boxNumber]);
+            return olderBoxDatas;
         }
     }
 }

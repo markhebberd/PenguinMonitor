@@ -23,7 +23,19 @@ namespace BluePenguinMonitoring.Models
         {
             this.filesDir = filesDir;
         }
-        public Android.Content.Context? context;
+        private bool isBluetoothEnabled;
+        public bool IsBlueToothEnabled
+        {
+            get => isBluetoothEnabled;
+            set
+            {
+                if (isBluetoothEnabled != value)
+                {
+                    isBluetoothEnabled = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
         private bool showMultiboxFilterCard;
         public bool ShowMultiboxFilterCard
         {

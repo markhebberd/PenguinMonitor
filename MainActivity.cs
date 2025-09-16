@@ -878,8 +878,6 @@ namespace BluePenguinMonitoring
             {
                 TextSize = 12,
             };
-
-
             if (_appSettings.CurrentlyVisibleMonitor == 0)
                 timeTV.Text = "Data is local only";
             else
@@ -1190,16 +1188,23 @@ namespace BluePenguinMonitoring
 
                     _multiBoxViewCard.AddView(currentRow);
                 }
-                if (_remoteBoxData != null && _remoteBoxData.ContainsKey(boxNumber))
+                var olderBoxDatas = DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, boxNumber);
+                string nrfPercentageString = olderBoxDatas.First().Eggs == 0 ? "0" : olderBoxDatas.Count(x => x.Adults == 0 && x.Eggs > 0) + "/" + olderBoxDatas.Count(x => x.Eggs > 0);
+                if (boxNumber == 18)
+                    ;
+
+                if (olderBoxDatas.Count > 0)
                 {
-                    bool showBox = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber) && _appSettings.ShowBoxesWithDataInMultiBoxView
-                                    || _appSettings.ShowAllBoxesInMultiBoxView
-                                    || _appSettings.ShowConfidentBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON"
-                                    || _appSettings.ShowPotentialBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "POT"
-                                    || _appSettings.ShowUnlikleyBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL"
-                                    || _appSettings.ShowNoBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO"
-                                    || _appSettings.ShowInterestingBoxesInMultiBoxView && !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes)
-                                    || _appSettings.ShowSingleEggBoxesInMultiboxView && _remoteBoxData[boxNumber].numEggs() == 1;
+                    BoxData currentBoxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber) ? _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[boxNumber] : new BoxData();
+                    BoxData olderBoxData = olderBoxDatas.First();
+                    bool showBox = _appSettings.ShowAllBoxesInMultiBoxView
+                                || _appSettings.ShowBoxesWithDataInMultiBoxView && (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber))
+                                || _appSettings.ShowConfidentBoxesInMultiBoxView && (olderBoxData.BreedingChance.Equals("CON") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON")
+                                || _appSettings.ShowPotentialBoxesInMultiBoxView && (olderBoxData.BreedingChance.Equals("POT") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "POT")
+                                || _appSettings.ShowUnlikleyBoxesInMultiBoxView && (olderBoxData.BreedingChance.Equals("UNL") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL")
+                                || _appSettings.ShowNoBoxesInMultiBoxView && (olderBoxData.BreedingChance.Equals("NO") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO")
+                                || _appSettings.ShowInterestingBoxesInMultiBoxView && (olderBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes))
+                                || _appSettings.ShowSingleEggBoxesInMultiboxView && (olderBoxData.Eggs == 1);
 
                     bool hideBoxWithData = _appSettings.HideBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber);
                     bool hideDCM = _appSettings.HideDCMInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "DCM";
@@ -1208,9 +1213,9 @@ namespace BluePenguinMonitoring
                     {
                         View? card;
                         if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber))
-                            card = CreateBoxSummaryCard(boxNumber, _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[boxNumber], boxNumber == _currentBox);
+                            card = CreateBoxSummaryCard(boxNumber, _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[boxNumber], boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
                         else
-                            card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber], boxNumber == _currentBox);
+                            card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber], boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
                         currentRow?.AddView(card);
                         visibleBoxCount++;
                     }
@@ -1235,7 +1240,7 @@ namespace BluePenguinMonitoring
             return DateTime.MinValue;
         }
 
-        private View? CreateBoxRemoteSummaryCard(int boxNumber, BoxRemoteData boxData, bool selected = false)
+        private View? CreateBoxRemoteSummaryCard(int boxNumber, BoxRemoteData boxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
         {
             var card = new LinearLayout(this)
             {
@@ -1259,10 +1264,11 @@ namespace BluePenguinMonitoring
 
             var summary = new TextView(this)
             {
-                Text = boxData.boxMiniStatus(),
+                Text = boxData.boxMiniStatus(olderBoxDatas.First().Eggs, olderBoxDatas.First().Chicks),
                 Gravity = GravityFlags.Center,
                 TextSize = 14
             };
+            summary.Text += !nrfPercentageString.StartsWith("0") ? $" (NRF:{nrfPercentageString})" : "";
             if (_remoteBreedingDates.ContainsKey(boxNumber))
             {
                 summary.Text += "\n" + _remoteBreedingDates[boxNumber].breedingDateStatus();
@@ -1278,7 +1284,7 @@ namespace BluePenguinMonitoring
             };
             return card;
         }
-        private View? CreateBoxSummaryCard(int boxNumber, BoxData thisBoxData, bool selected)
+        private View? CreateBoxSummaryCard(int boxNumber, BoxData thisBoxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
         {
             var card = new LinearLayout(this)
             {
@@ -1290,9 +1296,9 @@ namespace BluePenguinMonitoring
             card.LayoutParameters = cardParams;
             bool gotRemoteBoxData = _remoteBoxData.TryGetValue(boxNumber, out var thisRemoteBoxData);
             bool differenceFound = false;
-            if (gotRemoteBoxData && thisBoxData.Eggs != thisRemoteBoxData?.numEggs()
-                || thisBoxData.Chicks != thisRemoteBoxData?.numChicks()
-                || thisRemoteBoxData?.breedingLikelyhoodText != "BR" && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
+            if (thisBoxData.Eggs != olderBoxDatas.First().Eggs
+                || thisBoxData.Chicks != olderBoxDatas.First().Chicks
+                || (thisRemoteBoxData?.breedingLikelyhoodText != "BR" || olderBoxDatas.First().BreedingChance != "BR") && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
             {
                 differenceFound = true;
                 card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.PRIMARY_BLUE, backgroundColor:selected?UIFactory.WARNING_YELLOW:null);
@@ -1319,14 +1325,14 @@ namespace BluePenguinMonitoring
                 Gravity = GravityFlags.Center,
                 TextSize = 14
             };
-            if (boxNumber == 99)
+            if (boxNumber == 100)
                 ;
-            var remoteChicks = thisRemoteBoxData?.numChicks(); 
-            var remoteEggs = thisRemoteBoxData?.numEggs();
+            var previousChicks = olderBoxDatas.First().Chicks;
+            var previousEggs = olderBoxDatas.First().Eggs;
 
-            if (differenceFound && remoteChicks + remoteEggs > 0 && (thisBoxData.Eggs != remoteEggs || thisBoxData.Chicks != remoteChicks))
+            if (differenceFound && previousChicks + previousEggs > 0 && (thisBoxData.Eggs != previousEggs || thisBoxData.Chicks != previousChicks))
             {
-                summary.Text += $"({string.Concat(Enumerable.Repeat("🥚", thisRemoteBoxData.numEggs()))}{string.Concat(Enumerable.Repeat("🐣", thisRemoteBoxData.numChicks()))})";
+                summary.Text += $"({string.Concat(Enumerable.Repeat("🥚", previousEggs))}{string.Concat(Enumerable.Repeat("🐣", previousChicks))})";
             }
             if (_remoteBreedingDates.ContainsKey(boxNumber))
             {
@@ -1340,7 +1346,8 @@ namespace BluePenguinMonitoring
 
             string gateStatus = thisBoxData.GateStatus;
             string notes = string.IsNullOrWhiteSpace(thisBoxData.Notes) ? "" : "notes";
-            notes += gotRemoteBoxData && !string.IsNullOrEmpty(thisRemoteBoxData.PersistentNotes) ? $" ({thisRemoteBoxData.PersistentNotes})" : ""; 
+            notes += gotRemoteBoxData && !string.IsNullOrEmpty(thisRemoteBoxData.PersistentNotes) ? $" ({thisRemoteBoxData.PersistentNotes})" : "";
+            notes += !nrfPercentageString.StartsWith("0") ? $" (NRF:{nrfPercentageString})" : "";
             string lineThreeStatusText = "";
             if (!string.IsNullOrWhiteSpace(gateStatus) && !string.IsNullOrWhiteSpace(notes))
                 lineThreeStatusText = gateStatus + " & " + notes;
@@ -1391,15 +1398,17 @@ namespace BluePenguinMonitoring
                 Text = "Enable bluetooth",
             };
             _isBluetoothEnabledCheckBox.SetTextColor(Color.Black);
-            _isBluetoothEnabledCheckBox.Checked = false;
+            _isBluetoothEnabledCheckBox.Checked = _appSettings.IsBlueToothEnabled;
             _isBluetoothEnabledCheckBox.CheckedChange += (s, e) =>
             {
                 if (_isBluetoothEnabledCheckBox.Checked)
                 {
                     InitializeBluetooth();
+                    _appSettings.IsBlueToothEnabled = true;
                 }
                 else
                 {
+                    _appSettings.IsBlueToothEnabled = false;
                     _bluetoothManager?.Dispose();
                     _bluetoothManager = null;
                     UpdateStatusText("Bluetooth Disabled");

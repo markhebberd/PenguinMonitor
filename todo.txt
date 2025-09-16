@@ -1,10 +1,10 @@
 TODO
 
-Force all entries should be on same date. 
+Force all entries to be on same date. 
 previous data    LAST BOX INSPECTION: Date and Hour #PEC, Notes, Gate status, PersistentNotes, penguin scans M&F ? 
 check alert for bird without sex assigned. 
 data summary should show count of new eggs and new chicks. 
-update spanner icons v Box Overview becomes greater than when opened. & settings spanner  <-- hamburger top right
+update spanner icons & settings spanner  <-- hamburger menu top right ?
 if numChicks + numEggs ever > 2 alert. 
 Save to file > Saved, when allData[0] matches allData[1]
 penguin reporting under specific name to seperate britta from alternate locations
@@ -21,6 +21,7 @@ MAYBE_DO?
 
 DONE
 
+v Box Overview becomes greater than when opened.
 Seperate from monitor settings, this is application settings
 	which set of data should we be looking, from int 0 to < monitors
 	CurrentBox
