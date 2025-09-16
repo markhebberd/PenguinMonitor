@@ -890,13 +890,13 @@ namespace BluePenguinMonitoring
             {
                 foreach (ScanRecord sc in box.ScannedIds)
                 {
-                    timeTV.Text += "\n" + sc.Timestamp.ToLocalTime().ToString("d MMM yy");
+                    timeTV.Text += "\n" + sc.Timestamp.ToLocalTime().ToString("d MMM yy, HH:mm");
                     timeFound = true;
                     break;
                 }
                 if (!timeFound && box.whenDataCollectedUtc.Year > 2015)
                 {
-                    timeTV.Text += "\n" + box.whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy");
+                    timeTV.Text += "\n" + box.whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy, HH:mm");
                     timeFound = true;
                 }
                 if (timeFound) break;
