@@ -784,11 +784,11 @@ namespace BluePenguinMonitoring
             CreateBoxDataCard();
 
             //Create Multi box view card
-            createMultiBoxViewCard();
+            //createMultiBoxViewCard();
 
             parentLinearLayout.AddView(_settingsCard);
             parentLinearLayout.AddView(_dataCard);
-            parentLinearLayout.AddView(_multiBoxViewCard);
+            //parentLinearLayout.AddView(_multiBoxViewCard);
 
             DrawPageLayouts();
             _rootScrollView.AddView(parentLinearLayout);
@@ -1569,9 +1569,8 @@ namespace BluePenguinMonitoring
                     }
 
                     if (_dataCardTitleText != null)
-                    {
                         _dataCardTitleText.Text = $"Box {_currentBox}";
-                    }
+
                     _interestingBoxTextView.Visibility = ViewStates.Gone;
                     if (null != _remoteBoxData && _remoteBoxData.ContainsKey(_currentBox) && !string.IsNullOrWhiteSpace(_remoteBoxData[_currentBox].PersistentNotes))
                     {
@@ -1598,7 +1597,7 @@ namespace BluePenguinMonitoring
                         SetSpinnerStatus(_gateStatusSpinner, boxData.GateStatus);
                         if (_notesEditText != null) _notesEditText.Text = boxData.Notes;
                         buildScannedIdsLayout(boxData.ScannedIds);
-                        SetSpinnerStatus(_breedingChanceSpinner, !string.IsNullOrWhiteSpace(boxData.BreedingChance) ? boxData.BreedingChance : _remoteBoxData[_currentBox].breedingLikelyhoodText   );
+                        SetSpinnerStatus(_breedingChanceSpinner, !string.IsNullOrWhiteSpace(boxData.BreedingChance) ? boxData.BreedingChance : _remoteBoxData[_currentBox].breedingLikelyhoodText);
                     }
                     else
                     {
@@ -1651,9 +1650,6 @@ namespace BluePenguinMonitoring
                         SetEnabledRecursive(child, !_isBoxLocked, _isBoxLocked ? 0.8f : 1.0f);
                     }
 
-
-
-
                     if (showOverview)
                     {
                         createMultiBoxViewCard();
@@ -1682,7 +1678,6 @@ namespace BluePenguinMonitoring
             {
                 _dataCard.RemoveAllViews();
             }
-
             // Horizontal layout for lock icon + box title
             _dataCardTitleLayout = new LinearLayout(this)
             {
@@ -1753,8 +1748,19 @@ namespace BluePenguinMonitoring
             _lockIconView.LayoutParameters = iconParams;
             _dataCardTitleLayout.AddView(_lockIconView);
 
-            _dataCard.AddView(_dataCardTitleLayout);
+            // Add a spacer that expands to fill available space
+            var spacer = new View(this);
+            spacer.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
+            _dataCardTitleLayout.AddView(spacer);
 
+            TextView cardSavedTime = new TextView(this)
+            {
+                Text = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].whenDataCollectedUtc.Year > 2010 ?
+                    "Last saved: " + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].whenDataCollectedUtc.ToLocalTime().ToString("g") : "Not yet saved",
+                Gravity = GravityFlags.Top | GravityFlags.Right,
+            };
+            _dataCardTitleLayout.AddView(cardSavedTime);
+            _dataCard.AddView(_dataCardTitleLayout);
 
             _interestingBoxTextView = new TextView(this)
             {
