@@ -659,6 +659,8 @@ namespace BluePenguinMonitoring
         }
 
         private bool _isDownloadingCsvData = false;
+        private CheckBox _setTimeActiveSessionCheckBox;
+
         private void OnDownloadCsvClick(object? sender, EventArgs e)
         {
             if (sender is Button clickedButton && _isDownloadingCsvData == false)
@@ -781,8 +783,6 @@ namespace BluePenguinMonitoring
             CreateBoxDataCard();
 
             //Create Multi box view card
-            _appSettings.ShowMultiboxFilterCard = false;
-            // _hideBoxesWithDataInMultiBoxView = false;
             createMultiBoxViewCard();
 
             parentLinearLayout.AddView(_settingsCard);
@@ -838,7 +838,11 @@ namespace BluePenguinMonitoring
             {
                 _multiBoxViewCard.RemoveAllViews();
             }
-            var headerCard = _uiFactory.CreateCard(Android.Widget.Orientation.Horizontal, borderWidth:4);
+
+            var headerCard = _uiFactory.CreateCard(
+                Android.Widget.Orientation.Horizontal,
+                borderWidth: _appSettings.ActiveSessionTimeStampActive ? 6 : 4,
+                borderColour: _appSettings.ActiveSessionTimeStampActive ? UIFactory.DANGER_RED : null);
             headerCard.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             
             var showFiltersButton = new ImageButton(this);
@@ -1138,8 +1142,10 @@ namespace BluePenguinMonitoring
             gotoNextData.Click += (s, e) =>
             {
                 _appSettings.CurrentlyVisibleMonitor--;
-                _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
-                _appSettings.ActiveSessionTimeStampActive = _appSettings.CurrentlyVisibleMonitor != 0;
+                if(_appSettings.CurrentlyVisibleMonitor != 0)
+                    _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
+                else
+                    _appSettings.ActiveSessionTimeStampActive = false;
                 DrawPageLayouts();
             };
             browseOtherDataButtonLayout.AddView(gotoNextData);
@@ -1400,17 +1406,20 @@ namespace BluePenguinMonitoring
             };
             _settingsCard.AddView(_isBluetoothEnabledCheckBox);
 
-            CheckBox setTimeActiveSessionPicker = new CheckBox(this)
+            _setTimeActiveSessionCheckBox = new CheckBox(this)
             {
                 Text = "Set time for active session",
                 Checked = _appSettings.ActiveSessionTimeStampActive
             };
-            setTimeActiveSessionPicker.SetTextColor(Color.Black);
-            setTimeActiveSessionPicker.SetPadding(0, 0, 0, 0);
-            setTimeActiveSessionPicker.CheckedChange += (s, e) =>
+            _setTimeActiveSessionCheckBox.SetTextColor(Color.Black);
+            _setTimeActiveSessionCheckBox.SetPadding(0, 0, 0, 0);
+            _setTimeActiveSessionCheckBox.CheckedChange += (s, e) =>
             {
-                _appSettings.ActiveSessionTimeStampActive = setTimeActiveSessionPicker.Checked;
-                if (setTimeActiveSessionPicker.Checked)
+                _appSettings.ActiveSessionTimeStampActive = _setTimeActiveSessionCheckBox.Checked;
+            };
+            _setTimeActiveSessionCheckBox.Click += (s, e) =>
+            {
+                if (_setTimeActiveSessionCheckBox.Checked)
                 {
                     var timePicker = new TimePickerDialog(this,
                         (sender, e) =>
@@ -1420,7 +1429,6 @@ namespace BluePenguinMonitoring
                         _appSettings.ActiveSessionLocalTimeStamp.Hour,
                         _appSettings.ActiveSessionLocalTimeStamp.Minute,
                         true); // true = 24 hour format
-
                     var datePicker = new DatePickerDialog(this, (sender, e) =>
                     {
                         _appSettings.ActiveSessionLocalTimeStamp = e.Date + _appSettings.ActiveSessionLocalTimeStamp.TimeOfDay;
@@ -1433,11 +1441,9 @@ namespace BluePenguinMonitoring
                     _appSettings.ActiveSessionLocalTimeStamp.Day);
                     datePicker.Show();
                 }
+                DrawPageLayouts();
             };
-            _settingsCard.AddView(setTimeActiveSessionPicker);
-
-
-
+            _settingsCard.AddView(_setTimeActiveSessionCheckBox);
         }
         private void OnScrollViewTouch(object? sender, View.TouchEventArgs e)
         {
@@ -1518,9 +1524,10 @@ namespace BluePenguinMonitoring
                     _settingsCard.Visibility = showSettings ? ViewStates.Visible : ViewStates.Gone;
                     _multiBoxViewCard.Visibility = showOverview ? ViewStates.Visible : ViewStates.Gone;
 
+                    // update settings card
+                    _setTimeActiveSessionCheckBox.Checked = _appSettings.ActiveSessionTimeStampActive;
 
                     ///Single Box Card
-                    ///
                     // Update lock icon
                     if (_lockIconView != null)
                     {
