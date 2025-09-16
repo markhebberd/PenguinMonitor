@@ -2465,10 +2465,7 @@ namespace BluePenguinMonitoring
                 if (string.IsNullOrEmpty(internalPath))
                     throw new Exception();
                 _appSettings = DataStorageService.loadAppSettingsFromDir(internalPath);
-                _appSettings.PropertyChanged += (s, e) =>
-                {
-                    DataStorageService.saveApplicationSettings(_appSettings);
-                };
+                _appSettings.PropertyChanged += (s, e) => DataStorageService.saveApplicationSettings(_appSettings);
 
                 // Load remote penguin data.
                 _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
