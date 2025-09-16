@@ -254,8 +254,12 @@ namespace BluePenguinMonitoring.Services
         }
         public static void saveApplicationSettings(string filesDir, AppSettings appSettings)
         {
-            var appSettingsJson = JsonConvert.SerializeObject(appSettings, Formatting.Indented);
-            File.WriteAllText(Path.Combine(filesDir, APP_SETTINGS_FILENAME), appSettingsJson);
+            try
+            {
+                var appSettingsJson = JsonConvert.SerializeObject(appSettings, Formatting.Indented);
+                File.WriteAllText(Path.Combine(filesDir, APP_SETTINGS_FILENAME), appSettingsJson);
+            }
+            catch { }
         }
         public static AppSettings loadAppSettingsFromDir(string filesDir)
         {
