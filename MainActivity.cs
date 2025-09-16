@@ -684,7 +684,7 @@ namespace BluePenguinMonitoring
                         clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_BLUE, 8);
                         if (!_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
                             _appSettings.CurrentlyVisibleMonitor = 0;
-                        SaveToAppDataDir();
+                        SaveToAppDataDir(false);
                         DrawPageLayouts();
                     });
                 });
