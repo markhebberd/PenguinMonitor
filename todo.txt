@@ -1,40 +1,38 @@
 TODO
 
-Save to app dir after getting birdstats. 
 Force all entries should be on same date. 
 previous data    LAST BOX INSPECTION: Date and Hour #PEC, Notes, Gate status, PersistentNotes, penguin scans M&F ? 
-renaming everything to penguin monitor
 check alert for bird without sex assigned. 
-box with data summary change to egg before chick. 
-don't save to server if there is no box data. 
 data summary should show count of new eggs and new chicks. 
-server should clean redundant backups. 
 update spanner icons v Box Overview becomes greater than when opened. & settings spanner  <-- hamburger top right
-save summary should be identical to normal summary. 
-Penguin database query 
-Box database query
-Allow Britta to specify data collection time
 if numChicks + numEggs ever > 2 alert. 
 Save to file > Saved, when allData[0] matches allData[1]
 penguin reporting under specific name to seperate britta from alternate locations
+Penguin database query, clicking on a scan entry should 
+	show all known data about the bird 
+	prompt to enter optional information connected with the scan result, i.e. Sex, weight, etc.
+	Have move/delete contained. 
+	Scanned entries should be bigger and easier to click
+Box database query
+	Show box history
+
+MAYBE_DO?
+
+
+DONE
 
 Seperate from monitor settings, this is application settings
 	which set of data should we be looking, from int 0 to < monitors
 	CurrentBox
 	Visible cards
 	Selected Filter options. 
-clicking on a scan entry should 
-	show all known data about the bird 
-	prompt to enter optional information connected with the scan result, i.e. Sex, weight, etc.
-	Have move/delete contained. 
-	Scanned entries should be bigger and easier to click
-
-MAYBE_DO?
-
+box with data summary change to egg before chick. 
 Current state of the app to be saved in same format as save/load data.
-
-DONE
-
+renaming everything to penguin monitor
+don't save to server if there is no box data. 
+save summary should be identical to normal summary. 
+Allow Britta to specify data collection time
+Save to app dir after getting birdstats. 
 entry date should be in box data header. 
 int & single egg row NO/No DCM
 show all boxes and filter boxes. 
@@ -68,5 +66,6 @@ better penguin icon
 
 FIXED BY DESIGN
 
+server should clean redundant backups. 
 move should adjust the box count of the source and destination boxes
 Brittas GPS bug, accuracy 

@@ -849,8 +849,8 @@ namespace BluePenguinMonitoring
             var showFiltersButton = new ImageButton(this);
             showFiltersButton.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
             showFiltersButton.SetPadding(0, 0, 0, 0);
-            showFiltersButton.SetImageResource(Android.Resource.Drawable.IcMenuManage); // Use built-in menu icon
-            showFiltersButton.SetBackgroundColor(Color.Transparent); // No background
+            showFiltersButton.SetImageResource(_appSettings.ShowMultiboxFilterCard ? Resource.Drawable.fold : Resource.Drawable.unfold); 
+            showFiltersButton.SetBackgroundColor(Color.Transparent); 
             showFiltersButton.Click += (sender, e) =>
             {
                 _appSettings.ShowMultiboxFilterCard = !_appSettings.ShowMultiboxFilterCard;
