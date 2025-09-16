@@ -21,6 +21,7 @@ MAYBE_DO?
 
 DONE
 
+NRF calculated based on egg and adult absence. 
 v Box Overview becomes greater than when opened.
 Seperate from monitor settings, this is application settings
 	which set of data should we be looking, from int 0 to < monitors

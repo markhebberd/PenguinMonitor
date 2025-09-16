@@ -1621,9 +1621,13 @@ namespace BluePenguinMonitoring
                     {
                         Button child = (Button) _topButtonLayout.GetChildAt(i);
                         SetEnabledRecursive(child, _isBoxLocked, _isBoxLocked ? 1.0f : 0.5f);
-                        if (_appSettings.CurrentlyVisibleMonitor == 0 &&   _isBoxLocked && child.Text.Equals("Clear All") && _allMonitorData[0].BoxData.Count == 0)
-                            SetEnabledRecursive(child, false, 0.5f);
-                        else if ( _isBoxLocked && child.Text.Equals("Clear Box") && !_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+                        if ((child.Text.Equals("Clear All") || child.Text.Equals("Delete")))
+                        {
+                            child.Text = _appSettings.CurrentlyVisibleMonitor == 0 ? "Clear All":"Delete" ;
+                            if (!_isBoxLocked || _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Count == 0)
+                                SetEnabledRecursive(child, false, 0.5f); 
+                        }
+                        else if (_isBoxLocked && child.Text.Equals("Clear Box") && !_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
                             SetEnabledRecursive(child, false, 0.5f);
                     }
 
@@ -1968,19 +1972,38 @@ namespace BluePenguinMonitoring
         }
         private void OnClearBoxesClick(object? sender, EventArgs e)
         {
-            ShowConfirmationDialog(
-                "Clear All Data",
-                "Are you sure you want to clear data for ALL boxes? This cannot be undone!",
-                ("Yes, Clear All", new Action(() =>
-                {
-                    _allMonitorData[0].BoxData.Clear();  //by design this only clears the current monitor.
-                    _currentBox = 1;
-                    ClearInternalStorageData();
-                    SaveToAppDataDir();
-                    DrawPageLayouts();
-                })),
-                ("Cancel", new Action(() => { }))
-            );
+            if (_appSettings.CurrentlyVisibleMonitor==0)
+            {
+                ShowConfirmationDialog(
+                    "Clear all data",
+                    "Are you sure you want to clear data for ALL boxes? This cannot be undone!",
+                    ("Yes, clear all", new Action(() =>
+                    {
+                        _allMonitorData[0].BoxData.Clear();
+                        _currentBox = 1;
+                        ClearInternalStorageData();
+                        SaveToAppDataDir(reportHome:false);
+                        DrawPageLayouts();
+                    })),
+                    ("Cancel", new Action(() => { }))
+                );
+            }
+            else
+            {
+                ShowConfirmationDialog(
+                    "Delete monitoring data",
+                    "Are you sure you want to set this monitor to be ignored on Marks server? (NOT IMPLEMENTED)",
+                    ("Yes, flag monitor to be ignored", new Action(() =>
+                    {
+                        //_allMonitorData[0].BoxData.Clear();  //by design this only clears the current monitor.
+                        //_currentBox = 1;
+                        //ClearInternalStorageData();
+                        //SaveToAppDataDir();
+                        //DrawPageLayouts();
+                    })),
+                    ("Cancel", new Action(() => { }))
+                );
+            }
         }
         private void OnSaveDataClick(object? sender, EventArgs e)
         {
