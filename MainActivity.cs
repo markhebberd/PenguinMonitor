@@ -111,7 +111,7 @@ namespace BluePenguinMonitoring
         private MediaPlayer? _alertMediaPlayer;
 
         //Lazy versioning.
-        private static int version = 30;
+        private static int version = 31;
         private static int numberMonitorBoxes = 150;
 
         //multibox View
@@ -1416,10 +1416,10 @@ namespace BluePenguinMonitoring
             _setTimeActiveSessionCheckBox.SetPadding(0, 0, 0, 0);
             _setTimeActiveSessionCheckBox.CheckedChange += (s, e) =>
             {
-                _appSettings.ActiveSessionTimeStampActive = _setTimeActiveSessionCheckBox.Checked;
             };
             _setTimeActiveSessionCheckBox.Click += (s, e) =>
             {
+                _appSettings.ActiveSessionTimeStampActive = _setTimeActiveSessionCheckBox.Checked;
                 if (_setTimeActiveSessionCheckBox.Checked)
                 {
                     var timePicker = new TimePickerDialog(this,
@@ -1830,8 +1830,12 @@ namespace BluePenguinMonitoring
                 {
                     if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
                     {
-                        _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Add(_currentBox, new BoxData());
-                        _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].GateStatus = status;
+                        BoxData boxData = new BoxData { GateStatus = status };
+                        if (_appSettings.ActiveSessionTimeStampActive)
+                            _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved = boxData.whenDataCollectedUtc = _appSettings.ActiveSessionLocalTimeStamp.ToUniversalTime();
+                        else
+                            _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved = boxData.whenDataCollectedUtc = DateTime.UtcNow;
+                        _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Add(_currentBox, boxData);
                         SaveToAppDataDir();
                         _isBoxLocked = true;
                         DrawPageLayouts();
@@ -2065,9 +2069,7 @@ namespace BluePenguinMonitoring
         private void SaveCurrentBoxData()
         {
             if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
-            {
                 _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox] = new BoxData();
-            }
             var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox];
             string boxDataString = boxData.ToString();
             
@@ -2086,9 +2088,9 @@ namespace BluePenguinMonitoring
             if (boxData.ToString() != boxDataString)
             {
                 if (_appSettings.ActiveSessionTimeStampActive)
-                    boxData.whenDataCollectedUtc = _appSettings.ActiveSessionLocalTimeStamp.ToUniversalTime();
+                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved = boxData.whenDataCollectedUtc = _appSettings.ActiveSessionLocalTimeStamp.ToUniversalTime();
                 else
-                    boxData.whenDataCollectedUtc = DateTime.UtcNow; 
+                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved = boxData.whenDataCollectedUtc = DateTime.UtcNow;
                 _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox] = boxData;
                 SaveToAppDataDir();
             }
@@ -2540,15 +2542,13 @@ namespace BluePenguinMonitoring
                 var scanRecord = new ScanRecord
                 {
                     BirdId = shortId,
-                    Timestamp = DateTime.UtcNow,
+                    Timestamp = _appSettings.ActiveSessionTimeStampActive ? _appSettings.ActiveSessionLocalTimeStamp.ToUniversalTime() : DateTime.UtcNow,
                     Latitude = _currentLocation?.Latitude ?? 0,
                     Longitude = _currentLocation?.Longitude ?? 0,
                     Accuracy = _currentLocation?.Accuracy ?? -1
                 };
-
                 boxData.ScannedIds.Add(scanRecord);
                 SaveCurrentBoxData();
-
                 RunOnUiThread(() =>
                 {
                     // Enhanced toast message with life stage info
@@ -2648,7 +2648,7 @@ namespace BluePenguinMonitoring
         {
             try
             {
-                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename = fileName;
+                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename = fileName.Replace(".json","");
                 var jsonContents = JsonConvert.SerializeObject(_allMonitorData[_appSettings.CurrentlyVisibleMonitor], Formatting.Indented);
                 var downloadsPath = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads)?.AbsolutePath;
 
