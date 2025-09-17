@@ -30,10 +30,9 @@
             }
             catch
             {
-                return $"Box{boxNumber}: Error parsing breeding date";
+                return $"B:No Dates";
             }
         }
-
         private string getDateString(DateTime expectedDate)
         {
             DateTime today = DateTime.Today;

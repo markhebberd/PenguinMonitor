@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -69,6 +70,71 @@ namespace BluePenguinMonitoring.Services
                         foreach (string json in response.Split("~~~~", StringSplitOptions.RemoveEmptyEntries))
                         {
                             MonitorDetails monitor = Newtonsoft.Json.JsonConvert.DeserializeObject<MonitorDetails>(json);
+                            
+                            /// Don't import deleted monitors
+                            if(monitor.IsDeleted)
+                                continue;
+                            //bool adjusted = false;
+                            //DateTime lastSaved = monitor.LastSaved.ToUniversalTime();
+                            //List<BoxData> bds = monitor.BoxData.Values.ToList();
+                            //bds.Reverse();
+
+                            //DateTime highest = DateTime.MinValue;
+                            //DateTime lowest = DateTime.MaxValue;
+                            //foreach (BoxData box in bds)
+                            //{
+                            //    DateTime boxHighest = DateTime.MinValue;
+
+                            //    if (box.whenDataCollectedUtc.ToUniversalTime() > boxHighest)
+                            //        boxHighest = box.whenDataCollectedUtc.ToUniversalTime();
+                            //    if (box.whenDataCollectedUtc.ToUniversalTime() > highest)
+                            //        highest = box.whenDataCollectedUtc.ToUniversalTime();
+                            //    if (box.whenDataCollectedUtc.ToUniversalTime() < lowest)
+                            //        lowest = box.whenDataCollectedUtc.ToUniversalTime();
+
+                            //    for (int j = 0; j < box.ScannedIds.Count; j++)
+                            //    {
+                            //        if (box.whenDataCollectedUtc < box.ScannedIds[j].Timestamp.ToUniversalTime())
+                            //        {
+
+                            //            if (box.ScannedIds[j].Timestamp.ToUniversalTime() > boxHighest)
+                            //                boxHighest = box.ScannedIds[j].Timestamp.ToUniversalTime();
+                            //            if (box.ScannedIds[j].Timestamp.ToUniversalTime() > highest)
+                            //                highest = box.ScannedIds[j].Timestamp.ToUniversalTime();
+                            //            if (box.ScannedIds[j].Timestamp.ToUniversalTime() < lowest)
+                            //                lowest = box.ScannedIds[j].Timestamp.ToUniversalTime();
+                            //        }
+                            //    }
+                            //    if (box.whenDataCollectedUtc < boxHighest)
+                            //    {
+                            //        box.whenDataCollectedUtc = boxHighest;
+                            //        adjusted = true;
+                            //    }
+                            //    else if (box.whenDataCollectedUtc < lowest)
+                            //    {  box.whenDataCollectedUtc = lowest;
+                            //        adjusted = true;
+                            //    }
+                            //}
+
+                            //foreach (BoxData box in bds)
+                            //{
+                            //    if(box.whenDataCollectedUtc.Year < 2020)
+                            //    {  
+                            //        box.whenDataCollectedUtc = highest;
+                            //        adjusted = true;
+                            //    }
+                            //}
+                            //if (monitor.LastSaved.Year < 2020)
+                            //{
+                            //    monitor.LastSaved = highest.ToUniversalTime();
+                            //    adjusted = true;
+                            //}
+                            //monitor.filename += " GenTime";
+                            //if (adjusted)
+                            //{
+                            //    var currentDataJson = JsonConvert.SerializeObject(monitor, Formatting.Indented);
+                            //    string response = Backend.RequestServerResponse("PenguinReport-Saved:" + currentDataJson.ToString());
+                            //}
                             _allMonitorData.Add(_allMonitorData.Count, monitor);
                         }
                     }
@@ -358,10 +424,79 @@ namespace BluePenguinMonitoring.Services
         internal static List<BoxData> getOlderBoxDatas(Dictionary<int, MonitorDetails> allMonitorData, int currentlyVisibleMonitor, int boxNumber)
         {
             List<BoxData> olderBoxDatas = new List<BoxData>();
-            for (int i = currentlyVisibleMonitor +0; i < allMonitorData.Count; i++)
+            for (int i = currentlyVisibleMonitor; i < allMonitorData.Count; i++)
                 if (allMonitorData[i].BoxData.ContainsKey(boxNumber) )
                     olderBoxDatas.Add(allMonitorData[i].BoxData[boxNumber]);
             return olderBoxDatas;
+        }
+
+        internal static string GetBoxBreedingStatusString(BoxData? thisBoxData, List<BoxData> olderBoxDatas)
+        {
+
+            if (thisBoxData == null)
+                thisBoxData = olderBoxDatas.First();
+
+            if (thisBoxData.Eggs + thisBoxData.Chicks == 0)
+                return "";
+            string breedingStatusString = "";
+            DateTime offspringFound = thisBoxData.whenDataCollectedUtc;
+            DateTime offspringNotFound = DateTime.MinValue;
+            foreach (BoxData olderBoxData in olderBoxDatas)
+            {
+                if (olderBoxData.Eggs + olderBoxData.Chicks == 0)
+                {
+                    offspringNotFound = olderBoxData.whenDataCollectedUtc;
+                    DateTime probableLaidDate = offspringNotFound + (offspringFound - offspringNotFound) / 2;
+                    int daysSinceLaid = (int)(DateTime.UtcNow - probableLaidDate).TotalDays;
+                    return breedingDateStatus(daysSinceLaid);
+                }
+            }
+            return "";
+        }
+        public static string breedingDateStatus(int daysSinceLaid)
+        {
+            try
+            {
+                DateTime estHatch = DateTime.Today.AddDays(35 - daysSinceLaid);
+                if (estHatch.AddDays(3) >= DateTime.Today)
+                    return "Hatch" + getDateString(estHatch);
+
+                DateTime estPG = DateTime.Today.AddDays(49 - daysSinceLaid);
+                if (estPG.AddDays(3) >= DateTime.Today)
+                    return "PG" + getDateString(estPG);
+
+                DateTime chipStart = DateTime.Today.AddDays(77 - daysSinceLaid);
+                if (chipStart.AddDays(3) >= DateTime.Today)
+                    return "Chip" + getDateString(chipStart);
+
+                DateTime estFledge = DateTime.Today.AddDays(84 - daysSinceLaid);
+                return "Fledge" + getDateString(estFledge);
+            }
+            catch
+            {
+                return "Error calc breed dates";
+            }
+        }
+        private static string getDateString(DateTime expectedDate)
+        {
+            DateTime today = DateTime.Today;
+            if (expectedDate.Date.Equals(today))
+            {
+                return " today";
+            }
+            if ((expectedDate.Date - today).TotalDays == 1 && expectedDate > today)
+            {
+                return " tomorrow";
+            }
+            if ((today - expectedDate.Date).TotalDays == 1)
+            {
+                return " yesterday";
+            }
+            if (expectedDate > today)
+            {
+                return " in " + Math.Ceiling((expectedDate - today).TotalDays) + " days";
+            }
+            return " " + Math.Ceiling((today - expectedDate).TotalDays) + " days ago";
         }
     }
 }

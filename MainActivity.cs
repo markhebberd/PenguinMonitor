@@ -112,7 +112,7 @@ namespace BluePenguinMonitoring
         private MediaPlayer? _alertMediaPlayer;
 
         //Lazy versioning.
-        private static int version = 33;
+        private static int version = 34;
         private static int numberMonitorBoxes = 150;
 
         //multibox View
@@ -1234,7 +1234,7 @@ namespace BluePenguinMonitoring
             return DateTime.MinValue;
         }
 
-        private View? CreateBoxRemoteSummaryCard(int boxNumber, BoxRemoteData boxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
+        private View? CreateBoxRemoteSummaryCard(int boxNumber, BoxRemoteData thisBoxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
         {
             var card = new LinearLayout(this)
             {
@@ -1258,15 +1258,18 @@ namespace BluePenguinMonitoring
 
             var summary = new TextView(this)
             {
-                Text = boxData.boxMiniStatus(olderBoxDatas.First().Eggs, olderBoxDatas.First().Chicks),
+                Text = thisBoxData.boxMiniStatus(olderBoxDatas.First().Eggs, olderBoxDatas.First().Chicks),
                 Gravity = GravityFlags.Center,
                 TextSize = 14
             };
             summary.Text += !nrfPercentageString.StartsWith("0") ? $" (NRF:{nrfPercentageString})" : "";
             if (_remoteBreedingDates.ContainsKey(boxNumber))
             {
-                summary.Text += "\n" + _remoteBreedingDates[boxNumber].breedingDateStatus();
+                summary.Text += "\nB:" + _remoteBreedingDates[boxNumber].breedingDateStatus();
             }
+            string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(null, olderBoxDatas);
+            if (!string.IsNullOrWhiteSpace(calculatedBreedingStatusString))
+                summary.Text += "\nM:" + calculatedBreedingStatusString;
             summary.SetTextColor(Color.Black);
 
             card.AddView(title);
@@ -1330,8 +1333,12 @@ namespace BluePenguinMonitoring
             }
             if (_remoteBreedingDates.ContainsKey(boxNumber))
             {
-                summary.Text += "\n" + _remoteBreedingDates[boxNumber].breedingDateStatus();
+                summary.Text += "\nB:" + _remoteBreedingDates[boxNumber].breedingDateStatus();
             }
+            string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(thisBoxData, olderBoxDatas);
+            if(!string.IsNullOrWhiteSpace(calculatedBreedingStatusString))
+                summary.Text += "\nM:" + calculatedBreedingStatusString ;
+
             if (differenceFound && thisRemoteBoxData?.breedingLikelyhoodText != "BR" && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
             {
                 summary.Text += $"({thisRemoteBoxData.breedingLikelyhoodText})";
@@ -1536,7 +1543,7 @@ namespace BluePenguinMonitoring
                     if (_lockIconView != null)
                     {
                         _lockIconView.SetColorFilter(null);
-                        if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) && _isBoxLocked)
+                        if (_allMonitorData.Count > 0 && !_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) && _isBoxLocked)
                         {
                             _lockIconView.SetImageResource(Resource.Drawable.locked_yellow);
                             _lockIconView.SetColorFilter(
@@ -1565,7 +1572,7 @@ namespace BluePenguinMonitoring
                     if (_dataCardTitleText != null)
                         _dataCardTitleText.Text = $"Box {_currentBox}";
 
-                    _boxSavedTimeTextView.Text = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) ?
+                    _boxSavedTimeTextView.Text = _allMonitorData.Count > 0 && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) ?
                 _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy\nHH:mm") : "";
                     _boxSavedTimeTextView.SetTextColor(Color.Black);
                     _boxSavedTimeTextView.Gravity = GravityFlags.Right;
@@ -1587,7 +1594,7 @@ namespace BluePenguinMonitoring
                         if (editText != null) editText.TextChanged -= OnDataChanged;
                     }
 
-                    if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+                    if (_allMonitorData.Count > 0 && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
                     {
                         var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox];
                         if (_adultsEditText != null) _adultsEditText.Text = boxData.Adults.ToString();
@@ -1606,13 +1613,12 @@ namespace BluePenguinMonitoring
                         SetSpinnerStatus(_gateStatusSpinner, null);
                         if (_notesEditText != null) _notesEditText.Text = "";
                         buildScannedIdsLayout(new List<ScanRecord>());
-                        SetSpinnerStatus(_breedingChanceSpinner, _remoteBoxData[_currentBox].breedingLikelyhoodText);
+                        if(_remoteBoxData != null)
+                            SetSpinnerStatus(_breedingChanceSpinner, _remoteBoxData[_currentBox].breedingLikelyhoodText);
                     }
 
                     foreach (var editText in editTexts)
-                    {
                         if (editText != null) editText.TextChanged += OnDataChanged;
-                    }
 
                     //disable/enable UI elememts according to _isBoxLocked
                     for (int i = 0; i < _topButtonLayout.ChildCount; i++)
