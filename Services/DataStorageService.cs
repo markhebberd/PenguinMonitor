@@ -424,7 +424,7 @@ namespace BluePenguinMonitoring.Services
         internal static List<BoxData> getOlderBoxDatas(Dictionary<int, MonitorDetails> allMonitorData, int currentlyVisibleMonitor, int boxNumber)
         {
             List<BoxData> olderBoxDatas = new List<BoxData>();
-            for (int i = currentlyVisibleMonitor; i < allMonitorData.Count; i++)
+            for (int i = currentlyVisibleMonitor + 1; i < allMonitorData.Count; i++)
                 if (allMonitorData[i].BoxData.ContainsKey(boxNumber) )
                     olderBoxDatas.Add(allMonitorData[i].BoxData[boxNumber]);
             return olderBoxDatas;
@@ -434,7 +434,8 @@ namespace BluePenguinMonitoring.Services
         {
             if (thisBoxData == null)
                 thisBoxData = olderBoxDatas.First();
-
+            if(boxnumber==35)
+                    ;
             if (thisBoxData.Eggs + thisBoxData.Chicks == 0)
                 return "";
             string breedingStatusString = "";

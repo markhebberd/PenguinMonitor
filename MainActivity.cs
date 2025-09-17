@@ -1267,7 +1267,7 @@ namespace BluePenguinMonitoring
             {
                 summary.Text += "\nB:" + _remoteBreedingDates[boxNumber].breedingDateStatus();
             }
-            string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(_currentBox, null, olderBoxDatas);
+            string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(boxNumber, null, olderBoxDatas);
             if (!string.IsNullOrWhiteSpace(calculatedBreedingStatusString))
                 summary.Text += "\nM:" + calculatedBreedingStatusString;
             summary.SetTextColor(Color.Black);
@@ -1295,7 +1295,8 @@ namespace BluePenguinMonitoring
             bool differenceFound = false;
             if (thisBoxData.Eggs != olderBoxDatas.First().Eggs
                 || thisBoxData.Chicks != olderBoxDatas.First().Chicks
-                || (thisRemoteBoxData?.breedingLikelyhoodText != "BR" || olderBoxDatas.First().BreedingChance != "BR") && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
+                || olderBoxDatas.First().BreedingChance != null && olderBoxDatas.First().BreedingChance != "" 
+                && olderBoxDatas.First().BreedingChance != "BR" && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
             {
                 differenceFound = true;
                 card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.PRIMARY_BLUE, backgroundColor:selected?UIFactory.WARNING_YELLOW:null);
@@ -1335,7 +1336,7 @@ namespace BluePenguinMonitoring
             {
                 summary.Text += "\nB:" + _remoteBreedingDates[boxNumber].breedingDateStatus();
             }
-            string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(_currentBox, thisBoxData, olderBoxDatas);
+            string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(boxNumber, thisBoxData, olderBoxDatas);
             if(!string.IsNullOrWhiteSpace(calculatedBreedingStatusString))
                 summary.Text += "\nM:" + calculatedBreedingStatusString ;
 
