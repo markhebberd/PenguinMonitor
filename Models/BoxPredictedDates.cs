@@ -28,10 +28,7 @@
                 DateTime estFledge = DateTime.Parse(estFledgeDate);
                 return "Fledge" + getDateString(estFledge);
             }
-            catch
-            {
-                return $"B:No Dates";
-            }
+            catch { return $"No dates in sheet"; }
         }
         private string getDateString(DateTime expectedDate)
         {

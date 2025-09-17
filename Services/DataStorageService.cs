@@ -432,7 +432,6 @@ namespace BluePenguinMonitoring.Services
 
         internal static string GetBoxBreedingStatusString(BoxData? thisBoxData, List<BoxData> olderBoxDatas)
         {
-
             if (thisBoxData == null)
                 thisBoxData = olderBoxDatas.First();
 
