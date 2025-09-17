@@ -56,6 +56,10 @@ namespace BluePenguinMonitoring
         // UI Components
         private TextView? _statusText; // scanner and GPS status
 
+        private Button _showLatestMonitorButton;
+        private Button _gotoNextMonitor;
+        private Button _gotoPreviousMonitor;
+
         private Button? _prevBoxButton;
         private Button? _selectBoxButton;
         private Button? _nextBoxButton;
@@ -78,6 +82,10 @@ namespace BluePenguinMonitoring
         private LinearLayout? _settingsCard;
         private CheckBox? _isBluetoothEnabledCheckBox;
         private TextView? _interestingBoxTextView;
+
+
+        private CheckBox _setTimeActiveSessionCheckBox;
+        private TextView _boxSavedTimeTextView;
 
         private UIFactory.selectedPage selectedPage;
         // ===== Multi-page menu state =====
@@ -112,7 +120,7 @@ namespace BluePenguinMonitoring
         private MediaPlayer? _alertMediaPlayer;
 
         //Lazy versioning.
-        private static int version = 37;
+        private static int version = 38;
         private static int numberMonitorBoxes = 150;
 
         //multibox View
@@ -658,11 +666,7 @@ namespace BluePenguinMonitoring
                          $"Box range: {(_allMonitorData[selectedMonitor].BoxData.Keys.Any() ? _allMonitorData[selectedMonitor].BoxData.Keys.Min() : 0)} - {(_allMonitorData[selectedMonitor].BoxData.Keys.Any() ? _allMonitorData[selectedMonitor].BoxData.Keys.Max() : 0)}";
             return summary;
         }
-
         private bool _isDownloadingCsvData = false;
-        private CheckBox _setTimeActiveSessionCheckBox;
-        private TextView _boxSavedTimeTextView;
-
         private void OnDownloadCsvClick(object? sender, EventArgs e)
         {
             if (sender is Button clickedButton && _isDownloadingCsvData == false)
@@ -772,6 +776,51 @@ namespace BluePenguinMonitoring
             statusParams.SetMargins(0, 0, 0, 10);
             _topButtonLayout.LayoutParameters = statusParams;
             headerCard.AddView(_topButtonLayout);
+
+            //Navigate Monitors
+            var browseOtherMonitorsLayout = new LinearLayout(this)
+            {
+                Orientation = Android.Widget.Orientation.Horizontal
+            };
+            _gotoPreviousMonitor = _uiFactory.CreateStyledButton("← Prev monitor", UIFactory.PRIMARY_BLUE);
+            _gotoPreviousMonitor.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
+
+            _gotoPreviousMonitor.Click += (s, e) =>
+            {
+                _appSettings.CurrentlyVisibleMonitor++;
+                _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
+                _appSettings.ActiveSessionTimeStampActive = true;
+                DrawPageLayouts();
+            };
+            browseOtherMonitorsLayout.AddView(_gotoPreviousMonitor);
+
+            _gotoNextMonitor = _uiFactory.CreateStyledButton("Next monitor →", UIFactory.PRIMARY_BLUE);
+            var gotoNextButtonParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
+            gotoNextButtonParams.SetMargins(8, 0, 8, 8);
+            _gotoNextMonitor.LayoutParameters = gotoNextButtonParams;
+            _gotoNextMonitor.Click += (s, e) =>
+            {
+                _appSettings.CurrentlyVisibleMonitor--;
+                if (_appSettings.CurrentlyVisibleMonitor != 0 && _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
+                    _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
+                else
+                    _appSettings.ActiveSessionTimeStampActive = false;
+                DrawPageLayouts();
+            };
+            browseOtherMonitorsLayout.AddView(_gotoNextMonitor);
+
+            _showLatestMonitorButton = _uiFactory.CreateStyledButton("Latest →|", UIFactory.PRIMARY_BLUE);
+            _showLatestMonitorButton.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
+            _showLatestMonitorButton.Click += (s, e) =>
+            {
+                _appSettings.CurrentlyVisibleMonitor = 0;
+                _appSettings.ActiveSessionTimeStampActive = false;
+                DrawPageLayouts();
+            };
+            browseOtherMonitorsLayout.AddView(_showLatestMonitorButton);
+
+            headerCard.AddView(browseOtherMonitorsLayout);
+
 
             // Navigation card
             var boxNavLayout = CreateNavigationLayout();
@@ -1093,70 +1142,16 @@ namespace BluePenguinMonitoring
             hideBoxesLayout.AddView(hideDCMInMultiboxView);
             _multiboxBoxFilterCard.AddView(hideBoxesLayout);
 
+            //TextView browseDataTitle = new TextView(this)
+            //{
+            //    Text = "Browse monitor collections (change day)",
+            //    TextSize = 16,
+            //    Gravity = GravityFlags.Center,
 
-
-            TextView browseDataTitle = new TextView(this)
-            {
-                Text = "Browse monitor collections (change day)",
-                TextSize = 16,
-                Gravity = GravityFlags.Center,
-
-            };
-            browseDataTitle.SetTypeface(null, TypefaceStyle.Bold);
-            browseDataTitle.SetTextColor(Color.Black);
-            _multiboxBoxFilterCard.AddView(browseDataTitle);
-
-
-            var browseOtherDataButtonLayout = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Horizontal
-            };
-            var outsideButtonParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
-            outsideButtonParams.SetMargins(8, 0, 8, 8);
-
-            Button gotoPreviousData = _uiFactory.CreateStyledButton("← Show previous", UIFactory.PRIMARY_BLUE);
-            gotoPreviousData.LayoutParameters = outsideButtonParams;
-            bool olderAvailable = _allMonitorData.Count > _appSettings.CurrentlyVisibleMonitor + 1;
-            SetEnabledRecursive(gotoPreviousData, olderAvailable, olderAvailable ? 1.0f: 0.5f);
-            gotoPreviousData.Click += (s, e) =>
-            {
-                _appSettings.CurrentlyVisibleMonitor++;
-                _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
-                _appSettings.ActiveSessionTimeStampActive = true;
-                DrawPageLayouts();
-            };
-            browseOtherDataButtonLayout.AddView(gotoPreviousData);
-
-            Button gotoNextData = _uiFactory.CreateStyledButton("Show next →", UIFactory.PRIMARY_BLUE);
-            var gotoNextButtonParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
-            gotoNextButtonParams.SetMargins(0, 0, 0, 0);
-            gotoNextData.LayoutParameters = gotoNextButtonParams;
-            bool newerAvailable = _appSettings.CurrentlyVisibleMonitor != 0;
-            SetEnabledRecursive(gotoNextData, newerAvailable, newerAvailable ? 1.0f : 0.5f);
-            gotoNextData.Click += (s, e) =>
-            {
-                _appSettings.CurrentlyVisibleMonitor--;
-                if(_appSettings.CurrentlyVisibleMonitor != 0 && _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
-                    _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
-                else
-                    _appSettings.ActiveSessionTimeStampActive = false;
-                DrawPageLayouts();
-            };
-            browseOtherDataButtonLayout.AddView(gotoNextData);
-
-            Button showLatestDataButton = _uiFactory.CreateStyledButton("Show latest →", UIFactory.PRIMARY_BLUE);
-            outsideButtonParams.SetMargins(8, 0, 8, 8);
-            showLatestDataButton.LayoutParameters = outsideButtonParams;
-            SetEnabledRecursive(showLatestDataButton, newerAvailable, newerAvailable ? 1.0f : 0.5f);
-            showLatestDataButton.Click += (s, e) =>
-            {
-                _appSettings.CurrentlyVisibleMonitor = 0;
-                _appSettings.ActiveSessionTimeStampActive = false;
-                DrawPageLayouts();
-            };
-            browseOtherDataButtonLayout.AddView(showLatestDataButton);
-
-            _multiboxBoxFilterCard.AddView(browseOtherDataButtonLayout);
+            //};
+            //browseDataTitle.SetTypeface(null, TypefaceStyle.Bold);
+            //browseDataTitle.SetTextColor(Color.Black);
+            //_multiboxBoxFilterCard.AddView(browseDataTitle);            
 
             _multiBoxViewCard.AddView(_multiboxBoxFilterCard);
             _multiboxBoxFilterCard.Visibility = _appSettings.ShowMultiboxFilterCard ? ViewStates.Visible : ViewStates.Gone;
@@ -1521,23 +1516,13 @@ namespace BluePenguinMonitoring
             {
                 Orientation = Android.Widget.Orientation.Horizontal
             };
-
             _prevBoxButton = _uiFactory.CreateStyledButton("← Prev box", UIFactory.PRIMARY_BLUE);
             _prevBoxButton.Click += OnPrevBoxClick;
             var prevParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             _prevBoxButton.LayoutParameters = prevParams;
 
-            _selectBoxButton = new Button(this)
-            {
-                Text = "Select box",
-                Clickable = true,
-                Focusable = true
-            };
-            _selectBoxButton.SetTextColor(Color.White);
-            _selectBoxButton.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
-            _selectBoxButton.SetPadding(16, 24, 16, 24);
-            _selectBoxButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_BLUE, 8);
-            _selectBoxButton.Click += OnBoxNumberClick;
+            _selectBoxButton = _uiFactory.CreateStyledButton("Select box", UIFactory.PRIMARY_BLUE);
+            _selectBoxButton.Click += (s,e) => ShowBoxJumpDialog();
             var boxParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             boxParams.SetMargins(8, 0, 8, 0);
             _selectBoxButton.LayoutParameters = boxParams;
@@ -1559,6 +1544,12 @@ namespace BluePenguinMonitoring
                 {
                     if (_appSettings.CurrentlyVisibleMonitor >= _allMonitorData.Count)
                         _appSettings.CurrentlyVisibleMonitor = Math.Max(0, _allMonitorData.Count - 1);
+
+                    bool olderAvailable = _allMonitorData.Count > _appSettings.CurrentlyVisibleMonitor + 1;
+                    SetEnabledRecursive(_gotoPreviousMonitor, olderAvailable, olderAvailable ? 1.0f : 0.5f);
+                    bool newerAvailable = _appSettings.CurrentlyVisibleMonitor != 0;
+                    SetEnabledRecursive(_gotoNextMonitor, newerAvailable, newerAvailable ? 1.0f : 0.5f);
+                    SetEnabledRecursive(_showLatestMonitorButton, newerAvailable, newerAvailable ? 1.0f : 0.5f);
 
                     // Allow multiple pages visible at once
                     bool showSingle = _appSettings.VisiblePages.Contains(UIFactory.selectedPage.BoxDataSingle);
@@ -2849,10 +2840,6 @@ namespace BluePenguinMonitoring
                 System.Diagnostics.Debug.WriteLine($"Permission check failed: {ex.Message}");
                 return false;
             }
-        }
-        private void OnBoxNumberClick(object? sender, EventArgs e)
-        {
-            ShowBoxJumpDialog();
         }
         private void ShowBoxJumpDialog()
         {
