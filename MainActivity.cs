@@ -83,7 +83,6 @@ namespace BluePenguinMonitoring
         private CheckBox? _isBluetoothEnabledCheckBox;
         private TextView? _interestingBoxTextView;
 
-
         private CheckBox _setTimeActiveSessionCheckBox;
         private TextView _boxSavedTimeTextView;
 
@@ -120,7 +119,7 @@ namespace BluePenguinMonitoring
         private MediaPlayer? _alertMediaPlayer;
 
         //Lazy versioning.
-        private static int version = 38;
+        private static int version = 37;
         private static int numberMonitorBoxes = 150;
 
         //multibox View
