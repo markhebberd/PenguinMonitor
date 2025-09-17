@@ -430,7 +430,7 @@ namespace BluePenguinMonitoring.Services
             return olderBoxDatas;
         }
 
-        internal static string GetBoxBreedingStatusString(BoxData? thisBoxData, List<BoxData> olderBoxDatas)
+        internal static string GetBoxBreedingStatusString(int boxnumber, BoxData? thisBoxData, List<BoxData> olderBoxDatas)
         {
             if (thisBoxData == null)
                 thisBoxData = olderBoxDatas.First();
@@ -449,6 +449,7 @@ namespace BluePenguinMonitoring.Services
                     int daysSinceLaid = (int)(DateTime.UtcNow - probableLaidDate).TotalDays;
                     return breedingDateStatus(daysSinceLaid);
                 }
+                offspringFound = olderBoxData.whenDataCollectedUtc;
             }
             return "";
         }
@@ -456,19 +457,19 @@ namespace BluePenguinMonitoring.Services
         {
             try
             {
-                DateTime estHatch = DateTime.Today.AddDays(35 - daysSinceLaid);
+                DateTime estHatch = DateTime.Today.AddDays(37 - daysSinceLaid);
                 if (estHatch.AddDays(3) >= DateTime.Today)
                     return "Hatch" + getDateString(estHatch);
 
-                DateTime estPG = DateTime.Today.AddDays(49 - daysSinceLaid);
+                DateTime estPG = DateTime.Today.AddDays(50 - daysSinceLaid);
                 if (estPG.AddDays(3) >= DateTime.Today)
                     return "PG" + getDateString(estPG);
 
-                DateTime chipStart = DateTime.Today.AddDays(77 - daysSinceLaid);
+                DateTime chipStart = DateTime.Today.AddDays(78 - daysSinceLaid);
                 if (chipStart.AddDays(3) >= DateTime.Today)
                     return "Chip" + getDateString(chipStart);
 
-                DateTime estFledge = DateTime.Today.AddDays(84 - daysSinceLaid);
+                DateTime estFledge = DateTime.Today.AddDays(85 - daysSinceLaid);
                 return "Fledge" + getDateString(estFledge);
             }
             catch

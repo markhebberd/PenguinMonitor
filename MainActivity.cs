@@ -112,7 +112,7 @@ namespace BluePenguinMonitoring
         private MediaPlayer? _alertMediaPlayer;
 
         //Lazy versioning.
-        private static int version = 34;
+        private static int version = 35;
         private static int numberMonitorBoxes = 150;
 
         //multibox View
@@ -1096,7 +1096,7 @@ namespace BluePenguinMonitoring
 
             TextView browseDataTitle = new TextView(this)
             {
-                Text = "Browse Data",
+                Text = "Browse monitor collections (change day)",
                 TextSize = 16,
                 Gravity = GravityFlags.Center,
 
@@ -1267,7 +1267,7 @@ namespace BluePenguinMonitoring
             {
                 summary.Text += "\nB:" + _remoteBreedingDates[boxNumber].breedingDateStatus();
             }
-            string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(null, olderBoxDatas);
+            string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(_currentBox, null, olderBoxDatas);
             if (!string.IsNullOrWhiteSpace(calculatedBreedingStatusString))
                 summary.Text += "\nM:" + calculatedBreedingStatusString;
             summary.SetTextColor(Color.Black);
@@ -1335,7 +1335,7 @@ namespace BluePenguinMonitoring
             {
                 summary.Text += "\nB:" + _remoteBreedingDates[boxNumber].breedingDateStatus();
             }
-            string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(thisBoxData, olderBoxDatas);
+            string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(_currentBox, thisBoxData, olderBoxDatas);
             if(!string.IsNullOrWhiteSpace(calculatedBreedingStatusString))
                 summary.Text += "\nM:" + calculatedBreedingStatusString ;
 
