@@ -457,7 +457,7 @@ namespace BluePenguinMonitoring.Services
         {
             try
             {
-                DateTime estHatch = DateTime.Today.AddDays(37 - daysSinceLaid);
+                DateTime estHatch = DateTime.Today.AddDays(36 - daysSinceLaid);
                 if (estHatch.AddDays(3) >= DateTime.Today)
                     return "Hatch" + getDateString(estHatch);
 
