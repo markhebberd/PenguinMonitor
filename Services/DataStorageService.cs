@@ -457,19 +457,19 @@ namespace BluePenguinMonitoring.Services
         {
             try
             {
-                DateTime estHatch = DateTime.Today.AddDays(36 - daysSinceLaid);
+                DateTime estHatch = DateTime.Today.AddDays(37 - daysSinceLaid);
                 if (estHatch.AddDays(3) >= DateTime.Today)
                     return "Hatch" + getDateString(estHatch);
 
-                DateTime estPG = DateTime.Today.AddDays(50 - daysSinceLaid);
+                DateTime estPG = DateTime.Today.AddDays(51 - daysSinceLaid);
                 if (estPG.AddDays(3) >= DateTime.Today)
                     return "PG" + getDateString(estPG);
 
-                DateTime chipStart = DateTime.Today.AddDays(78 - daysSinceLaid);
+                DateTime chipStart = DateTime.Today.AddDays(79 - daysSinceLaid);
                 if (chipStart.AddDays(3) >= DateTime.Today)
                     return "Chip" + getDateString(chipStart);
 
-                DateTime estFledge = DateTime.Today.AddDays(85 - daysSinceLaid);
+                DateTime estFledge = DateTime.Today.AddDays(86 - daysSinceLaid);
                 return "Fledge" + getDateString(estFledge);
             }
             catch

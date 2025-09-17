@@ -112,7 +112,7 @@ namespace BluePenguinMonitoring
         private MediaPlayer? _alertMediaPlayer;
 
         //Lazy versioning.
-        private static int version = 35;
+        private static int version = 36;
         private static int numberMonitorBoxes = 150;
 
         //multibox View
