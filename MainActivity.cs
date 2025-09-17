@@ -112,7 +112,7 @@ namespace BluePenguinMonitoring
         private MediaPlayer? _alertMediaPlayer;
 
         //Lazy versioning.
-        private static int version = 36;
+        private static int version = 37;
         private static int numberMonitorBoxes = 150;
 
         //multibox View
@@ -875,24 +875,25 @@ namespace BluePenguinMonitoring
             if (_appSettings.CurrentlyVisibleMonitor == 0)
                 timeTV.Text = "Data is local only";
             else
-                timeTV.Text = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename; // + timeTV.Text).Trim();
+                timeTV.Text = _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) ? _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename : "";
 
             bool timeFound = false;
-            foreach (BoxData box in _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Values)
-            {
-                foreach (ScanRecord sc in box.ScannedIds)
+            if (_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
+                foreach (BoxData box in _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Values)
                 {
-                    timeTV.Text += "\n" + sc.Timestamp.ToLocalTime().ToString("d MMM yy, HH:mm");
-                    timeFound = true;
-                    break;
+                    foreach (ScanRecord sc in box.ScannedIds)
+                    {
+                        timeTV.Text += "\n" + sc.Timestamp.ToLocalTime().ToString("d MMM yy, HH:mm");
+                        timeFound = true;
+                        break;
+                    }
+                    if (!timeFound && box.whenDataCollectedUtc.Year > 2015)
+                    {
+                        timeTV.Text += "\n" + box.whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy, HH:mm");
+                        timeFound = true;
+                    }
+                    if (timeFound) break;
                 }
-                if (!timeFound && box.whenDataCollectedUtc.Year > 2015)
-                {
-                    timeTV.Text += "\n" + box.whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy, HH:mm");
-                    timeFound = true;
-                }
-                if (timeFound) break;
-            }
             if(!timeFound)
                 timeTV.Text += "\nNo date in data" ;
             timeTV.Text = timeTV.Text.Trim();
@@ -1135,7 +1136,7 @@ namespace BluePenguinMonitoring
             gotoNextData.Click += (s, e) =>
             {
                 _appSettings.CurrentlyVisibleMonitor--;
-                if(_appSettings.CurrentlyVisibleMonitor != 0)
+                if(_appSettings.CurrentlyVisibleMonitor != 0 && _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
                     _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
                 else
                     _appSettings.ActiveSessionTimeStampActive = false;
@@ -1183,7 +1184,7 @@ namespace BluePenguinMonitoring
                     _multiBoxViewCard.AddView(currentRow);
                 }
                 var olderBoxDatas = DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, boxNumber);
-                string nrfPercentageString = olderBoxDatas.First().Eggs == 0 ? "0" : olderBoxDatas.Count(x => x.Adults == 0 && x.Eggs > 0) + "/" + olderBoxDatas.Count(x => x.Eggs > 0);
+                string nrfPercentageString = olderBoxDatas.Count > 0 && olderBoxDatas.First().Eggs > 0 ? olderBoxDatas.Count(x => x.Adults == 0 && x.Eggs > 0) + "/" + olderBoxDatas.Count(x => x.Eggs > 0) : "0";
                 if (boxNumber == 18)
                     ;
 
@@ -1199,6 +1200,32 @@ namespace BluePenguinMonitoring
                                 || _appSettings.ShowNoBoxesInMultiBoxView && (olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("NO") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO")
                                 || _appSettings.ShowInterestingBoxesInMultiBoxView && (olderBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes))
                                 || _appSettings.ShowSingleEggBoxesInMultiboxView && (olderBoxData.Eggs == 1);
+
+                    bool hideBoxWithData = _appSettings.HideBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber);
+                    bool hideDCM = _appSettings.HideDCMInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "DCM";
+
+                    if (showBox && !hideBoxWithData && !hideDCM)
+                    {
+                        View? card;
+                        if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber))
+                            card = CreateBoxSummaryCard(boxNumber, _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[boxNumber], boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
+                        else
+                            card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber], boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
+                        currentRow?.AddView(card);
+                        visibleBoxCount++;
+                    }
+                }
+                else //remoteBoxData (while we still need it...)
+                {
+                    BoxData currentBoxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber) ? _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[boxNumber] : new BoxData();
+                    bool showBox = _appSettings.ShowAllBoxesInMultiBoxView
+                                || _appSettings.ShowBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber)
+                                || _appSettings.ShowConfidentBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON"
+                                || _appSettings.ShowPotentialBoxesInMultiBoxView &&_remoteBoxData[boxNumber].breedingLikelyhoodText == "POT"
+                                || _appSettings.ShowUnlikleyBoxesInMultiBoxView &&  _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL"
+                                || _appSettings.ShowNoBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO"
+                                || _appSettings.ShowInterestingBoxesInMultiBoxView && (!nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes))
+                                || _appSettings.ShowSingleEggBoxesInMultiboxView && _remoteBoxData[boxNumber].numEggs() == 1;
 
                     bool hideBoxWithData = _appSettings.HideBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber);
                     bool hideDCM = _appSettings.HideDCMInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "DCM";
@@ -1283,6 +1310,10 @@ namespace BluePenguinMonitoring
         }
         private View? CreateBoxSummaryCard(int boxNumber, BoxData thisBoxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
         {
+            if (selected)
+            {
+                ;
+            }
             var card = new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Vertical
@@ -1293,13 +1324,16 @@ namespace BluePenguinMonitoring
             card.LayoutParameters = cardParams;
             bool gotRemoteBoxData = _remoteBoxData.TryGetValue(boxNumber, out var thisRemoteBoxData);
             bool differenceFound = false;
-            if (thisBoxData.Eggs != olderBoxDatas.First().Eggs
+            if (olderBoxDatas.Count > 0
+                && (thisBoxData.Eggs != olderBoxDatas.First().Eggs
                 || thisBoxData.Chicks != olderBoxDatas.First().Chicks
-                || olderBoxDatas.First().BreedingChance != null && olderBoxDatas.First().BreedingChance != "" 
-                && olderBoxDatas.First().BreedingChance != "BR" && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
+                || olderBoxDatas.First().BreedingChance != null && olderBoxDatas.First().BreedingChance != ""
+                /*|| (olderBoxDatas.First().BreedingChance != "BR" || olderBoxDatas.First().BreedingChance != "CON") && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0) **/ )
+                || thisBoxData.Eggs + thisBoxData.Chicks > 0
+                )
             {
                 differenceFound = true;
-                card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.PRIMARY_BLUE, backgroundColor:selected?UIFactory.WARNING_YELLOW:null);
+                card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.PRIMARY_BLUE, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
             }
             else
             {
@@ -1318,32 +1352,28 @@ namespace BluePenguinMonitoring
             var summary = new TextView(this)
             {
                 Text = $"{string.Concat(Enumerable.Repeat("🐧", thisBoxData.Adults))}" +
-                    $"{string.Concat(Enumerable.Repeat("🥚", thisBoxData.Eggs))}" + 
-                    $"{string.Concat(Enumerable.Repeat("🐣", thisBoxData.Chicks))}", 
+                    $"{string.Concat(Enumerable.Repeat("🥚", thisBoxData.Eggs))}" +
+                    $"{string.Concat(Enumerable.Repeat("🐣", thisBoxData.Chicks))}",
                 Gravity = GravityFlags.Center,
                 TextSize = 14
             };
             if (boxNumber == 100)
                 ;
-            var previousChicks = olderBoxDatas.First().Chicks;
-            var previousEggs = olderBoxDatas.First().Eggs;
-
-            if (differenceFound && previousChicks + previousEggs > 0 && (thisBoxData.Eggs != previousEggs || thisBoxData.Chicks != previousChicks))
+            if (differenceFound && olderBoxDatas.Count > 0) //olderBoxDatas.Count > 0 only needed while sometimes using _remoteboxdata csv data
             {
-                summary.Text += $"({string.Concat(Enumerable.Repeat("🥚", previousEggs))}{string.Concat(Enumerable.Repeat("🐣", previousChicks))})";
+                var previousChicks = olderBoxDatas.First().Chicks;
+                var previousEggs = olderBoxDatas.First().Eggs;
+                if (differenceFound && previousChicks + previousEggs > 0 && (thisBoxData.Eggs != previousEggs || thisBoxData.Chicks != previousChicks))
+                    summary.Text += $"({string.Concat(Enumerable.Repeat("🥚", previousEggs))}{string.Concat(Enumerable.Repeat("🐣", previousChicks))})";
             }
             if (_remoteBreedingDates.ContainsKey(boxNumber))
-            {
                 summary.Text += "\nB:" + _remoteBreedingDates[boxNumber].breedingDateStatus();
-            }
             string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(boxNumber, thisBoxData, olderBoxDatas);
             if(!string.IsNullOrWhiteSpace(calculatedBreedingStatusString))
                 summary.Text += "\nM:" + calculatedBreedingStatusString ;
 
             if (differenceFound && thisRemoteBoxData?.breedingLikelyhoodText != "BR" && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
-            {
                 summary.Text += $"({thisRemoteBoxData.breedingLikelyhoodText})";
-            }
             summary.SetTextColor(Color.Black);
 
             string gateStatus = thisBoxData.GateStatus;
@@ -1527,6 +1557,9 @@ namespace BluePenguinMonitoring
         {
             new Handler(Looper.MainLooper).Post(() =>
                 {
+                    if (_appSettings.CurrentlyVisibleMonitor >= _allMonitorData.Count)
+                        _appSettings.CurrentlyVisibleMonitor = Math.Max(0, _allMonitorData.Count - 1);
+
                     // Allow multiple pages visible at once
                     bool showSingle = _appSettings.VisiblePages.Contains(UIFactory.selectedPage.BoxDataSingle);
                     bool showSettings = _appSettings.VisiblePages.Contains(UIFactory.selectedPage.Settings);
@@ -1544,7 +1577,7 @@ namespace BluePenguinMonitoring
                     if (_lockIconView != null)
                     {
                         _lockIconView.SetColorFilter(null);
-                        if (_allMonitorData.Count > 0 && !_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) && _isBoxLocked)
+                        if (_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && !_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) && _isBoxLocked)
                         {
                             _lockIconView.SetImageResource(Resource.Drawable.locked_yellow);
                             _lockIconView.SetColorFilter(
@@ -1573,7 +1606,7 @@ namespace BluePenguinMonitoring
                     if (_dataCardTitleText != null)
                         _dataCardTitleText.Text = $"Box {_currentBox}";
 
-                    _boxSavedTimeTextView.Text = _allMonitorData.Count > 0 && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) ?
+                    _boxSavedTimeTextView.Text = _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) ?
                 _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy\nHH:mm") : "";
                     _boxSavedTimeTextView.SetTextColor(Color.Black);
                     _boxSavedTimeTextView.Gravity = GravityFlags.Right;
@@ -1595,7 +1628,7 @@ namespace BluePenguinMonitoring
                         if (editText != null) editText.TextChanged -= OnDataChanged;
                     }
 
-                    if (_allMonitorData.Count > 0 && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+                    if (_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
                     {
                         var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox];
                         if (_adultsEditText != null) _adultsEditText.Text = boxData.Adults.ToString();

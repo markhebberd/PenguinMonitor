@@ -74,6 +74,9 @@ namespace BluePenguinMonitoring.Services
                             /// Don't import deleted monitors
                             if(monitor.IsDeleted)
                                 continue;
+
+                            /// Fix any old data with bad timestamps
+
                             //bool adjusted = false;
                             //DateTime lastSaved = monitor.LastSaved.ToUniversalTime();
                             //List<BoxData> bds = monitor.BoxData.Values.ToList();
