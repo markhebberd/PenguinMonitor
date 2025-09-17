@@ -1323,7 +1323,7 @@ namespace BluePenguinMonitoring
                 || thisBoxData.Chicks != olderBoxDatas.First().Chicks
                 || olderBoxDatas.First().BreedingChance != null && olderBoxDatas.First().BreedingChance != ""
                 /*|| (olderBoxDatas.First().BreedingChance != "BR" || olderBoxDatas.First().BreedingChance != "CON") && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0) **/ )
-                || thisBoxData.Eggs + thisBoxData.Chicks > 0
+               
                 )
             {
                 differenceFound = true;
