@@ -428,18 +428,53 @@ namespace BluePenguinMonitoring.Services
         {
             List<BoxData> olderBoxDatas = new List<BoxData>();
             for (int i = currentlyVisibleMonitor + 1; i < allMonitorData.Count; i++)
-                if (allMonitorData[i].BoxData.ContainsKey(boxNumber) )
+                if (allMonitorData[i].BoxData.ContainsKey(boxNumber))
                     olderBoxDatas.Add(allMonitorData[i].BoxData[boxNumber]);
             return olderBoxDatas;
         }
 
+        internal static string getPersistentNotes(List<BoxData> olderBoxes)
+        {
+            List<string> removedLabels = new List<string>();
+            string labels = "";
+            foreach (BoxData boxData in olderBoxes)
+            {
+                foreach (string part in boxData.Notes.Split(" ", StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (part.StartsWith("l-"))
+                    {
+                        removedLabels.Add(part);
+                    }
+                    else if (part.StartsWith("l=") && part.Length > 2)
+                    {
+                        string label = part.Substring(2);
+                        if (!removedLabels.Contains(label))
+                            labels += label + " ";
+                    }
+                    else if (part.StartsWith("l="))
+                    {
+                        return labels.Trim();
+                    }
+                }
+            }
+            return labels.Trim();
+        }
+
         internal static string GetBoxBreedingStatusString(int boxnumber, BoxData? thisBoxData, List<BoxData> olderBoxDatas)
         {
+            if(olderBoxDatas.Count == 0)
+                return "";
             if (thisBoxData == null)
-                thisBoxData = olderBoxDatas.First();
-            if(boxnumber==35)
+            {
+                if (olderBoxDatas.Count == 1)
+                    return "";
+                thisBoxData = olderBoxDatas[0];
+                olderBoxDatas.RemoveAt(0);
+            }
+
+            if (boxnumber==35)
                     ;
-            if (thisBoxData.Eggs + thisBoxData.Chicks == 0)
+            if (thisBoxData == null || thisBoxData.Eggs + thisBoxData.Chicks == 0 || olderBoxDatas == null || olderBoxDatas.Count==0)
                 return "";
             string breedingStatusString = "";
             DateTime offspringFound = thisBoxData.whenDataCollectedUtc;

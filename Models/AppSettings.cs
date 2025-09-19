@@ -129,6 +129,19 @@ namespace BluePenguinMonitoring.Models
                 }
             }
         }
+        internal bool showBoxesWithNotesInMultiboxView;
+        public bool ShowBoxesWithNotesInMultiboxView
+        {
+            get => showBoxesWithNotesInMultiboxView;
+            set
+            {
+                if (showBoxesWithNotesInMultiboxView != value)
+                {
+                    showBoxesWithNotesInMultiboxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
         private bool showInterestingBoxesInMultiBoxView;
         public bool ShowInterestingBoxesInMultiBoxView 
         {
@@ -221,6 +234,7 @@ namespace BluePenguinMonitoring.Models
             }
         }
         private HashSet<UIFactory.selectedPage> visiblePages = new HashSet<UIFactory.selectedPage>();
+
         public IEnumerable<UIFactory.selectedPage> VisiblePages => visiblePages;
         public bool AddVisiblePage(UIFactory.selectedPage page)
         {

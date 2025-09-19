@@ -54,7 +54,10 @@ namespace BluePenguinMonitoring
         private float _gpsAccuracy = -1;
 
         // UI Components
+        private ScrollView? _rootScrollView;
         private TextView? _statusText; // scanner and GPS status
+
+        private LinearLayout? _topButtonLayout; //Clear, bird stats and save/load. 
 
         private Button _showLatestMonitorButton;
         private Button _gotoNextMonitor;
@@ -64,30 +67,33 @@ namespace BluePenguinMonitoring
         private Button? _selectBoxButton;
         private Button? _nextBoxButton;
 
-        private LinearLayout? _scannedIdsLayout;
-        private EditText? _adultsEditText;
-        private EditText? _eggsEditText;
-        private EditText? _chicksEditText;
-        private Spinner? _gateStatusSpinner;
-        private Spinner? _breedingChanceSpinner; 
-        private EditText? _notesEditText;
-        private EditText? _manualScanEditText;
-        // Add a field for the data card title so it can be updated dynamically
-        private TextView? _dataCardTitleText;
-        private LinearLayout? _dataCardTitleLayout;
-        private ImageView? _lockIconView;
-        private bool _isBoxLocked;
-        private ScrollView? _rootScrollView;
-        private LinearLayout? _topButtonLayout;
+
         private LinearLayout? _settingsCard;
         private CheckBox? _isBluetoothEnabledCheckBox;
         private TextView? _interestingBoxTextView;
-
         private CheckBox _setTimeActiveSessionCheckBox;
         private TextView _boxSavedTimeTextView;
 
+        // Single box data 
+        private bool _isBoxLocked;
+        private LinearLayout? _singleBoxDataLayout;
+        private LinearLayout? _singleBoxDataTitleLayout;
+        private TextView? _dataCardTitleText;
+        private ImageView? _dataCardLockIconView;
+
+        private ScrollView? _prevBoxDataScrollView;
+
+        private List<LinearLayout?> _scannedIdsLayout;
+        private EditText? _manualScanEditText;
+
+        private List<EditText?> _adultsEditText;
+        private List<EditText?> _eggsEditText;
+        private List<EditText?> _chicksEditText;
+        private List<Spinner?> _breedingChanceSpinner;
+        private List<Spinner?> _gateStatusSpinner;
+        private List<EditText?> _notesEditText;
+
         private UIFactory.selectedPage selectedPage;
-        // ===== Multi-page menu state =====
         private readonly (string Text, UIFactory.selectedPage Page)[] _menuItems = new[]
         {
             ("⚙️ Settings",      UIFactory.selectedPage.Settings),
@@ -97,7 +103,6 @@ namespace BluePenguinMonitoring
 
         // Add gesture detection components
         private GestureDetector? _gestureDetector;
-        private LinearLayout? _dataCard;
 
         // Services
         public UIFactory? _uiFactory;
@@ -119,12 +124,11 @@ namespace BluePenguinMonitoring
         private MediaPlayer? _alertMediaPlayer;
 
         //Lazy versioning.
-        private static int version = 37;
+        private static string version = "37.1";
         private static int numberMonitorBoxes = 150;
 
         //multibox View
         private LinearLayout? _multiBoxViewCard;
-        private LinearLayout? _multiboxBoxFilterCard;
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
@@ -786,7 +790,9 @@ namespace BluePenguinMonitoring
 
             _gotoPreviousMonitor.Click += (s, e) =>
             {
-                _appSettings.CurrentlyVisibleMonitor++;
+                if (_appSettings.CurrentlyVisibleMonitor < _allMonitorData.Count - 1)
+                    _appSettings.CurrentlyVisibleMonitor++;
+                _appSettings.CurrentlyVisibleMonitor = Math.Min(_appSettings.CurrentlyVisibleMonitor, _allMonitorData.Count-1 );
                 _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
                 _appSettings.ActiveSessionTimeStampActive = true;
                 DrawPageLayouts();
@@ -799,7 +805,9 @@ namespace BluePenguinMonitoring
             _gotoNextMonitor.LayoutParameters = gotoNextButtonParams;
             _gotoNextMonitor.Click += (s, e) =>
             {
-                _appSettings.CurrentlyVisibleMonitor--;
+                if (_appSettings.CurrentlyVisibleMonitor > 0)
+                    _appSettings.CurrentlyVisibleMonitor--;
+                _appSettings.CurrentlyVisibleMonitor = Math.Max(_appSettings.CurrentlyVisibleMonitor, 0);
                 if (_appSettings.CurrentlyVisibleMonitor != 0 && _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
                     _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
                 else
@@ -836,7 +844,7 @@ namespace BluePenguinMonitoring
             _multiBoxViewCard = _uiFactory.CreateCard();
 
             parentLinearLayout.AddView(_settingsCard);
-            parentLinearLayout.AddView(_dataCard);
+            parentLinearLayout.AddView(_singleBoxDataLayout);
             parentLinearLayout.AddView(_multiBoxViewCard);
 
             DrawPageLayouts();
@@ -883,11 +891,13 @@ namespace BluePenguinMonitoring
             _multiBoxViewCard.RemoveAllViews();
 
             var headerCard = _uiFactory.CreateCard(
-                Android.Widget.Orientation.Horizontal,
+                Android.Widget.Orientation.Vertical,
                 borderWidth: _appSettings.ActiveSessionTimeStampActive ? 6 : 4,
                 borderColour: _appSettings.ActiveSessionTimeStampActive ? UIFactory.DANGER_RED : null);
             headerCard.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
-            
+
+            LinearLayout headerTitle = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
+
             var showFiltersButton = new ImageButton(this);
             showFiltersButton.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
             showFiltersButton.SetPadding(0, 0, 0, 0);
@@ -898,7 +908,7 @@ namespace BluePenguinMonitoring
                 _appSettings.ShowMultiboxFilterCard = !_appSettings.ShowMultiboxFilterCard;
                 DrawPageLayouts();
             };
-            headerCard.AddView(showFiltersButton);
+            headerTitle.AddView(showFiltersButton);
 
             TextView multiBoxTitle = new TextView(this)
             {
@@ -909,12 +919,12 @@ namespace BluePenguinMonitoring
             multiBoxTitle.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
             multiBoxTitle.SetTextColor(Color.Black);
             multiBoxTitle.SetPadding(0, 0, 0, 0);
-            headerCard.AddView(multiBoxTitle);
+            headerTitle.AddView(multiBoxTitle);
 
             // Add a spacer that expands to fill available space
             var spacer = new View(this);
             spacer.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
-            headerCard.AddView(spacer);
+            headerTitle.AddView(spacer);
 
             TextView timeTV = new TextView(this)
             {
@@ -949,26 +959,22 @@ namespace BluePenguinMonitoring
             timeTV.SetPadding(0,0,0,0);
             timeTV.Gravity = GravityFlags.Right | GravityFlags.Bottom;
             timeTV.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.MatchParent);
-            headerCard.AddView(timeTV);
+            headerTitle.AddView(timeTV);
 
-            _multiBoxViewCard.AddView(headerCard);
-
-            _multiboxBoxFilterCard = _uiFactory.CreateCard(padding: 0, borderWidth: 4);
-            TextView filtersTitle = new TextView(this)
+            headerCard.AddView(headerTitle);
+            
+            TextView showBoxesTitle = new TextView(this)
             {
                 Text = "Show Boxes",
                 TextSize = 16,
                 Gravity = GravityFlags.Center,
                 
             };
-            filtersTitle.SetTypeface(null, TypefaceStyle.Bold);
-            filtersTitle.SetTextColor(Color.Black);
-            _multiboxBoxFilterCard.AddView(filtersTitle);
+            showBoxesTitle.SetTypeface(null, TypefaceStyle.Bold);
+            showBoxesTitle.SetTextColor(Color.Black);
+            headerCard.AddView(showBoxesTitle);
 
-            var allAndDataFiltersLayout = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Horizontal
-            };
+            var allAndDataCheckBoxesLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
 
             CheckBox showAllBoxesInMultiBoxView = new CheckBox(this)
             {
@@ -981,7 +987,7 @@ namespace BluePenguinMonitoring
                 _appSettings.ShowAllBoxesInMultiBoxView = showAllBoxesInMultiBoxView.Checked;
                 DrawPageLayouts();
             };
-            allAndDataFiltersLayout.AddView(showAllBoxesInMultiBoxView);
+            allAndDataCheckBoxesLayout.AddView(showAllBoxesInMultiBoxView);
 
             CheckBox showBoxesWithDataInMultiboxView = new CheckBox(this)
             {
@@ -996,15 +1002,10 @@ namespace BluePenguinMonitoring
                 if (_appSettings.ShowBoxesWithDataInMultiBoxView) _appSettings.HideBoxesWithDataInMultiBoxView = false;
                 DrawPageLayouts();
             };
-            allAndDataFiltersLayout.AddView(showBoxesWithDataInMultiboxView);
-
-            _multiboxBoxFilterCard.AddView(allAndDataFiltersLayout);
-
-
-            var breedingChanceFilterLayout= new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Horizontal
-            };
+            allAndDataCheckBoxesLayout.AddView(showBoxesWithDataInMultiboxView);
+            headerCard.AddView(allAndDataCheckBoxesLayout);
+            
+            var breedingChanceFilterLayout= new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             CheckBox showNoBoxesInMultiboxView = new CheckBox(this)
             {
                 Text = "No",
@@ -1060,15 +1061,31 @@ namespace BluePenguinMonitoring
                 DrawPageLayouts();
             };
             breedingChanceFilterLayout.AddView(showConfidentBoxesInMultiboxView);
-            _multiboxBoxFilterCard.AddView(breedingChanceFilterLayout);
+            headerCard.AddView(breedingChanceFilterLayout);
 
             var specialBoxFilterLayout = new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Horizontal
             };
+
+
+            CheckBox showBoxesWithNotesInMultiboxView = new CheckBox(this)
+            {
+                Text = "Has notes",
+                Checked = _appSettings.showBoxesWithNotesInMultiboxView
+            };
+            showBoxesWithNotesInMultiboxView.SetTextColor(Color.Black);
+            showBoxesWithNotesInMultiboxView.Click += (s, e) =>
+            {
+                _appSettings.showBoxesWithNotesInMultiboxView = showBoxesWithNotesInMultiboxView.Checked;
+                if (_appSettings.showBoxesWithNotesInMultiboxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
+                DrawPageLayouts();
+            };
+            specialBoxFilterLayout.AddView(showBoxesWithNotesInMultiboxView);
+
             CheckBox showSpecialBoxesInMultiboxView = new CheckBox(this)
             {
-                Text = "Special",
+                Text = "has label",
                 Checked = _appSettings.ShowInterestingBoxesInMultiBoxView
             };
             showSpecialBoxesInMultiboxView.SetTextColor(Color.Black);
@@ -1094,19 +1111,18 @@ namespace BluePenguinMonitoring
                 DrawPageLayouts();
             };
             specialBoxFilterLayout.AddView(showSingleEggBoxesInMultiboxView);
-            _multiboxBoxFilterCard.AddView(specialBoxFilterLayout);
+            headerCard.AddView(specialBoxFilterLayout);
 
-
-            TextView hideFiltersTitle = new TextView(this)
+            TextView hideBoxesTitle = new TextView(this)
             {
                 Text = "Hide Boxes",
                 TextSize = 16,
                 Gravity = GravityFlags.Center,
 
             };
-            hideFiltersTitle.SetTypeface(null, TypefaceStyle.Bold);
-            hideFiltersTitle.SetTextColor(Color.Black);
-            _multiboxBoxFilterCard.AddView(hideFiltersTitle);
+            hideBoxesTitle.SetTypeface(null, TypefaceStyle.Bold);
+            hideBoxesTitle.SetTextColor(Color.Black);
+            headerCard.AddView(hideBoxesTitle);
 
             var hideBoxesLayout = new LinearLayout(this)
             {
@@ -1139,21 +1155,12 @@ namespace BluePenguinMonitoring
                 DrawPageLayouts();
             };
             hideBoxesLayout.AddView(hideDCMInMultiboxView);
-            _multiboxBoxFilterCard.AddView(hideBoxesLayout);
+            headerCard.AddView(hideBoxesLayout);
+            _multiBoxViewCard.AddView(headerCard);
 
-            //TextView browseDataTitle = new TextView(this)
-            //{
-            //    Text = "Browse monitor collections (change day)",
-            //    TextSize = 16,
-            //    Gravity = GravityFlags.Center,
-
-            //};
-            //browseDataTitle.SetTypeface(null, TypefaceStyle.Bold);
-            //browseDataTitle.SetTextColor(Color.Black);
-            //_multiboxBoxFilterCard.AddView(browseDataTitle);            
-
-            _multiBoxViewCard.AddView(_multiboxBoxFilterCard);
-            _multiboxBoxFilterCard.Visibility = _appSettings.ShowMultiboxFilterCard ? ViewStates.Visible : ViewStates.Gone;
+            hideBoxesTitle.Visibility =  showBoxesTitle.Visibility =  hideBoxesLayout.Visibility = 
+                specialBoxFilterLayout.Visibility = breedingChanceFilterLayout.Visibility = 
+                allAndDataCheckBoxesLayout.Visibility = _appSettings.ShowMultiboxFilterCard ? ViewStates.Visible : ViewStates.Gone;
 
             int boxesPerRow = 3;
             LinearLayout? currentRow = null;
@@ -1192,11 +1199,12 @@ namespace BluePenguinMonitoring
                                 || _appSettings.ShowPotentialBoxesInMultiBoxView && (olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("POT") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "POT")
                                 || _appSettings.ShowUnlikleyBoxesInMultiBoxView && (olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("UNL") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL")
                                 || _appSettings.ShowNoBoxesInMultiBoxView && (olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("NO") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO")
+                                || _appSettings.ShowBoxesWithNotesInMultiboxView && !String.IsNullOrWhiteSpace(currentBoxData.Notes)
                                 || _appSettings.ShowInterestingBoxesInMultiBoxView && (olderBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes))
                                 || _appSettings.ShowSingleEggBoxesInMultiboxView && (olderBoxData.Eggs == 1);
 
                     bool hideBoxWithData = _appSettings.HideBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber);
-                    bool hideDCM = _appSettings.HideDCMInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "DCM";
+                    bool hideDCM = _appSettings.HideDCMInMultiBoxView && ((olderBoxData.BreedingChance!=null && olderBoxData.BreedingChance == "DCM") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "DCM");
 
                     if (showBox && !hideBoxWithData && !hideDCM)
                     {
@@ -1254,7 +1262,6 @@ namespace BluePenguinMonitoring
             }
             return DateTime.MinValue;
         }
-
         private View? CreateBoxRemoteSummaryCard(int boxNumber, BoxRemoteData thisBoxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
         {
             var card = new LinearLayout(this)
@@ -1279,11 +1286,13 @@ namespace BluePenguinMonitoring
 
             var summary = new TextView(this)
             {
-                Text = thisBoxData.boxMiniStatus(olderBoxDatas.First().Eggs, olderBoxDatas.First().Chicks),
+                Text = (olderBoxDatas == null || olderBoxDatas.Count < 1) ? thisBoxData.boxMiniStatus(-1, -1) : thisBoxData.boxMiniStatus(olderBoxDatas.First().Eggs, olderBoxDatas.First().Chicks),
                 Gravity = GravityFlags.Center,
                 TextSize = 14
             };
             summary.Text += !nrfPercentageString.StartsWith("0") ? $" (NRF:{nrfPercentageString})" : "";
+            string persistentNotes = DataStorageService.getPersistentNotes(olderBoxDatas);
+            summary.Text += !string.IsNullOrEmpty(persistentNotes) ? $" ({persistentNotes})" : "";
             if (_remoteBreedingDates.ContainsKey(boxNumber))
             {
                 summary.Text += "\nB:" + _remoteBreedingDates[boxNumber].breedingDateStatus();
@@ -1319,6 +1328,12 @@ namespace BluePenguinMonitoring
             bool gotRemoteBoxData = _remoteBoxData.TryGetValue(boxNumber, out var thisRemoteBoxData);
             bool differenceFound = false;
             if (olderBoxDatas.Count > 0
+                && thisBoxData.Eggs + thisBoxData.Chicks < olderBoxDatas.First().Eggs + olderBoxDatas.First().Chicks)
+            {
+                differenceFound = true;
+                card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.DANGER_RED, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
+            }
+            else if (olderBoxDatas.Count > 0
                 && (thisBoxData.Eggs != olderBoxDatas.First().Eggs
                 || thisBoxData.Chicks != olderBoxDatas.First().Chicks
                 || olderBoxDatas.First().BreedingChance != null && olderBoxDatas.First().BreedingChance != ""
@@ -1372,7 +1387,8 @@ namespace BluePenguinMonitoring
 
             string gateStatus = thisBoxData.GateStatus;
             string notes = string.IsNullOrWhiteSpace(thisBoxData.Notes) ? "" : "notes";
-            notes += gotRemoteBoxData && !string.IsNullOrEmpty(thisRemoteBoxData.PersistentNotes) ? $" ({thisRemoteBoxData.PersistentNotes})" : "";
+            string persistentNotes = DataStorageService.getPersistentNotes(olderBoxDatas);
+            notes += gotRemoteBoxData && !string.IsNullOrEmpty(persistentNotes) ? $" ({persistentNotes})" : "";
             notes += !nrfPercentageString.StartsWith("0") ? $" (NRF:{nrfPercentageString})" : "";
             string lineThreeStatusText = "";
             if (!string.IsNullOrWhiteSpace(gateStatus) && !string.IsNullOrWhiteSpace(notes))
@@ -1544,6 +1560,9 @@ namespace BluePenguinMonitoring
                     if (_appSettings.CurrentlyVisibleMonitor >= _allMonitorData.Count)
                         _appSettings.CurrentlyVisibleMonitor = Math.Max(0, _allMonitorData.Count - 1);
 
+                    if (_appSettings.CurrentlyVisibleMonitor < 0)
+                        _appSettings.CurrentlyVisibleMonitor = 0;
+
                     bool olderAvailable = _allMonitorData.Count > _appSettings.CurrentlyVisibleMonitor + 1;
                     SetEnabledRecursive(_gotoPreviousMonitor, olderAvailable, olderAvailable ? 1.0f : 0.5f);
                     bool newerAvailable = _appSettings.CurrentlyVisibleMonitor != 0;
@@ -1555,7 +1574,7 @@ namespace BluePenguinMonitoring
                     bool showSettings = _appSettings.VisiblePages.Contains(UIFactory.selectedPage.Settings);
                     bool showOverview = _appSettings.VisiblePages.Contains(UIFactory.selectedPage.BoxOverview);
 
-                    _dataCard.Visibility = showSingle ? ViewStates.Visible : ViewStates.Gone;
+                    _singleBoxDataLayout.Visibility = showSingle ? ViewStates.Visible : ViewStates.Gone;
                     _settingsCard.Visibility = showSettings ? ViewStates.Visible : ViewStates.Gone;
                     _multiBoxViewCard.Visibility = showOverview ? ViewStates.Visible : ViewStates.Gone;
 
@@ -1564,29 +1583,29 @@ namespace BluePenguinMonitoring
 
                     ///Single Box Card
                     // Update lock icon
-                    if (_lockIconView != null)
+                    if (_dataCardLockIconView != null)
                     {
-                        _lockIconView.SetColorFilter(null);
+                        _dataCardLockIconView.SetColorFilter(null);
                         if (_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && !_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) && _isBoxLocked)
                         {
-                            _lockIconView.SetImageResource(Resource.Drawable.locked_yellow);
-                            _lockIconView.SetColorFilter(
+                            _dataCardLockIconView.SetImageResource(Resource.Drawable.locked_yellow);
+                            _dataCardLockIconView.SetColorFilter(
                                 new Android.Graphics.PorterDuffColorFilter(
                                     UIFactory.WARNING_YELLOW, // yellow
                                     Android.Graphics.PorterDuff.Mode.SrcIn));
                         }
                         else if (_isBoxLocked)
                         {
-                            _lockIconView.SetImageResource(Resource.Drawable.locked_green);
-                            _lockIconView.SetColorFilter(
+                            _dataCardLockIconView.SetImageResource(Resource.Drawable.locked_green);
+                            _dataCardLockIconView.SetColorFilter(
                                 new Android.Graphics.PorterDuffColorFilter(
                                     UIFactory.SUCCESS_GREEN,     // green
                                     Android.Graphics.PorterDuff.Mode.SrcIn));
                         }
                         else
                         {
-                            _lockIconView.SetImageResource(Resource.Drawable.unlocked_red);
-                            _lockIconView.SetColorFilter(
+                            _dataCardLockIconView.SetImageResource(Resource.Drawable.unlocked_red);
+                            _dataCardLockIconView.SetColorFilter(
                                 new Android.Graphics.PorterDuffColorFilter(
                                     UIFactory.DANGER_RED,     // red
                                     Android.Graphics.PorterDuff.Mode.SrcIn));
@@ -1602,9 +1621,10 @@ namespace BluePenguinMonitoring
                     _boxSavedTimeTextView.Gravity = GravityFlags.Right;
 
                     _interestingBoxTextView.Visibility = ViewStates.Gone;
-                    if (null != _remoteBoxData && _remoteBoxData.ContainsKey(_currentBox) && !string.IsNullOrWhiteSpace(_remoteBoxData[_currentBox].PersistentNotes))
+                    string persistentNotes = DataStorageService.getPersistentNotes(DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, _currentBox));
+                    if (!string.IsNullOrWhiteSpace(persistentNotes))
                     {
-                        _interestingBoxTextView.Text = "💡 Note: " + _remoteBoxData[_currentBox].PersistentNotes;
+                        _interestingBoxTextView.Text = "💡 Note: " + persistentNotes;
                         _interestingBoxTextView.Visibility = ViewStates.Visible;
                         _interestingBoxTextView.Gravity = GravityFlags.Center;
                         _interestingBoxTextView.SetBackgroundColor(UIFactory.LIGHT_GRAY);
@@ -1615,34 +1635,34 @@ namespace BluePenguinMonitoring
 
                     foreach (var editText in editTexts)
                     {
-                        if (editText != null) editText.TextChanged -= OnDataChanged;
+                        if (editText != null) editText[0].TextChanged -= OnDataChanged;
                     }
 
                     if (_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
                     {
                         var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox];
-                        if (_adultsEditText != null) _adultsEditText.Text = boxData.Adults.ToString();
-                        if (_eggsEditText != null) _eggsEditText.Text = boxData.Eggs.ToString();
-                        if (_chicksEditText != null) _chicksEditText.Text = boxData.Chicks.ToString();
-                        SetSpinnerStatus(_gateStatusSpinner, boxData.GateStatus);
-                        if (_notesEditText != null) _notesEditText.Text = boxData.Notes;
+                        if (_adultsEditText != null) _adultsEditText[0].Text = boxData.Adults.ToString();
+                        if (_eggsEditText != null) _eggsEditText[0].Text = boxData.Eggs.ToString();
+                        if (_chicksEditText != null) _chicksEditText[0].Text = boxData.Chicks.ToString();
+                        SetSpinnerStatus(_gateStatusSpinner[0], boxData.GateStatus);
+                        if (_notesEditText != null) _notesEditText[0].Text = boxData.Notes;
                         buildScannedIdsLayout(boxData.ScannedIds);
-                        SetSpinnerStatus(_breedingChanceSpinner, !string.IsNullOrWhiteSpace(boxData.BreedingChance) ? boxData.BreedingChance : _remoteBoxData[_currentBox].breedingLikelyhoodText);
+                        SetSpinnerStatus(_breedingChanceSpinner[0], !string.IsNullOrWhiteSpace(boxData.BreedingChance) ? boxData.BreedingChance : _remoteBoxData[_currentBox].breedingLikelyhoodText);
                     }
                     else
                     {
-                        if (_adultsEditText != null) _adultsEditText.Text = "0";
-                        if (_eggsEditText != null) _eggsEditText.Text = "0";
-                        if (_chicksEditText != null) _chicksEditText.Text = "0";
-                        SetSpinnerStatus(_gateStatusSpinner, null);
-                        if (_notesEditText != null) _notesEditText.Text = "";
+                        if (_adultsEditText != null) _adultsEditText[0].Text = "0";
+                        if (_eggsEditText != null) _eggsEditText[0].Text = "0";
+                        if (_chicksEditText != null) _chicksEditText[0].Text = "0";
+                        SetSpinnerStatus(_gateStatusSpinner[0], null);
+                        if (_notesEditText != null) _notesEditText[0].Text = "";
                         buildScannedIdsLayout(new List<ScanRecord>());
                         if(_remoteBoxData != null)
-                            SetSpinnerStatus(_breedingChanceSpinner, _remoteBoxData[_currentBox].breedingLikelyhoodText);
+                            SetSpinnerStatus(_breedingChanceSpinner[0], _remoteBoxData[_currentBox].breedingLikelyhoodText);
                     }
 
                     foreach (var editText in editTexts)
-                        if (editText != null) editText.TextChanged += OnDataChanged;
+                        if (editText != null) editText[0].TextChanged += OnDataChanged;
 
                     //disable/enable UI elememts according to _isBoxLocked
                     for (int i = 0; i < _topButtonLayout.ChildCount; i++)
@@ -1673,9 +1693,9 @@ namespace BluePenguinMonitoring
                     }
 
                     // title Layout "Box n" is item 0, which we don't want to disable!
-                    for (int i = 1; i < _dataCard.ChildCount; i++)
+                    for (int i = 1; i < _singleBoxDataLayout.ChildCount; i++)
                     {
-                        var child = _dataCard.GetChildAt(i);
+                        var child = _singleBoxDataLayout.GetChildAt(i);
                         SetEnabledRecursive(child, !_isBoxLocked, _isBoxLocked ? 0.8f : 1.0f);
                     }
 
@@ -1687,35 +1707,35 @@ namespace BluePenguinMonitoring
         }
         private bool dataCardHasZeroData()
         {
-            int.TryParse(_adultsEditText?.Text ?? "0", out int adults);
-            int.TryParse(_eggsEditText?.Text ?? "0", out int eggs);
-            int.TryParse(_chicksEditText?.Text ?? "0", out int chicks);
+            int.TryParse(_adultsEditText?[0].Text ?? "0", out int adults);
+            int.TryParse(_eggsEditText?[0].Text ?? "0", out int eggs);
+            int.TryParse(_chicksEditText?[0].Text ?? "0", out int chicks);
 
-            string? gate = GetSelectedStatus(_gateStatusSpinner); // returns null for blank
+            string? gate = GetSelectedStatus(_gateStatusSpinner[0]); // returns null for blank
             bool noGate = string.IsNullOrEmpty(gate);
-            bool noNotes = string.IsNullOrWhiteSpace(_notesEditText?.Text);
+            bool noNotes = string.IsNullOrWhiteSpace(_notesEditText?[0].Text);
 
             return adults == 0 && eggs == 0 && chicks == 0  && noGate && noNotes;
         }
         private void CreateBoxDataCard()
         {
-            if (_dataCard == null)
+            if (_singleBoxDataLayout == null)
             {
-                _dataCard = _uiFactory.CreateCard();
+                _singleBoxDataLayout = _uiFactory.CreateCard();
             }
             else
             {
-                _dataCard.RemoveAllViews();
+                _singleBoxDataLayout.RemoveAllViews();
             }
             // Horizontal layout for lock icon + box title
-            _dataCardTitleLayout = new LinearLayout(this)
+            _singleBoxDataTitleLayout = new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Horizontal,
                 Clickable = true,
                 Focusable = true
             };
-            _dataCardTitleLayout.SetGravity(GravityFlags.Center);
-            _dataCardTitleLayout.Click += (sender, e) =>
+            _singleBoxDataTitleLayout.SetGravity(GravityFlags.Center);
+            _singleBoxDataTitleLayout.Click += (sender, e) =>
             {
                 _isBoxLocked = !_isBoxLocked;
                 if (!_isBoxLocked)
@@ -1746,7 +1766,7 @@ namespace BluePenguinMonitoring
             // Add a spacer that expands to fill available space
             var spacer = new View(this);
             spacer.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
-            _dataCardTitleLayout.AddView(spacer);
+            _singleBoxDataTitleLayout.AddView(spacer);
 
             // Box title text
             _dataCardTitleText = new TextView(this)
@@ -1758,7 +1778,7 @@ namespace BluePenguinMonitoring
             _dataCardTitleText.SetTextColor(UIFactory.TEXT_PRIMARY);
             _dataCardTitleText.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
             _dataCardTitleText.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
-            _dataCardTitleLayout.AddView(_dataCardTitleText);
+            _singleBoxDataTitleLayout.AddView(_dataCardTitleText);
 
             // visually indicate locked state
             if (_isBoxLocked)
@@ -1772,40 +1792,42 @@ namespace BluePenguinMonitoring
 
             var boxTitleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             boxTitleParams.SetMargins(0, 0, 0, 16);
-            _dataCardTitleLayout.LayoutParameters = boxTitleParams;
+            _singleBoxDataTitleLayout.LayoutParameters = boxTitleParams;
 
             // Lock icon
-            _lockIconView = new ImageView(this);
-            _lockIconView.SetImageResource(Android.Resource.Drawable.IcLockLock);
+            _dataCardLockIconView = new ImageView(this);
+            _dataCardLockIconView.SetImageResource(Android.Resource.Drawable.IcLockLock);
             var iconParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
             iconParams.SetMargins(0, 0, 12, 0); // Space between icon and text
-            _lockIconView.LayoutParameters = iconParams;
-            _dataCardTitleLayout.AddView(_lockIconView);
+            _dataCardLockIconView.LayoutParameters = iconParams;
+            _singleBoxDataTitleLayout.AddView(_dataCardLockIconView);
 
             // Add a spacer that expands to fill available space
             var spacer1 = new View(this);
             spacer1.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
-            _dataCardTitleLayout.AddView(spacer1);
+            _singleBoxDataTitleLayout.AddView(spacer1);
 
             _boxSavedTimeTextView = new TextView(this);
-            _dataCardTitleLayout.AddView(_boxSavedTimeTextView);
-            _dataCard.AddView(_dataCardTitleLayout);
+            _singleBoxDataTitleLayout.AddView(_boxSavedTimeTextView);
+            _singleBoxDataLayout.AddView(_singleBoxDataTitleLayout);
 
             _interestingBoxTextView = new TextView(this);
             _interestingBoxTextView.Visibility = ViewStates.Gone;
-            _dataCard.AddView(_interestingBoxTextView);
-
+            _singleBoxDataLayout.AddView(_interestingBoxTextView);
+            
+            _scannedIdsLayout = new List<LinearLayout?>();
             // Scanned birds container
-            _scannedIdsLayout = new LinearLayout(this)
+            _scannedIdsLayout.Add(new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Vertical
-            };
-            _scannedIdsLayout.SetPadding(16, 16, 16, 16);
-            _scannedIdsLayout.Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
+            });
+            
+            _scannedIdsLayout[0].SetPadding(16, 16, 16, 16);
+            _scannedIdsLayout[0].Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
             var idsParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             idsParams.SetMargins(0, 0, 0, 16);
-            _scannedIdsLayout.LayoutParameters = idsParams;
-            _dataCard.AddView(_scannedIdsLayout);
+            _scannedIdsLayout[0].LayoutParameters = idsParams;
+            _singleBoxDataLayout.AddView(_scannedIdsLayout[0]);
 
             // Headings row: Adults, Eggs, Chicks, Gate Status
             var headingsLayout = new LinearLayout(this)
@@ -1827,34 +1849,35 @@ namespace BluePenguinMonitoring
             headingsLayout.AddView(chicksLabel);
             headingsLayout.AddView(breedingChance);
             headingsLayout.AddView(gateLabel);
-            _dataCard.AddView(headingsLayout);
+            _singleBoxDataLayout.AddView(headingsLayout);
 
             // Input fields row: Adults, Eggs, Chicks inputs, Gate Status spinner
-            var inputFieldsLayout = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Horizontal
-            };
+            var inputFieldsLayout = new LinearLayout(this){ Orientation = Android.Widget.Orientation.Horizontal };
             var inputFieldsParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             inputFieldsParams.SetMargins(0, 0, 0, 16);
             inputFieldsLayout.LayoutParameters = inputFieldsParams;
 
-            _adultsEditText = _uiFactory.CreateStyledNumberField();
-            _eggsEditText = _uiFactory.CreateStyledNumberField();
-            _chicksEditText = _uiFactory.CreateStyledNumberField();
+            _adultsEditText = new List<EditText?>();
+            _adultsEditText.Add( _uiFactory.CreateStyledNumberField());
+            _eggsEditText = new List<EditText?>();
+            _eggsEditText.Add(_uiFactory.CreateStyledNumberField());
+            _chicksEditText = new List<EditText?>();
+            _chicksEditText.Add(_uiFactory.CreateStyledNumberField());
 
-            _breedingChanceSpinner = new Spinner(this);
-            _breedingChanceSpinner.SetPadding(16, 20, 16, 20);
-            _breedingChanceSpinner.Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
+            _breedingChanceSpinner = new List<Spinner?>();
+            _breedingChanceSpinner.Add(new Spinner(this));
+            _breedingChanceSpinner[0].SetPadding(16, 20, 16, 20);
+            _breedingChanceSpinner[0].Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
 
             // Set the spinner to have the same layout weight as the input fields
             var spinnerParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             spinnerParams.SetMargins(4, 0, 4, 0);
-            _breedingChanceSpinner.LayoutParameters = spinnerParams;
-            _breedingChanceSpinner.SetGravity(GravityFlags.Center);
+            _breedingChanceSpinner[0].LayoutParameters = spinnerParams;
+            _breedingChanceSpinner[0].SetGravity(GravityFlags.Center);
             List<string> items = new List<string> { "", "DCM", "NO", "UNL", "POT", "CON", "BR" };
             ArrayAdapter<string> adapter = new(this, Android.Resource.Layout.SimpleSpinnerItem, items);
             adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
-            _breedingChanceSpinner.Adapter = adapter;
+            _breedingChanceSpinner[0].Adapter = adapter;
             string? breedingChanceString = "";
             try { breedingChanceString = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].BreedingChance; }
             catch { }
@@ -1862,16 +1885,17 @@ namespace BluePenguinMonitoring
             if (breedingChanceString != null)
                 breedingPercentageIndex = items.FindIndex(x => x == breedingChanceString);
             breedingPercentageIndex = Math.Max(0, breedingPercentageIndex);
-            _breedingChanceSpinner.SetSelection(breedingPercentageIndex, false);
-            _breedingChanceSpinner.ItemSelected += (s, e) =>
+            _breedingChanceSpinner[0].SetSelection(breedingPercentageIndex, false);
+            _breedingChanceSpinner[0].ItemSelected += (s, e) =>
             {
                 string selectedItem = items[e.Position];
-                string status = _breedingChanceSpinner.SelectedItem.ToString();
+                string status = _breedingChanceSpinner[0].SelectedItem.ToString();
             };
-            _gateStatusSpinner = _uiFactory.CreateGateStatusSpinner();
-            _gateStatusSpinner.ItemSelected += (s, e) => 
+            _gateStatusSpinner = new List<Spinner?>();
+            _gateStatusSpinner.Add(_uiFactory.CreateGateStatusSpinner());
+            _gateStatusSpinner[0].ItemSelected += (s, e) => 
             {
-                string status = _gateStatusSpinner.SelectedItem.ToString();
+                string status = _gateStatusSpinner[0].SelectedItem.ToString();
                 if (status.Equals("Gate up") || status.Equals("Regate"))
                 {
                     if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
@@ -1890,24 +1914,24 @@ namespace BluePenguinMonitoring
             };
 
             // Add event handlers
-            _adultsEditText.TextChanged += OnDataChanged;
-            _adultsEditText.Click += OnNumberFieldClick;
-            _adultsEditText.FocusChange += OnNumberFieldFocus;
+            _adultsEditText[0].TextChanged += OnDataChanged;
+            _adultsEditText[0].Click += OnNumberFieldClick;
+            _adultsEditText[0].FocusChange += OnNumberFieldFocus;
 
-            _eggsEditText.TextChanged += OnDataChanged;
-            _eggsEditText.Click += OnNumberFieldClick;
-            _eggsEditText.FocusChange += OnNumberFieldFocus;
+            _eggsEditText[0].TextChanged += OnDataChanged;
+            _eggsEditText[0].Click += OnNumberFieldClick;
+            _eggsEditText[0].FocusChange += OnNumberFieldFocus;
 
-            _chicksEditText.TextChanged += OnDataChanged;
-            _chicksEditText.Click += OnNumberFieldClick;
-            _chicksEditText.FocusChange += OnNumberFieldFocus;
+            _chicksEditText[0].TextChanged += OnDataChanged;
+            _chicksEditText[0].Click += OnNumberFieldClick;
+            _chicksEditText[0].FocusChange += OnNumberFieldFocus;
 
-            inputFieldsLayout.AddView(_adultsEditText);
-            inputFieldsLayout.AddView(_eggsEditText);
-            inputFieldsLayout.AddView(_chicksEditText);
-            inputFieldsLayout.AddView(_breedingChanceSpinner);
-            inputFieldsLayout.AddView(_gateStatusSpinner);
-            _dataCard.AddView(inputFieldsLayout);
+            inputFieldsLayout.AddView(_adultsEditText[0]);
+            inputFieldsLayout.AddView(_eggsEditText[0]);
+            inputFieldsLayout.AddView(_chicksEditText[0]);
+            inputFieldsLayout.AddView(_breedingChanceSpinner[0]);
+            inputFieldsLayout.AddView(_gateStatusSpinner[0]);
+            _singleBoxDataLayout.AddView(inputFieldsLayout);
 
             var notesLabel = new TextView(this)
             {
@@ -1919,23 +1943,24 @@ namespace BluePenguinMonitoring
             var notesLabelParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             notesLabelParams.SetMargins(0, 0, 0, 8);
             notesLabel.LayoutParameters = notesLabelParams;
-            _dataCard.AddView(notesLabel);
+            _singleBoxDataLayout.AddView(notesLabel);
 
-            _notesEditText = new EditText(this)
+            _notesEditText = new List<EditText?>();
+            _notesEditText.Add(new EditText(this)
             {
                 InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextFlagMultiLine | Android.Text.InputTypes.TextFlagCapSentences,
                 Hint = "Enter any additional notes...",
                 Gravity = Android.Views.GravityFlags.Top | Android.Views.GravityFlags.Start
-            };
-            _notesEditText.SetTextColor(UIFactory.TEXT_PRIMARY);
-            _notesEditText.SetHintTextColor(UIFactory.TEXT_SECONDARY);
-            _notesEditText.SetPadding(16, 16, 16, 16);
-            _notesEditText.Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
+            });
+            _notesEditText[0].SetTextColor(UIFactory.TEXT_PRIMARY);
+            _notesEditText[0].SetHintTextColor(UIFactory.TEXT_SECONDARY);
+            _notesEditText[0].SetPadding(16, 16, 16, 16);
+            _notesEditText[0].Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
             var notesEditParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             notesEditParams.SetMargins(0, 0, 0, 8);
-            _notesEditText.LayoutParameters = notesEditParams;
-            _notesEditText.TextChanged += OnDataChanged;
-            _dataCard.AddView(_notesEditText);
+            _notesEditText[0].LayoutParameters = notesEditParams;
+            _notesEditText[0].TextChanged += OnDataChanged;
+            _singleBoxDataLayout.AddView(_notesEditText[0]);
         }
         private void SetEnabledRecursive(View view, bool enabled, float alpha)
         {
@@ -2087,9 +2112,9 @@ namespace BluePenguinMonitoring
         private void CheckForHighValueConfirmation()
         {
             int adults, eggs, chicks;
-            int.TryParse(_adultsEditText?.Text ?? "0", out adults);
-            int.TryParse(_eggsEditText?.Text ?? "0", out eggs);
-            int.TryParse(_chicksEditText?.Text ?? "0", out chicks);
+            int.TryParse(_adultsEditText?[0].Text ?? "0", out adults);
+            int.TryParse(_eggsEditText?[0].Text ?? "0", out eggs);
+            int.TryParse(_chicksEditText?[0].Text ?? "0", out chicks);
 
             // Check if any values are 3 or greater - no state tracking, ask every time
             var highValues = new List<(string type, int count)>();
@@ -2137,16 +2162,16 @@ namespace BluePenguinMonitoring
             string boxDataString = boxData.ToString();
             
             int adults, eggs, chicks;
-            int.TryParse(_adultsEditText?.Text ?? "0", out adults);
-            int.TryParse(_eggsEditText?.Text ?? "0", out eggs);
-            int.TryParse(_chicksEditText?.Text ?? "0", out chicks);
+            int.TryParse(_adultsEditText?[0].Text ?? "0", out adults);
+            int.TryParse(_eggsEditText?[0].Text ?? "0", out eggs);
+            int.TryParse(_chicksEditText?[0].Text ?? "0", out chicks);
 
             boxData.Adults = adults;
             boxData.Eggs = eggs;
             boxData.Chicks = chicks;
-            boxData.GateStatus = GetSelectedStatus(_gateStatusSpinner);
-            boxData.BreedingChance = GetSelectedStatus(_breedingChanceSpinner);
-            boxData.Notes = _notesEditText?.Text ?? "";
+            boxData.GateStatus = GetSelectedStatus(_gateStatusSpinner[0]);
+            boxData.BreedingChance = GetSelectedStatus(_breedingChanceSpinner[0]);
+            boxData.Notes = _notesEditText?[0].Text ?? "";
 
             if (boxData.ToString() != boxDataString)
             {
@@ -2163,7 +2188,7 @@ namespace BluePenguinMonitoring
             if (_scannedIdsLayout == null) return;
 
             // Clear existing views
-            _scannedIdsLayout.RemoveAllViews();
+            _scannedIdsLayout[0].RemoveAllViews();
 
             if (scans.Count == 0)
             {
@@ -2173,7 +2198,7 @@ namespace BluePenguinMonitoring
                     TextSize = 14
                 };
                 emptyText.SetTextColor(UIFactory.TEXT_SECONDARY);
-                _scannedIdsLayout.AddView(emptyText);
+                _scannedIdsLayout[0].AddView(emptyText);
             }
             else
             {
@@ -2188,14 +2213,14 @@ namespace BluePenguinMonitoring
                 var headerParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
                 headerParams.SetMargins(0, 0, 0, 12);
                 headerText.LayoutParameters = headerParams;
-                _scannedIdsLayout.AddView(headerText);
+                _scannedIdsLayout[0].AddView(headerText);
 
                 // Individual scan records with delete buttons
                 for (int i = 0; i < scans.Count; i++)
                 {
                     var scan = scans[i];
                     var scanLayout = CreateScanRecordView(scan, i);
-                    _scannedIdsLayout.AddView(scanLayout);
+                    _scannedIdsLayout[0].AddView(scanLayout);
                 }
             }
 
@@ -2242,7 +2267,7 @@ namespace BluePenguinMonitoring
 
             manualInputLayout.AddView(_manualScanEditText);
             manualInputLayout.AddView(addButton);
-            _scannedIdsLayout.AddView(manualInputLayout);
+            _scannedIdsLayout[0].AddView(manualInputLayout);
         }
         private LinearLayout CreateScanRecordView(ScanRecord scan, int index)
         {
@@ -2368,11 +2393,11 @@ namespace BluePenguinMonitoring
                             _remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData);
                             if (penguinData!=null && LifeStage.Adult == penguinData.LastKnownLifeStage)
                             {
-                                _adultsEditText.Text = "" + Math.Max(0, int.Parse(_adultsEditText.Text ?? "0") - 1);
+                                _adultsEditText[0].Text = "" + Math.Max(0, int.Parse(_adultsEditText[0].Text ?? "0") - 1);
                             }
                             else if (penguinData != null && LifeStage.Chick == penguinData.LastKnownLifeStage)
                             {
-                                _chicksEditText.Text = "" + Math.Max(0, int.Parse(_chicksEditText.Text ?? "0") - 1);
+                                _chicksEditText[0].Text = "" + Math.Max(0, int.Parse(_chicksEditText[0].Text ?? "0") - 1);
                             }
                             SaveCurrentBoxData();
                             buildScannedIdsLayout(boxData.ScannedIds);
@@ -2470,12 +2495,12 @@ namespace BluePenguinMonitoring
                             _remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData);
                             if (LifeStage.Adult == penguinData.LastKnownLifeStage)
                             {
-                                _adultsEditText.Text = "" + Math.Max(0, int.Parse(_adultsEditText.Text ?? "0") - 1);
+                                _adultsEditText[0].Text = "" + Math.Max(0, int.Parse(_adultsEditText[0].Text ?? "0") - 1);
                                 _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Adults++;
                             }
                             else if (LifeStage.Chick == penguinData.LastKnownLifeStage)
                             {
-                                _chicksEditText.Text = "" + Math.Max(0, int.Parse(_chicksEditText.Text ?? "0") - 1);
+                                _chicksEditText[0].Text = "" + Math.Max(0, int.Parse(_chicksEditText[0].Text ?? "0") - 1);
                                 _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Adults++;
                             }
                             SaveCurrentBoxData();
@@ -2621,7 +2646,7 @@ namespace BluePenguinMonitoring
                         if (penguin.LastKnownLifeStage == LifeStage.Adult || 
                             penguin.LastKnownLifeStage == LifeStage.Returnee)
                         {
-                            _adultsEditText.Text = (int.Parse(_adultsEditText.Text ?? "0") + 1).ToString();
+                            _adultsEditText[0].Text = (int.Parse(_adultsEditText[0].Text ?? "0") + 1).ToString();
                             SaveCurrentBoxData();
                             if (!penguin.Sex.Equals("f", StringComparison.OrdinalIgnoreCase) && !penguin.Sex.Equals("m", StringComparison.OrdinalIgnoreCase))
                             {
@@ -2633,7 +2658,7 @@ namespace BluePenguinMonitoring
                         }
                         else if (penguin.LastKnownLifeStage == LifeStage.Chick)
                         {
-                            _chicksEditText.Text = (int.Parse(_chicksEditText.Text ?? "0") + 1).ToString();
+                            _chicksEditText[0].Text = (int.Parse(_chicksEditText[0].Text ?? "0") + 1).ToString();
                             SaveCurrentBoxData();
                             triggerAlertAsync();
                             toastMessage += $" (+1 Chick)";

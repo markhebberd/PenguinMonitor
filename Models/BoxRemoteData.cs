@@ -18,7 +18,7 @@
             }
             return eggChickStatusText.Trim().Replace("  ", " ").Split(" ")[1].Count(c => c == 'x');
         }
-        public string boxMiniStatus(int numEggs, int numChicks)
+        public string boxMiniStatus(int? numEggs, int? numChicks)
         {
             string miniStatus = "";
             for (int i = 0; i < numEggs; i++)
