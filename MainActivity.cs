@@ -76,8 +76,9 @@ namespace BluePenguinMonitoring
 
         // Single box data 
         private bool _isBoxLocked;
-        private LinearLayout? _singleBoxDataLayout;
+        private LinearLayout? _singleBoxDataOuterLayout;
         private LinearLayout? _singleBoxDataTitleLayout;
+        private LinearLayout _singleBoxDataContentLayout;
         private TextView? _dataCardTitleText;
         private ImageView? _dataCardLockIconView;
 
@@ -124,7 +125,7 @@ namespace BluePenguinMonitoring
         private MediaPlayer? _alertMediaPlayer;
 
         //Lazy versioning.
-        private static string version = "37.2";
+        private static string version = "37.3";
         private static int numberMonitorBoxes = 150;
 
         //multibox View
@@ -135,7 +136,7 @@ namespace BluePenguinMonitoring
             base.OnCreate(savedInstanceState);
             RequestPermissions();
             LoadFromAppDataDir();
-            CreateDataRecordingUI();
+            CreateUI();
         }
         private void RequestPermissions()
         {
@@ -698,7 +699,7 @@ namespace BluePenguinMonitoring
                 });
             }
         }
-        private void CreateDataRecordingUI()
+        private void CreateUI()
         {
             _uiFactory = new UIFactory(this);
             selectedPage = UIFactory.selectedPage.BoxDataSingle;
@@ -715,30 +716,46 @@ namespace BluePenguinMonitoring
                 Orientation = Android.Widget.Orientation.Vertical
             };
 
-            // App header
-            var headerCard = _uiFactory.CreateCard(borderWidth: 0);
-            var menuButton = new ImageButton(this)
-            {
-                LayoutParameters = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WrapContent,
-                    ViewGroup.LayoutParams.WrapContent)
-            };
-            menuButton.SetPadding(0, 0, 0, 0);
-            menuButton.SetImageResource(Android.Resource.Drawable.IcMenuManage); // Use built-in menu icon
-            menuButton.SetBackgroundColor(Color.Transparent); // No background
-            menuButton.Click += hamburgerButtonClick;
+            var headerStatusSettingsCard = _uiFactory.CreateCard(padding: 20);
+            headerStatusSettingsCard.Background = _uiFactory.CreateCardBackground(borderWidth: 4);            
 
             var titleCard = _uiFactory.CreateCard(Android.Widget.Orientation.Horizontal, padding: 0, borderWidth: 0);
             titleCard.SetGravity(GravityFlags.Center);
 
-            // Add to headerCard before titleText
-            titleCard.AddView(menuButton);
+            var expandSettingsImageButton = new ImageButton(this)
+            {
+                LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent)
+            };
+            expandSettingsImageButton.SetImageResource(Resource.Drawable.unfold); 
+            expandSettingsImageButton.SetBackgroundColor(Color.Transparent); 
+            expandSettingsImageButton.Click += (s,e) => {
+                if (_settingsCard.Visibility == ViewStates.Gone)
+                {
+                    _settingsCard.Visibility = ViewStates.Visible;
+                    expandSettingsImageButton.SetImageResource(Resource.Drawable.fold);
+                }
+                else
+                {
+                    _settingsCard.Visibility = ViewStates.Gone;
+                    expandSettingsImageButton.SetImageResource(Resource.Drawable.unfold);
+                }
+            };
+            titleCard.AddView(expandSettingsImageButton);
+
+            // Add a spacer that expands to fill available space
+            var spacer = new View(this);
+            spacer.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
+            titleCard.AddView(spacer);
 
             ImageView iconView = new ImageView(this);
             iconView.SetPadding(0, 0, 0, 0);
             iconView.SetImageResource(Resource.Mipmap.appicon);
-            iconView.ScaleX = iconView.ScaleY = 0.7f;
+            iconView.ScaleX = iconView.ScaleY = 0.8f;
             titleCard.AddView(iconView);
+
+            var spacer1 = new View(this);
+            spacer1.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
+            titleCard.AddView(spacer1);
 
             var titleText = new TextView(this)
             {
@@ -746,10 +763,13 @@ namespace BluePenguinMonitoring
                 TextSize = 28,
                 Gravity = GravityFlags.Center
             };
-            titleText.SetPadding(0, 0, 0, 0);
+            titleText.SetPadding(0, 0, 50, 0);
             titleText.SetTextColor(UIFactory.PRIMARY_BLUE);
             titleText.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
             titleCard.AddView(titleText);
+
+            headerStatusSettingsCard.AddView(titleCard);
+
             _statusText = new TextView(this)
             {
                 Text = "Connecting to HR5... | GPS: No signal",
@@ -760,14 +780,14 @@ namespace BluePenguinMonitoring
             var statusParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             statusParams.SetMargins(0, 0, 0, 0);
             _statusText.LayoutParameters = statusParams;
-            var titleAndStatusCard = _uiFactory.CreateCard(padding: 5);
-            titleAndStatusCard.AddView(titleCard);
-            titleAndStatusCard.AddView(_statusText);
-            titleAndStatusCard.Background = _uiFactory.CreateCardBackground(borderWidth: 0);
 
-            headerCard.AddView(titleAndStatusCard);
+            headerStatusSettingsCard.AddView(_statusText);
 
-            parentLinearLayout.AddView(headerCard);
+            //Settings Card
+            createSettingsCard();
+            headerStatusSettingsCard.AddView(_settingsCard);
+
+            parentLinearLayout.AddView(headerStatusSettingsCard);
 
             // Action buttons
             _topButtonLayout = CreateStyledButtonLayout(
@@ -778,7 +798,7 @@ namespace BluePenguinMonitoring
             );
             statusParams.SetMargins(0, 0, 0, 10);
             _topButtonLayout.LayoutParameters = statusParams;
-            headerCard.AddView(_topButtonLayout);
+            headerStatusSettingsCard.AddView(_topButtonLayout);
 
             //Navigate Monitors
             var browseOtherMonitorsLayout = new LinearLayout(this)
@@ -826,16 +846,13 @@ namespace BluePenguinMonitoring
             };
             browseOtherMonitorsLayout.AddView(_showLatestMonitorButton);
 
-            headerCard.AddView(browseOtherMonitorsLayout);
+            headerStatusSettingsCard.AddView(browseOtherMonitorsLayout);
 
 
             // Navigation card
             var boxNavLayout = CreateNavigationLayout();
             boxNavLayout.LayoutParameters = statusParams;
-            headerCard.AddView(boxNavLayout);
-
-            //Settings Card
-            createSettingsCard();
+            headerStatusSettingsCard.AddView(boxNavLayout);
 
             // Data card
             CreateBoxDataCard();
@@ -843,8 +860,7 @@ namespace BluePenguinMonitoring
             //Create Multi box view card
             _multiBoxViewCard = _uiFactory.CreateCard();
 
-            parentLinearLayout.AddView(_settingsCard);
-            parentLinearLayout.AddView(_singleBoxDataLayout);
+            parentLinearLayout.AddView(_singleBoxDataOuterLayout);
             parentLinearLayout.AddView(_multiBoxViewCard);
 
             DrawPageLayouts();
@@ -852,40 +868,7 @@ namespace BluePenguinMonitoring
             SetContentView(_rootScrollView);
 
             _rootScrollView.SetOnApplyWindowInsetsListener(new ViewInsetsListener());
-        }
-        private void hamburgerButtonClick(object? sender, EventArgs e)
-        {
-            var labels = _menuItems.Select(m => m.Text).ToArray();
-            // Seed check state from currently visible pages
-            var checkedItems = _menuItems
-                     .Select(m => _appSettings.VisiblePages.Contains(m.Page))
-                     .ToArray();
-
-            var builder = new AlertDialog.Builder(this);
-            builder.SetTitle("Menu");
-
-            // Collect changes temporarily before applying
-            var tempVisible = new HashSet<UIFactory.selectedPage>(_appSettings.VisiblePages);
-            //Multi - choice(checkboxes)
-            builder.SetMultiChoiceItems(labels, checkedItems, (s, args) =>
-            {
-                var page = _menuItems[args.Which].Page;
-                if (args.IsChecked) tempVisible.Add(page);
-                else tempVisible.Remove(page);
-            });
-            builder.SetPositiveButton("Apply", (s, args) =>
-            {
-                if (tempVisible.Count == 0)
-                {
-                    Toast.MakeText(this, "At least one page must be visible", ToastLength.Short)?.Show();
-                    return;
-                }
-                _appSettings.VisiblePages.ToList().ForEach(p => _appSettings.RemovePage(p));
-                _appSettings.SetVisiblePages(tempVisible);
-                DrawPageLayouts();
-            });
-            builder.Show();
-        }
+        }       
         private void createMultiBoxViewCard()
         {
             _multiBoxViewCard.RemoveAllViews();
@@ -1581,7 +1564,7 @@ namespace BluePenguinMonitoring
                     bool showSettings = _appSettings.VisiblePages.Contains(UIFactory.selectedPage.Settings);
                     bool showOverview = _appSettings.VisiblePages.Contains(UIFactory.selectedPage.BoxOverview);
 
-                    _singleBoxDataLayout.Visibility = showSingle ? ViewStates.Visible : ViewStates.Gone;
+                    _singleBoxDataOuterLayout.Visibility = showSingle ? ViewStates.Visible : ViewStates.Gone;
                     _settingsCard.Visibility = showSettings ? ViewStates.Visible : ViewStates.Gone;
                     _multiBoxViewCard.Visibility = showOverview ? ViewStates.Visible : ViewStates.Gone;
 
@@ -1700,9 +1683,9 @@ namespace BluePenguinMonitoring
                     }
 
                     // title Layout "Box n" is item 0, which we don't want to disable!
-                    for (int i = 1; i < _singleBoxDataLayout.ChildCount; i++)
+                    for (int i = 1; i < _singleBoxDataOuterLayout.ChildCount; i++)
                     {
-                        var child = _singleBoxDataLayout.GetChildAt(i);
+                        var child = _singleBoxDataOuterLayout.GetChildAt(i);
                         SetEnabledRecursive(child, !_isBoxLocked, _isBoxLocked ? 0.8f : 1.0f);
                     }
 
@@ -1726,14 +1709,8 @@ namespace BluePenguinMonitoring
         }
         private void CreateBoxDataCard()
         {
-            if (_singleBoxDataLayout == null)
-            {
-                _singleBoxDataLayout = _uiFactory.CreateCard();
-            }
-            else
-            {
-                _singleBoxDataLayout.RemoveAllViews();
-            }
+            _singleBoxDataOuterLayout = _uiFactory.CreateCard();
+
             // Horizontal layout for lock icon + box title
             _singleBoxDataTitleLayout = new LinearLayout(this)
             {
@@ -1742,12 +1719,32 @@ namespace BluePenguinMonitoring
                 Focusable = true
             };
             _singleBoxDataTitleLayout.SetGravity(GravityFlags.Center);
+            var expandSingleBoxImageButton = new ImageButton(this)
+            {
+                LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent)
+            };
+            expandSingleBoxImageButton.SetImageResource(Resource.Drawable.unfold);
+            expandSingleBoxImageButton.SetBackgroundColor(Color.Transparent);
+            expandSingleBoxImageButton.Click += (s, e) => {
+                if (_singleBoxDataContentLayout.Visibility == ViewStates.Gone)
+                {
+                    _singleBoxDataContentLayout.Visibility = ViewStates.Visible;
+                    expandSingleBoxImageButton.SetImageResource(Resource.Drawable.fold);
+                }
+                else
+                {
+                    _singleBoxDataContentLayout.Visibility = ViewStates.Gone;
+                    expandSingleBoxImageButton.SetImageResource(Resource.Drawable.unfold);
+                }
+            };
+            _singleBoxDataTitleLayout.AddView(expandSingleBoxImageButton);
             _singleBoxDataTitleLayout.Click += (sender, e) =>
             {
                 _isBoxLocked = !_isBoxLocked;
                 if (!_isBoxLocked)
                 {
                     DrawPageLayouts();
+                    _singleBoxDataContentLayout.Visibility = ViewStates.Visible;
                 }
                 else
                 {
@@ -1787,16 +1784,6 @@ namespace BluePenguinMonitoring
             _dataCardTitleText.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
             _singleBoxDataTitleLayout.AddView(_dataCardTitleText);
 
-            // visually indicate locked state
-            if (_isBoxLocked)
-            {
-                _dataCardTitleText.SetTextColor(Color.Gray);
-            }
-            else
-            {
-                _dataCardTitleText.SetTextColor(UIFactory.TEXT_PRIMARY);
-            }
-
             var boxTitleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             boxTitleParams.SetMargins(0, 0, 0, 16);
             _singleBoxDataTitleLayout.LayoutParameters = boxTitleParams;
@@ -1816,25 +1803,28 @@ namespace BluePenguinMonitoring
 
             _boxSavedTimeTextView = new TextView(this);
             _singleBoxDataTitleLayout.AddView(_boxSavedTimeTextView);
-            _singleBoxDataLayout.AddView(_singleBoxDataTitleLayout);
+            _singleBoxDataOuterLayout.AddView(_singleBoxDataTitleLayout);
 
+            _singleBoxDataContentLayout = new LinearLayout(this)
+            {
+                Orientation = Android.Widget.Orientation.Vertical
+            };
             _interestingBoxTextView = new TextView(this);
             _interestingBoxTextView.Visibility = ViewStates.Gone;
-            _singleBoxDataLayout.AddView(_interestingBoxTextView);
+            _singleBoxDataContentLayout.AddView(_interestingBoxTextView);
             
             _scannedIdsLayout = new List<LinearLayout?>();
             // Scanned birds container
             _scannedIdsLayout.Add(new LinearLayout(this)
             {
                 Orientation = Android.Widget.Orientation.Vertical
-            });
-            
+            });            
             _scannedIdsLayout[0].SetPadding(16, 16, 16, 16);
             _scannedIdsLayout[0].Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
             var idsParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             idsParams.SetMargins(0, 0, 0, 16);
             _scannedIdsLayout[0].LayoutParameters = idsParams;
-            _singleBoxDataLayout.AddView(_scannedIdsLayout[0]);
+            _singleBoxDataContentLayout.AddView(_scannedIdsLayout[0]);
 
             // Headings row: Adults, Eggs, Chicks, Gate Status
             var headingsLayout = new LinearLayout(this)
@@ -1856,7 +1846,7 @@ namespace BluePenguinMonitoring
             headingsLayout.AddView(chicksLabel);
             headingsLayout.AddView(breedingChance);
             headingsLayout.AddView(gateLabel);
-            _singleBoxDataLayout.AddView(headingsLayout);
+            _singleBoxDataContentLayout.AddView(headingsLayout);
 
             // Input fields row: Adults, Eggs, Chicks inputs, Gate Status spinner
             var inputFieldsLayout = new LinearLayout(this){ Orientation = Android.Widget.Orientation.Horizontal };
@@ -1938,7 +1928,7 @@ namespace BluePenguinMonitoring
             inputFieldsLayout.AddView(_chicksEditText[0]);
             inputFieldsLayout.AddView(_breedingChanceSpinner[0]);
             inputFieldsLayout.AddView(_gateStatusSpinner[0]);
-            _singleBoxDataLayout.AddView(inputFieldsLayout);
+            _singleBoxDataContentLayout.AddView(inputFieldsLayout);
 
             var notesLabel = new TextView(this)
             {
@@ -1950,7 +1940,7 @@ namespace BluePenguinMonitoring
             var notesLabelParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             notesLabelParams.SetMargins(0, 0, 0, 8);
             notesLabel.LayoutParameters = notesLabelParams;
-            _singleBoxDataLayout.AddView(notesLabel);
+            _singleBoxDataContentLayout.AddView(notesLabel);
 
             _notesEditText = new List<EditText?>();
             _notesEditText.Add(new EditText(this)
@@ -1967,7 +1957,8 @@ namespace BluePenguinMonitoring
             notesEditParams.SetMargins(0, 0, 0, 8);
             _notesEditText[0].LayoutParameters = notesEditParams;
             _notesEditText[0].TextChanged += OnDataChanged;
-            _singleBoxDataLayout.AddView(_notesEditText[0]);
+            _singleBoxDataContentLayout.AddView(_notesEditText[0]);
+            _singleBoxDataOuterLayout.AddView(_singleBoxDataContentLayout);
         }
         private void SetEnabledRecursive(View view, bool enabled, float alpha)
         {
@@ -2927,6 +2918,7 @@ namespace BluePenguinMonitoring
         {
             if (targetBox == _currentBox)
             {
+                _singleBoxDataContentLayout.Visibility = ViewStates.Visible;
                 Toast.MakeText(this, $"Already at Box {_currentBox}", ToastLength.Short)?.Show();
                 return;
             }
@@ -2938,6 +2930,7 @@ namespace BluePenguinMonitoring
             if (!_appSettings.VisiblePages.Contains(UIFactory.selectedPage.BoxDataSingle))
                 _appSettings.AddVisiblePage(UIFactory.selectedPage.BoxDataSingle);
             _currentBox = targetBox;
+            _singleBoxDataContentLayout.Visibility = ViewStates.Visible;
             DrawPageLayouts();
         }
         private string? GetSelectedStatus(Spinner spinner)
