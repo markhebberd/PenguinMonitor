@@ -33,7 +33,7 @@
             {
                 miniStatus = breedingLikelyhoodText;
             }
-            return $"({miniStatus}) \n({PersistentNotes})".Replace("()","").Trim();
+            return $"({miniStatus})".Replace("()","").Trim();
         }
     }
 }

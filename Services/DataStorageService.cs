@@ -17,7 +17,7 @@ namespace BluePenguinMonitoring.Services
     public class DataStorageService
     {
         private const string APP_SETTINGS_FILENAME = "app_settings.json";
-        private const string AUTO_SAVE_FILENAME = "penguin_data_autosave.json";
+        private const string ALL_MONITOR_DATA_FILENAME = "penguin_data_autosave.json";
         internal const string REMOTE_BIRD_DATA_FILENAME = "remotePenguinData.json";
         internal const string REMOTE_BOX_DATA_FILENAME = "remoteBoxData.json";
         internal const string BREEDING_DATES_FILENAME = "predictedDates.json";
@@ -49,7 +49,7 @@ namespace BluePenguinMonitoring.Services
             catch { }
         }
 
-        public Dictionary<int, MonitorDetails> requestPastMonitorDetailsFromServer(Dictionary<int, MonitorDetails> _allMonitorData)
+        public static Dictionary<int, MonitorDetails> requestPastMonitorDetailsFromServer(Dictionary<int, MonitorDetails> _allMonitorData)
         {
             try
             {
@@ -58,127 +58,113 @@ namespace BluePenguinMonitoring.Services
                 _allMonitorData.Add(0, temp);
 
                 string response = "No Response";
-                BackgroundWorker bw = new BackgroundWorker();
-                bw.DoWork += (sender, e) =>
-                {
-                    response = Backend.RequestServerResponse("PenguinRequest-Saved");
-                };
-                bw.RunWorkerCompleted += (sender, e) =>
-                {
-                    try
-                    {
-                        foreach (string json in response.Split("~~~~", StringSplitOptions.RemoveEmptyEntries))
-                        {
-                            MonitorDetails monitor = Newtonsoft.Json.JsonConvert.DeserializeObject<MonitorDetails>(json);
+                response = Backend.RequestServerResponse("PenguinRequest-Saved");
+                
+                foreach (string json in response.Split("~~~~", StringSplitOptions.RemoveEmptyEntries))
+                {   
+                    MonitorDetails monitor = Newtonsoft.Json.JsonConvert.DeserializeObject<MonitorDetails>(json);
                             
-                            /// Don't import deleted monitors
-                            if(monitor.IsDeleted)
-                                continue;
+                    /// Don't import deleted monitors
+                    if(monitor.IsDeleted)
+                        continue;
 
-                            /// Fix any old data with bad timestamps
+                    /// Fix any old data with bad timestamps
 
-                            //bool adjusted = false;
-                            //DateTime lastSaved = monitor.LastSaved.ToUniversalTime();
-                            //List<BoxData> bds = monitor.BoxData.Values.ToList();
-                            //bds.Reverse();
+                    //bool adjusted = false;
+                    //DateTime lastSaved = monitor.LastSaved.ToUniversalTime();
+                    //List<BoxData> bds = monitor.BoxData.Values.ToList();
+                    //bds.Reverse();
 
-                            //DateTime highest = DateTime.MinValue;
-                            //DateTime lowest = DateTime.MaxValue;
-                            //foreach (BoxData box in bds)
-                            //{
-                            //    DateTime boxHighest = DateTime.MinValue;
+                    //DateTime highest = DateTime.MinValue;
+                    //DateTime lowest = DateTime.MaxValue;
+                    //foreach (BoxData box in bds)
+                    //{
+                    //    DateTime boxHighest = DateTime.MinValue;
 
-                            //    if (box.whenDataCollectedUtc.ToUniversalTime() > boxHighest)
-                            //        boxHighest = box.whenDataCollectedUtc.ToUniversalTime();
-                            //    if (box.whenDataCollectedUtc.ToUniversalTime() > highest)
-                            //        highest = box.whenDataCollectedUtc.ToUniversalTime();
-                            //    if (box.whenDataCollectedUtc.ToUniversalTime() < lowest)
-                            //        lowest = box.whenDataCollectedUtc.ToUniversalTime();
+                    //    if (box.whenDataCollectedUtc.ToUniversalTime() > boxHighest)
+                    //        boxHighest = box.whenDataCollectedUtc.ToUniversalTime();
+                    //    if (box.whenDataCollectedUtc.ToUniversalTime() > highest)
+                    //        highest = box.whenDataCollectedUtc.ToUniversalTime();
+                    //    if (box.whenDataCollectedUtc.ToUniversalTime() < lowest)
+                    //        lowest = box.whenDataCollectedUtc.ToUniversalTime();
 
-                            //    for (int j = 0; j < box.ScannedIds.Count; j++)
-                            //    {
-                            //        if (box.whenDataCollectedUtc < box.ScannedIds[j].Timestamp.ToUniversalTime())
-                            //        {
+                    //    for (int j = 0; j < box.ScannedIds.Count; j++)
+                    //    {
+                    //        if (box.whenDataCollectedUtc < box.ScannedIds[j].Timestamp.ToUniversalTime())
+                    //        {
 
-                            //            if (box.ScannedIds[j].Timestamp.ToUniversalTime() > boxHighest)
-                            //                boxHighest = box.ScannedIds[j].Timestamp.ToUniversalTime();
-                            //            if (box.ScannedIds[j].Timestamp.ToUniversalTime() > highest)
-                            //                highest = box.ScannedIds[j].Timestamp.ToUniversalTime();
-                            //            if (box.ScannedIds[j].Timestamp.ToUniversalTime() < lowest)
-                            //                lowest = box.ScannedIds[j].Timestamp.ToUniversalTime();
-                            //        }
-                            //    }
-                            //    if (box.whenDataCollectedUtc < boxHighest)
-                            //    {
-                            //        box.whenDataCollectedUtc = boxHighest;
-                            //        adjusted = true;
-                            //    }
-                            //    else if (box.whenDataCollectedUtc < lowest)
-                            //    {  box.whenDataCollectedUtc = lowest;
-                            //        adjusted = true;
-                            //    }
-                            //}
+                    //            if (box.ScannedIds[j].Timestamp.ToUniversalTime() > boxHighest)
+                    //                boxHighest = box.ScannedIds[j].Timestamp.ToUniversalTime();
+                    //            if (box.ScannedIds[j].Timestamp.ToUniversalTime() > highest)
+                    //                highest = box.ScannedIds[j].Timestamp.ToUniversalTime();
+                    //            if (box.ScannedIds[j].Timestamp.ToUniversalTime() < lowest)
+                    //                lowest = box.ScannedIds[j].Timestamp.ToUniversalTime();
+                    //        }
+                    //    }
+                    //    if (box.whenDataCollectedUtc < boxHighest)
+                    //    {
+                    //        box.whenDataCollectedUtc = boxHighest;
+                    //        adjusted = true;
+                    //    }
+                    //    else if (box.whenDataCollectedUtc < lowest)
+                    //    {  box.whenDataCollectedUtc = lowest;
+                    //        adjusted = true;
+                    //    }
+                    //}
 
-                            //foreach (BoxData box in bds)
-                            //{
-                            //    if(box.whenDataCollectedUtc.Year < 2020)
-                            //    {  
-                            //        box.whenDataCollectedUtc = highest;
-                            //        adjusted = true;
-                            //    }
-                            //}
-                            //if (monitor.LastSaved.Year < 2020)
-                            //{
-                            //    monitor.LastSaved = highest.ToUniversalTime();
-                            //    adjusted = true;
-                            //}
-                            //monitor.filename += " GenTime";
-                            //if (adjusted)
-                            //{
-                            //    var currentDataJson = JsonConvert.SerializeObject(monitor, Formatting.Indented);
-                            //    string response = Backend.RequestServerResponse("PenguinReport-Saved:" + currentDataJson.ToString());
-                            //}
-                            _allMonitorData.Add(_allMonitorData.Count, monitor);
-                        }
-                    }
-                    catch { }
-                };
-                bw.RunWorkerAsync();
+                    //foreach (BoxData box in bds)
+                    //{
+                    //    if(box.whenDataCollectedUtc.Year < 2020)
+                    //    {  
+                    //        box.whenDataCollectedUtc = highest;
+                    //        adjusted = true;
+                    //    }
+                    //}
+                    //if (monitor.LastSaved.Year < 2020)
+                    //{
+                    //    monitor.LastSaved = highest.ToUniversalTime();
+                    //    adjusted = true;
+                    //}
+                    //monitor.filename += " GenTime";
+                    //if (adjusted)
+                    //{
+                    //    var currentDataJson = JsonConvert.SerializeObject(monitor, Formatting.Indented);
+                    //    string response = Backend.RequestServerResponse("PenguinReport-Saved:" + currentDataJson.ToString());
+                    //}
+                    _allMonitorData.Add(_allMonitorData.Count, monitor);
+                }
             }
             catch { }
             return _allMonitorData;
         }
-        public void SaveDataToInternalStorage(string filesDir, Dictionary<int, MonitorDetails> _allMonitorData, Android.Content.Context context, bool reportHome = true)
+        public async static Task SaveAllMonitorDataToDisk(Android.Content.Context context, Dictionary<int, MonitorDetails> _allMonitorData, bool reportHome = true, bool downloadRemoteMonitorData = false)
         {
             try
             {
+                if (downloadRemoteMonitorData)
+                    _allMonitorData = requestPastMonitorDetailsFromServer(_allMonitorData);
+
+                var filesDir = context.FilesDir?.AbsolutePath;
                 if (string.IsNullOrEmpty(filesDir))
                     return;
-
                 var allMonitorDataJson = JsonConvert.SerializeObject(_allMonitorData, Formatting.Indented);
-                var filePath = Path.Combine(filesDir, AUTO_SAVE_FILENAME);
-
+                var filePath = Path.Combine(filesDir, ALL_MONITOR_DATA_FILENAME);
                 File.WriteAllText(filePath, allMonitorDataJson);
-
-                if (reportHome && _allMonitorData[0].BoxData.Count > 0)
-                {
+                if (reportHome && _allMonitorData[0].BoxData.Count > 0) {
                     try
                     {
                         var currentDataJson = JsonConvert.SerializeObject(_allMonitorData[0], Formatting.Indented);
-
                         string response = "No Response";
                         BackgroundWorker bw = new BackgroundWorker();
-                        bw.DoWork += (sender, e) =>
-                        {
-                            response = Backend.RequestServerResponse("PenguinReport:" + currentDataJson.ToString());
-                        };
+                        bw.DoWork += (sender, e) => 
+                            response = Backend.RequestServerResponse("PenguinReport:" + currentDataJson.ToString()); 
                         bw.RunWorkerCompleted += (sender, e) =>
                         {
                             new Handler(Looper.MainLooper).Post(() =>
                             {
                                 if (response == "fail")
                                 {
-                                    Toast.MakeText(context, "Unable to backup on Marks server.", ToastLength.Short)?.Show();
+                                    Toast.MakeText(context, "Unable to incremental on Marks server.", ToastLength.Short)?.Show();
                                 }
                                 else
                                 {
@@ -190,21 +176,17 @@ namespace BluePenguinMonitoring.Services
                     }
                     catch { }
                 }
-
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Auto-save failed: {ex.Message}");
             }
         }
-        public Dictionary<int, MonitorDetails>? LoadFromAppDataDir(string filesDir)
+        public Dictionary<int, MonitorDetails>? LoadAllMonitorDataFromDisk(Android.Content.Context? context)
         {
             try
             {
-                if (string.IsNullOrEmpty(filesDir))
-                    return null;
-
-                var filePath = Path.Combine(filesDir, AUTO_SAVE_FILENAME);
+                var filePath = Path.Combine(context.FilesDir?.AbsolutePath, ALL_MONITOR_DATA_FILENAME);
                 if (!File.Exists(filePath))
                     return null;
 
@@ -217,7 +199,7 @@ namespace BluePenguinMonitoring.Services
                 return null;
             }
         }
-        internal async Task DownloadCsvDataAsync(Android.Content.Context? context)
+        internal async Task DownloadRemoteData(Android.Content.Context? context, Dictionary<int, MonitorDetails> allMonitorData)
         {
             try
             {
@@ -227,15 +209,16 @@ namespace BluePenguinMonitoring.Services
                     _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(BOX_STATUS_URL));
                 Task<HttpResponseMessage> responseBreedingDatesTask =
                     _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(BREEDING_DATES_URL));
-                ;
+
+                Task saveMonitorDataToDiskTask = SaveAllMonitorDataToDisk(context, allMonitorData, reportHome:false, downloadRemoteMonitorData: true);
+
                 // Await them in parallel
-                await Task.WhenAll(responseBirdsTask, responseBoxesTask, responseBreedingDatesTask);
+                await Task.WhenAll(responseBirdsTask, responseBoxesTask, responseBreedingDatesTask, saveMonitorDataToDiskTask);
                 // Retrieve results
                 HttpResponseMessage responseBirds = await responseBirdsTask;
                 HttpResponseMessage responseBoxes = await responseBoxesTask;
                 HttpResponseMessage responseBreedingDates = await responseBreedingDatesTask;
 
-                responseBirds.EnsureSuccessStatusCode();
                 var csvContentBirds = await responseBirds.Content.ReadAsStringAsync();
                 var parsedDataBirds = _csvDataService.ParseBirdCsvData(csvContentBirds);
 
@@ -308,9 +291,13 @@ namespace BluePenguinMonitoring.Services
                 var pdJson = JsonConvert.SerializeObject(predictedDates, Formatting.Indented);
                 File.WriteAllText(Path.Combine(context.FilesDir?.AbsolutePath, BREEDING_DATES_FILENAME), pdJson);
 
+                int boxDataCount = 0;
+                foreach (MonitorDetails monitorDetails in allMonitorData.Values)
+                    boxDataCount += monitorDetails.BoxData.Count;
+
                 new Handler(Looper.MainLooper).Post(() =>
                 {
-                    Toast.MakeText(context, $"✅ Got {remotePenguinData.Count} bird, {remoteBoxData.Count} box, {predictedDates.Count} breeding records", ToastLength.Short)?.Show();
+                    Toast.MakeText(context, $"Got {boxDataCount} box monitor, {remotePenguinData.Count} remote bird, {remoteBoxData.Count} remote box, {predictedDates.Count} remote date infos", ToastLength.Long)?.Show();
                 });
             }
             catch (Exception ex)
@@ -356,10 +343,10 @@ namespace BluePenguinMonitoring.Services
             try
             {
                 string remoteBirdPath = Path.Combine(context.FilesDir?.AbsolutePath, REMOTE_BIRD_DATA_FILENAME);
-                if (!File.Exists(remoteBirdPath))
-                {
-                    await DownloadCsvDataAsync(context);
-                }
+                //if (!File.Exists(remoteBirdPath))
+                //{
+                //    await DownloadRemoteData(context, allMonitorData);
+                //}
                 var remoteBirdJson = File.ReadAllText(remoteBirdPath);
                 return JsonConvert.DeserializeObject<Dictionary<string, PenguinData>>(remoteBirdJson);
             }
@@ -374,10 +361,10 @@ namespace BluePenguinMonitoring.Services
             try
             {
                 string remoteBoxDataPath = Path.Combine(context.FilesDir?.AbsolutePath, REMOTE_BOX_DATA_FILENAME);
-                if (!File.Exists(remoteBoxDataPath))
-                {
-                    await DownloadCsvDataAsync(context);
-                }
+                //if (!File.Exists(remoteBoxDataPath))
+                //{
+                //    await DownloadRemoteData(context, allMonitorData);
+                //}
                 var remoteBoxDataJson = File.ReadAllText(remoteBoxDataPath);
                 return JsonConvert.DeserializeObject<Dictionary<int, BoxRemoteData>>(remoteBoxDataJson);
             }
@@ -392,10 +379,10 @@ namespace BluePenguinMonitoring.Services
             try
             {
                 string breedingDatesPath = Path.Combine(context.FilesDir?.AbsolutePath, BREEDING_DATES_FILENAME);
-                if (!File.Exists(breedingDatesPath))
-                {
-                    await DownloadCsvDataAsync(context);
-                }
+                //if (!File.Exists(breedingDatesPath))
+                //{
+                //    await DownloadRemoteData(context, allMonitorData);
+                //}
                 var breedingDatesJson = File.ReadAllText(breedingDatesPath);
                 return JsonConvert.DeserializeObject<Dictionary<int, BoxPredictedDates>>(breedingDatesJson);
             }
@@ -412,7 +399,7 @@ namespace BluePenguinMonitoring.Services
                 if (string.IsNullOrEmpty(filesDir))
                     return;
 
-                var filePath = Path.Combine(filesDir, AUTO_SAVE_FILENAME);
+                var filePath = Path.Combine(filesDir, ALL_MONITOR_DATA_FILENAME);
                 if (File.Exists(filePath))
                 {
                     File.Delete(filePath);
@@ -432,7 +419,6 @@ namespace BluePenguinMonitoring.Services
                     olderBoxDatas.Add(allMonitorData[i].BoxData[boxNumber]);
             return olderBoxDatas;
         }
-
         internal static string getPersistentNotes(List<BoxData> olderBoxes)
         {
             List<string> removedLabels = new List<string>();
@@ -459,17 +445,17 @@ namespace BluePenguinMonitoring.Services
             }
             return labels.Trim();
         }
-
         internal static string GetBoxBreedingStatusString(int boxnumber, BoxData? thisBoxData, List<BoxData> olderBoxDatas)
         {
             if(olderBoxDatas.Count == 0)
                 return "";
+            int skip = 0;
             if (thisBoxData == null)
             {
                 if (olderBoxDatas.Count == 1)
                     return "";
                 thisBoxData = olderBoxDatas[0];
-                olderBoxDatas.RemoveAt(0);
+                skip = 1;
             }
 
             if (boxnumber==35)
@@ -479,7 +465,7 @@ namespace BluePenguinMonitoring.Services
             string breedingStatusString = "";
             DateTime offspringFound = thisBoxData.whenDataCollectedUtc;
             DateTime offspringNotFound = DateTime.MinValue;
-            foreach (BoxData olderBoxData in olderBoxDatas)
+            foreach (BoxData olderBoxData in olderBoxDatas.Skip(skip))
             {
                 if (olderBoxData.Eggs + olderBoxData.Chicks == 0)
                 {

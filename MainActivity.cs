@@ -670,7 +670,7 @@ namespace BluePenguinMonitoring
             return summary;
         }
         private bool _isDownloadingCsvData = false;
-        private void OnDownloadCsvClick(object? sender, EventArgs e)
+        private void OnBirdStatsClick(object? sender, EventArgs e)
         {
             if (sender is Button clickedButton && _isDownloadingCsvData == false)
             {
@@ -678,10 +678,10 @@ namespace BluePenguinMonitoring
                 clickedButton.Text = "Loading data";
                 clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.WARNING_YELLOW, 8);
 
-                _allMonitorData = _dataStorageService.requestPastMonitorDetailsFromServer(_allMonitorData);
                 _ = Task.Run(async () =>
                 {
-                    await _dataStorageService.DownloadCsvDataAsync(this);
+                    await _dataStorageService.DownloadRemoteData(this, _allMonitorData);
+                    _allMonitorData = _dataStorageService.LoadAllMonitorDataFromDisk(this);
                     _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
                     _remoteBoxData = await _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
                     _remoteBreedingDates = await _dataStorageService.loadBreedingDatesFromAppDataDir(this);
@@ -773,7 +773,7 @@ namespace BluePenguinMonitoring
             _topButtonLayout = CreateStyledButtonLayout(
                 ("Clear all", OnClearBoxesClick, UIFactory.DANGER_RED),
                 ("Clear box", OnClearBoxClick, UIFactory.WARNING_YELLOW),
-                ("Bird stats", OnDownloadCsvClick, UIFactory.PRIMARY_BLUE),
+                ("Bird stats", OnBirdStatsClick, UIFactory.PRIMARY_BLUE),
                 ("Save/Load", OnDataClick, UIFactory.SUCCESS_GREEN)
             );
             statusParams.SetMargins(0, 0, 0, 10);
@@ -1212,7 +1212,7 @@ namespace BluePenguinMonitoring
                         if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber))
                             card = CreateBoxSummaryCard(boxNumber, _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[boxNumber], boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
                         else
-                            card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber], boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
+                            card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData, boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
                         currentRow?.AddView(card);
                         visibleBoxCount++;
                     }
@@ -1238,7 +1238,7 @@ namespace BluePenguinMonitoring
                         if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber))
                             card = CreateBoxSummaryCard(boxNumber, _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[boxNumber], boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
                         else
-                            card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData[boxNumber], boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
+                            card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData, boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
                         currentRow?.AddView(card);
                         visibleBoxCount++;
                     }
@@ -1262,7 +1262,7 @@ namespace BluePenguinMonitoring
             }
             return DateTime.MinValue;
         }
-        private View? CreateBoxRemoteSummaryCard(int boxNumber, BoxRemoteData thisBoxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
+        private View? CreateBoxRemoteSummaryCard(int boxNumber, Dictionary<int, BoxRemoteData>? _remoteBoxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
         {
             var card = new LinearLayout(this)
             {
@@ -1286,14 +1286,21 @@ namespace BluePenguinMonitoring
 
             var summary = new TextView(this)
             {
-                Text = (olderBoxDatas == null || olderBoxDatas.Count < 1) ? thisBoxData.boxMiniStatus(-1, -1) : thisBoxData.boxMiniStatus(olderBoxDatas.First().Eggs, olderBoxDatas.First().Chicks),
+                Text = "",
                 Gravity = GravityFlags.Center,
                 TextSize = 14
             };
+            if (olderBoxDatas != null && olderBoxDatas.Count > 0)
+            {
+                string st = $"({string.Concat(Enumerable.Repeat("🥚", olderBoxDatas.First().Eggs))}" +
+                $"{string.Concat(Enumerable.Repeat("🐣", olderBoxDatas.First().Chicks))})\n";
+                st = st.Replace("()", "").Trim();
+                summary.Text += st;
+            }
             summary.Text += !nrfPercentageString.StartsWith("0") ? $" (NRF:{nrfPercentageString})" : "";
             string persistentNotes = DataStorageService.getPersistentNotes(olderBoxDatas);
             summary.Text += !string.IsNullOrEmpty(persistentNotes) ? $" ({persistentNotes})" : "";
-            if (_remoteBreedingDates.ContainsKey(boxNumber))
+            if (_remoteBreedingDates != null && _remoteBreedingDates.ContainsKey(boxNumber))
             {
                 summary.Text += "\nB:" + _remoteBreedingDates[boxNumber].breedingDateStatus();
             }
@@ -1616,7 +1623,7 @@ namespace BluePenguinMonitoring
                         _dataCardTitleText.Text = $"Box {_currentBox}";
 
                     _boxSavedTimeTextView.Text = _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) ?
-                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy\nHH:mm") : "";
+                        _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy\nHH:mm") : "";
                     _boxSavedTimeTextView.SetTextColor(Color.Black);
                     _boxSavedTimeTextView.Gravity = GravityFlags.Right;
 
@@ -2532,7 +2539,7 @@ namespace BluePenguinMonitoring
                 }
 
                 // Load main app data
-                _allMonitorData = _dataStorageService.LoadFromAppDataDir(internalPath);
+                _allMonitorData = _dataStorageService.LoadAllMonitorDataFromDisk(this);
                 if (_allMonitorData != null)
                 {
                     Toast.MakeText(this, $"📱 Data restored...", ToastLength.Short)?.Show();
@@ -2551,7 +2558,7 @@ namespace BluePenguinMonitoring
         }
         private void SaveToAppDataDir(bool reportHome = true)
         {
-            _dataStorageService.SaveDataToInternalStorage(FilesDir?.AbsolutePath ?? "", _allMonitorData, this, reportHome: reportHome);
+            DataStorageService.SaveAllMonitorDataToDisk(this, _allMonitorData,  reportHome: reportHome);
         }
         private void triggerAlertAsync()
         {
