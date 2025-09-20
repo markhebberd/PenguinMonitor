@@ -318,7 +318,7 @@ namespace BluePenguinMonitoring.Services
                 File.Delete(tempFile);
                 File.WriteAllText(tempFile, appSettingsJson);
                 AppSettings g = JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(tempFile));
-                if (g.IsBlueToothEnabled != null && g.VisiblePages != null)
+                if (g.IsBlueToothEnabled != null)
                 {
                     File.Move(tempFile, saveTo, true);
                     return;

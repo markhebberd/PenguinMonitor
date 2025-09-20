@@ -125,7 +125,7 @@ namespace BluePenguinMonitoring
         private MediaPlayer? _alertMediaPlayer;
 
         //Lazy versioning.
-        private static string version = "37.3";
+        private static string version = "37.4";
         private static int numberMonitorBoxes = 150;
 
         //multibox View
@@ -859,6 +859,7 @@ namespace BluePenguinMonitoring
 
             //Create Multi box view card
             _multiBoxViewCard = _uiFactory.CreateCard();
+            _multiBoxViewCard.Visibility = ViewStates.Visible;
 
             parentLinearLayout.AddView(_singleBoxDataOuterLayout);
             parentLinearLayout.AddView(_multiBoxViewCard);
@@ -1416,11 +1417,13 @@ namespace BluePenguinMonitoring
         }
         private void createSettingsCard()
         {
-            _settingsCard = _uiFactory.CreateCard();
+            _settingsCard = _uiFactory.CreateCard(borderWidth:8);
+            _settingsCard.Visibility = ViewStates.Gone;
 
             TextView versionText = new TextView(this)
             {
                 Text = "Version: " + version
+                , Gravity = GravityFlags.CenterHorizontal
             };
             versionText.SetTextColor(Color.Black);
             _settingsCard.AddView(versionText);
@@ -1559,15 +1562,6 @@ namespace BluePenguinMonitoring
                     SetEnabledRecursive(_gotoNextMonitor, newerAvailable, newerAvailable ? 1.0f : 0.5f);
                     SetEnabledRecursive(_showLatestMonitorButton, newerAvailable, newerAvailable ? 1.0f : 0.5f);
 
-                    // Allow multiple pages visible at once
-                    bool showSingle = _appSettings.VisiblePages.Contains(UIFactory.selectedPage.BoxDataSingle);
-                    bool showSettings = _appSettings.VisiblePages.Contains(UIFactory.selectedPage.Settings);
-                    bool showOverview = _appSettings.VisiblePages.Contains(UIFactory.selectedPage.BoxOverview);
-
-                    _singleBoxDataOuterLayout.Visibility = showSingle ? ViewStates.Visible : ViewStates.Gone;
-                    _settingsCard.Visibility = showSettings ? ViewStates.Visible : ViewStates.Gone;
-                    _multiBoxViewCard.Visibility = showOverview ? ViewStates.Visible : ViewStates.Gone;
-
                     // update settings card
                     _setTimeActiveSessionCheckBox.Checked = _appSettings.ActiveSessionTimeStampActive;
 
@@ -1688,11 +1682,7 @@ namespace BluePenguinMonitoring
                         var child = _singleBoxDataOuterLayout.GetChildAt(i);
                         SetEnabledRecursive(child, !_isBoxLocked, _isBoxLocked ? 0.8f : 1.0f);
                     }
-
-                    if (showOverview)
-                    {
-                        createMultiBoxViewCard();
-                    }
+                    createMultiBoxViewCard();
                 });
         }
         private bool dataCardHasZeroData()
@@ -1710,6 +1700,7 @@ namespace BluePenguinMonitoring
         private void CreateBoxDataCard()
         {
             _singleBoxDataOuterLayout = _uiFactory.CreateCard();
+            _singleBoxDataOuterLayout.Visibility = ViewStates.Visible;
 
             // Horizontal layout for lock icon + box title
             _singleBoxDataTitleLayout = new LinearLayout(this)
@@ -2918,7 +2909,6 @@ namespace BluePenguinMonitoring
         {
             if (targetBox == _currentBox)
             {
-                _singleBoxDataContentLayout.Visibility = ViewStates.Visible;
                 Toast.MakeText(this, $"Already at Box {_currentBox}", ToastLength.Short)?.Show();
                 return;
             }
@@ -2927,8 +2917,6 @@ namespace BluePenguinMonitoring
                 Toast.MakeText(this, $"Cannot change box while current box is unlocked.", ToastLength.Short)?.Show();
                 return;
             }
-            if (!_appSettings.VisiblePages.Contains(UIFactory.selectedPage.BoxDataSingle))
-                _appSettings.AddVisiblePage(UIFactory.selectedPage.BoxDataSingle);
             _currentBox = targetBox;
             _singleBoxDataContentLayout.Visibility = ViewStates.Visible;
             DrawPageLayouts();
