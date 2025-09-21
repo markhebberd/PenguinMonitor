@@ -42,13 +42,12 @@ namespace BluePenguinMonitoring.Services
                 };
                 bw.RunWorkerCompleted += (sender, e) =>
                 {
-
+                    //Toast.MakeText(this, "Response from Penguin server: " + response, ToastLength.Long)?.Show();
                 };
                 bw.RunWorkerAsync();
             }
             catch { }
         }
-
         public static Dictionary<int, MonitorDetails> requestPastMonitorDetailsFromServer(Dictionary<int, MonitorDetails> _allMonitorData)
         {
             try
@@ -58,7 +57,7 @@ namespace BluePenguinMonitoring.Services
                 _allMonitorData.Add(0, temp);
 
                 string response = "No Response";
-                response = Backend.RequestServerResponse("PenguinRequest-Saved");
+                response = Backend.RequestServerResponse("PenguinRequest-Saved:");
                 
                 foreach (string json in response.Split("~~~~", StringSplitOptions.RemoveEmptyEntries))
                 {   
@@ -410,7 +409,6 @@ namespace BluePenguinMonitoring.Services
                 System.Diagnostics.Debug.WriteLine($"Failed to clear auto-save file: {ex.Message}");
             }
         }
-
         internal static List<BoxData> getOlderBoxDatas(Dictionary<int, MonitorDetails> allMonitorData, int currentlyVisibleMonitor, int boxNumber)
         {
             List<BoxData> olderBoxDatas = new List<BoxData>();

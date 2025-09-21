@@ -125,7 +125,7 @@ namespace BluePenguinMonitoring
         private MediaPlayer? _alertMediaPlayer;
 
         //Lazy versioning.
-        private static string version = "37.4";
+        private static string version = "5";
         private static int numberMonitorBoxes = 150;
 
         //multibox View
@@ -301,7 +301,7 @@ namespace BluePenguinMonitoring
         private void OnEidDataReceived(string eidData)
         {
             if (eidData.Length != 15)
-                return;
+                new Handler(Looper.MainLooper).Post(() => Toast.MakeText(this, "EID length " + eidData.Length + ", '" + eidData + "'", ToastLength.Long)?.Show());
             AddScannedId(eidData, 0);
             _isBoxLocked = false;
             DrawPageLayouts();
@@ -1230,7 +1230,7 @@ namespace BluePenguinMonitoring
             }
             if (visibleBoxCount == 0)
             {
-                var empty = new TextView(this) { Text = "No boxes yet — scan or load data." };
+                var empty = new TextView(this) { Text = "No boxes to show." };
                 _multiBoxViewCard.AddView(empty);
             }
         }
@@ -1417,13 +1417,14 @@ namespace BluePenguinMonitoring
         }
         private void createSettingsCard()
         {
-            _settingsCard = _uiFactory.CreateCard(borderWidth:8);
+            _settingsCard = _uiFactory.CreateCard(borderWidth: 8);
             _settingsCard.Visibility = ViewStates.Gone;
 
             TextView versionText = new TextView(this)
             {
                 Text = "Version: " + version
-                , Gravity = GravityFlags.CenterHorizontal
+                ,
+                Gravity = GravityFlags.CenterHorizontal
             };
             versionText.SetTextColor(Color.Black);
             _settingsCard.AddView(versionText);
@@ -1489,6 +1490,11 @@ namespace BluePenguinMonitoring
                 DrawPageLayouts();
             };
             _settingsCard.AddView(_setTimeActiveSessionCheckBox);
+
+            Button toggleOverview = _uiFactory.CreateStyledButton("Toggle overview visibility", UIFactory.PRIMARY_BLUE);
+            toggleOverview.Click += (s, e) => _multiBoxViewCard.Visibility = _multiBoxViewCard.Visibility.Equals(ViewStates.Visible) ? ViewStates.Gone : ViewStates.Visible;
+            _settingsCard.AddView(toggleOverview);
+
         }
         private void OnScrollViewTouch(object? sender, View.TouchEventArgs e)
         {
