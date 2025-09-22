@@ -301,7 +301,7 @@ namespace BluePenguinMonitoring
         private void OnEidDataReceived(string eidData)
         {
             if (eidData.Length != 15)
-                new Handler(Looper.MainLooper).Post(() => Toast.MakeText(this, "EID length " + eidData.Length + ", '" + eidData + "'", ToastLength.Long)?.Show());
+                ;// new Handler(Looper.MainLooper).Post(() => Toast.MakeText(this, "EID length " + eidData.Length + ", '" + eidData + "'", ToastLength.Long)?.Show());
             AddScannedId(eidData, 0);
             _isBoxLocked = false;
             DrawPageLayouts();
@@ -534,11 +534,7 @@ namespace BluePenguinMonitoring
                                 Chicks = dataNode["Chicks"]?.Value<int>() ?? 0,
                                 GateStatus = (dataNode["GateStatus"]?.Value<string>() ?? "").Replace("gate up", "Gate up").Replace("regate", "Regate"),
                                 Notes = dataNode["Notes"]?.Value<string>() ?? "",
-                                whenDataCollectedUtc = DateTime.TryParseExact(dataNode["whenDataCollectedUtc"]?.Value<string>() ?? "",
-                                "yyyy-MM-ddTHH:mm:ssZ",
-                                System.Globalization.CultureInfo.InvariantCulture,
-                                System.Globalization.DateTimeStyles.RoundtripKind,
-                                out DateTime whenCollected) ? whenCollected.ToUniversalTime() : DateTime.MinValue.ToUniversalTime(),
+                                whenDataCollectedUtc = dataNode["whenDataCollectedUtc"]?.Value<DateTime>().ToUniversalTime() ?? DateTime.MinValue.ToUniversalTime()
                             };
                             // Load scanned IDs
                             var scannedIdsNode = dataNode["ScannedIds"];
@@ -549,7 +545,7 @@ namespace BluePenguinMonitoring
                                     var scanRecord = new ScanRecord
                                     {
                                         BirdId = scanItem?["BirdId"]?.Value<string>() ?? "",
-                                        Timestamp = scanItem?["Timestamp"]?.Value<DateTime>() ?? DateTime.UtcNow,
+                                        Timestamp = scanItem?["Timestamp"]?.Value<DateTime>() ?? DateTime.MinValue.ToUniversalTime(),
                                         Latitude = scanItem?["Latitude"]?.Value<double>() ?? 0,
                                         Longitude = scanItem?["Longitude"]?.Value<double>() ?? 0,
                                         Accuracy = scanItem?["Accuracy"]?.Value<float>() ?? -1
@@ -573,7 +569,6 @@ namespace BluePenguinMonitoring
                     {
                         int boxNumber = int.Parse(boxItem.Key);
                         var dataNode = boxItem.Value;
-
                         var boxData = new BoxData
                         {
                             Adults = dataNode["Adults"]?.Value<int>() ?? 0,
@@ -581,11 +576,7 @@ namespace BluePenguinMonitoring
                             Chicks = dataNode["Chicks"]?.Value<int>() ?? 0,
                             GateStatus = (dataNode["GateStatus"]?.Value<string>() ?? "").Replace("gate up", "Gate up").Replace("regate", "Regate"),
                             Notes = dataNode["Notes"]?.Value<string>() ?? "",
-                            whenDataCollectedUtc = DateTime.TryParseExact(dataNode["whenDataCollectedUtc"]?.Value<string>() ?? "",
-                                "yyyy-MM-ddTHH:mm:ssZ",
-                                System.Globalization.CultureInfo.InvariantCulture,
-                                System.Globalization.DateTimeStyles.RoundtripKind,
-                                out DateTime whenCollected) ? whenCollected.ToUniversalTime() : DateTime.MinValue.ToUniversalTime(),
+                            whenDataCollectedUtc = dataNode["whenDataCollectedUtc"]?.Value<DateTime>().ToUniversalTime() ?? DateTime.MinValue.ToUniversalTime(),
                         };
                         // Load scanned IDs
                         var scannedIdsNode = dataNode["ScannedIds"];
@@ -601,7 +592,6 @@ namespace BluePenguinMonitoring
                                     Longitude = scanItem?["Longitude"]?.Value<double>() ?? 0,
                                     Accuracy = scanItem?["Accuracy"]?.Value<float>() ?? -1
                                 };
-
                                 boxData.ScannedIds.Add(scanRecord);
                                 birdCount++;
                             }
@@ -673,30 +663,37 @@ namespace BluePenguinMonitoring
         private bool _isDownloadingCsvData = false;
         private void OnBirdStatsClick(object? sender, EventArgs e)
         {
-            if (sender is Button clickedButton && _isDownloadingCsvData == false)
+            if (_isDownloadingCsvData == false)
             {
                 _isDownloadingCsvData = true;
-                clickedButton.Text = "Loading data";
-                clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.WARNING_YELLOW, 8);
-
-                _ = Task.Run(async () =>
+                for (int i = 0; i < _topButtonLayout.ChildCount; i++)
                 {
-                    await _dataStorageService.DownloadRemoteData(this, _allMonitorData);
-                    _allMonitorData = _dataStorageService.LoadAllMonitorDataFromDisk(this);
-                    _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
-                    _remoteBoxData = await _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
-                    _remoteBreedingDates = await _dataStorageService.loadBreedingDatesFromAppDataDir(this);
-                    new Handler(Looper.MainLooper).Post(() =>
+                    Button child = (Button)_topButtonLayout.GetChildAt(i);
+                    SetEnabledRecursive(child, _isBoxLocked, _isBoxLocked ? 1.0f : 0.5f);
+                    if (child.Text.Equals("Bird stats"))
                     {
-                        _isDownloadingCsvData = false;
-                        clickedButton.Text = "Bird Stats";
-                        clickedButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_BLUE, 8);
-                        if (!_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
-                            _appSettings.CurrentlyVisibleMonitor = 0;
-                        SaveToAppDataDir(false);
-                        DrawPageLayouts();
-                    });
-                });
+                        child.Text = "Loading data";
+                        child.Background = _uiFactory.CreateRoundedBackground(UIFactory.WARNING_YELLOW, 8);
+                        _ = Task.Run(async () =>
+                        {
+                            await _dataStorageService.DownloadRemoteData(this, _allMonitorData);
+                            _allMonitorData = _dataStorageService.LoadAllMonitorDataFromDisk(this);
+                            _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
+                            _remoteBoxData = await _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
+                            _remoteBreedingDates = await _dataStorageService.loadBreedingDatesFromAppDataDir(this);
+                            new Handler(Looper.MainLooper).Post(() =>
+                            {
+                                _isDownloadingCsvData = false;
+                                child.Text = "Bird stats";
+                                child.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_BLUE, 8);
+                                if (!_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
+                                    _appSettings.CurrentlyVisibleMonitor = 0;
+                                SaveToAppDataDir(false);
+                                DrawPageLayouts();
+                            });
+                        });
+                    }
+                }
             }
         }
         private void CreateUI()
@@ -1659,9 +1656,9 @@ namespace BluePenguinMonitoring
                     {
                         Button child = (Button) _topButtonLayout.GetChildAt(i);
                         SetEnabledRecursive(child, _isBoxLocked, _isBoxLocked ? 1.0f : 0.5f);
-                        if ((child.Text.Equals("Clear All") || child.Text.Equals("Delete")))
+                        if ((child.Text.Equals("Clear all") || child.Text.Equals("Delete")))
                         {
-                            child.Text = _appSettings.CurrentlyVisibleMonitor == 0 ? "Clear All":"Delete" ;
+                            child.Text = _appSettings.CurrentlyVisibleMonitor == 0 ? "Clear all":"Delete" ;
                             if (!_isBoxLocked || _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Count == 0)
                                 SetEnabledRecursive(child, false, 0.5f); 
                         }
@@ -2021,7 +2018,7 @@ namespace BluePenguinMonitoring
                 }),
                 ("No", () => { } ));
         }
-        private void OnClearBoxesClick(object? sender, EventArgs e)
+        private void OnClearBoxesClick(object? s, EventArgs e)
         {
             if (_appSettings.CurrentlyVisibleMonitor==0)
             {
@@ -2046,11 +2043,9 @@ namespace BluePenguinMonitoring
                     "Are you sure you want to set this monitor to be ignored on Marks server? (NOT IMPLEMENTED)",
                     ("Yes, flag monitor to be ignored", new Action(() =>
                     {
-                        //_allMonitorData[0].BoxData.Clear();  //by design this only clears the current monitor.
-                        //_currentBox = 1;
-                        //ClearInternalStorageData();
-                        //SaveToAppDataDir();
-                        //DrawPageLayouts();
+                        string response = Backend.RequestServerResponse("DeletePenguinMonitor:" + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename + "~~~~" + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved.ToUniversalTime());
+                        Toast.MakeText(this, "Response regarding json deletion: " + response, ToastLength.Short);
+                        OnBirdStatsClick(s, e);
                     })),
                     ("Cancel", new Action(() => { }))
                 );
