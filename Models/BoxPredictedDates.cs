@@ -47,7 +47,7 @@
             }
             if (expectedDate > today)
             {
-                return " in " + Math.Ceiling((expectedDate - today).TotalDays) + " days";
+                return " " + Math.Ceiling((expectedDate - today).TotalDays) + " days";
             }
             return " " + Math.Ceiling((today - expectedDate).TotalDays) + " days ago";
         }

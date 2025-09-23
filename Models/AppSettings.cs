@@ -25,6 +25,19 @@ namespace BluePenguinMonitoring.Models
         {
             this.filesDir = filesDir;
         }
+        public string boxSetsString;
+        public string BoxSetsString
+        {
+            get => boxSetsString;
+            set
+            {
+                if (boxSetsString != value)
+                {
+                    boxSetsString = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
         private bool isBluetoothEnabled;
         public bool IsBlueToothEnabled
         {

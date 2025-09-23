@@ -893,7 +893,7 @@ namespace BluePenguinMonitoring
 
             TextView multiBoxTitle = new TextView(this)
             {
-                Text = "Box Overview",
+                Text = "Overview",
                 TextSize = 30,
                 Gravity = GravityFlags.Left
             };
@@ -914,7 +914,7 @@ namespace BluePenguinMonitoring
             if (_appSettings.CurrentlyVisibleMonitor == 0)
                 timeTV.Text = "Data is local only";
             else
-                timeTV.Text = _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) ? _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename : "";
+                timeTV.Text = _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) ? _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename.Replace("PenguinMonitor", "").Trim() : "";
 
             bool timeFound = false;
             if (_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
@@ -1484,8 +1484,10 @@ namespace BluePenguinMonitoring
                     _appSettings.ActiveSessionLocalTimeStamp.Day);
                     datePicker.Show();
                 }
+
                 DrawPageLayouts();
             };
+
             _settingsCard.AddView(_setTimeActiveSessionCheckBox);
 
             Button toggleOverview = _uiFactory.CreateStyledButton("Toggle overview visibility", UIFactory.PRIMARY_BLUE);
@@ -1832,7 +1834,7 @@ namespace BluePenguinMonitoring
             var adultsLabel = _uiFactory.CreateDataLabel("Adults");
             var eggsLabel = _uiFactory.CreateDataLabel("Eggs");
             var chicksLabel = _uiFactory.CreateDataLabel("Chicks");
-            var breedingChance = _uiFactory.CreateDataLabel("Breeding %");
+            var breedingChance = _uiFactory.CreateDataLabel("Confidence");
             var gateLabel = _uiFactory.CreateDataLabel("Gate");
 
             headingsLayout.AddView(adultsLabel);
@@ -2040,7 +2042,7 @@ namespace BluePenguinMonitoring
             {
                 ShowConfirmationDialog(
                     "Delete monitoring data",
-                    "Are you sure you want to set this monitor to be ignored on Marks server? (NOT IMPLEMENTED)",
+                    "Are you sure you want to set this monitor to be ignored on Marks server?",
                     ("Yes, flag monitor to be ignored", new Action(() =>
                     {
                         string response = Backend.RequestServerResponse("DeletePenguinMonitor:" + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename + "~~~~" + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved.ToUniversalTime());

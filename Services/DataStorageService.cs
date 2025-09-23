@@ -378,10 +378,6 @@ namespace BluePenguinMonitoring.Services
             try
             {
                 string breedingDatesPath = Path.Combine(context.FilesDir?.AbsolutePath, BREEDING_DATES_FILENAME);
-                //if (!File.Exists(breedingDatesPath))
-                //{
-                //    await DownloadRemoteData(context, allMonitorData);
-                //}
                 var breedingDatesJson = File.ReadAllText(breedingDatesPath);
                 return JsonConvert.DeserializeObject<Dictionary<int, BoxPredictedDates>>(breedingDatesJson);
             }
@@ -448,57 +444,54 @@ namespace BluePenguinMonitoring.Services
             if(olderBoxDatas.Count == 0)
                 return "";
             int skip = 0;
-            if (thisBoxData == null)
+            if (thisBoxData == null) // iterate only using olderboxdatas
             {
                 if (olderBoxDatas.Count == 1)
                     return "";
                 thisBoxData = olderBoxDatas[0];
                 skip = 1;
             }
-
-            if (boxnumber==35)
-                    ;
+            if (boxnumber == 49)
+                ;
             if (thisBoxData == null || thisBoxData.Eggs + thisBoxData.Chicks == 0 || olderBoxDatas == null || olderBoxDatas.Count==0)
                 return "";
             string breedingStatusString = "";
-            DateTime offspringFound = thisBoxData.whenDataCollectedUtc;
-            DateTime offspringNotFound = DateTime.MinValue;
+            DateTime whenOffspringFound = thisBoxData.whenDataCollectedUtc.ToLocalTime().Date;
+            DateTime whenOffspringNotFound = DateTime.MinValue;
             foreach (BoxData olderBoxData in olderBoxDatas.Skip(skip))
             {
                 if (olderBoxData.Eggs + olderBoxData.Chicks == 0)
                 {
-                    offspringNotFound = olderBoxData.whenDataCollectedUtc;
-                    DateTime probableLaidDate = offspringNotFound + (offspringFound - offspringNotFound) / 2;
-                    int daysSinceLaid = (int)(DateTime.UtcNow - probableLaidDate).TotalDays;
-                    return breedingDateStatus(daysSinceLaid);
+                    if (thisBoxData.Eggs > 1) //in case of multiple eggs, assume first one was laid 2 days before found
+                        whenOffspringFound = whenOffspringFound.AddDays(-2);
+                    whenOffspringNotFound = olderBoxData.whenDataCollectedUtc.ToLocalTime().Date;
+                    TimeSpan uncertainty = (whenOffspringFound - whenOffspringNotFound)/2;
+                    DateTime probableLaidDate = whenOffspringNotFound.AddDays(Math.Ceiling(uncertainty.TotalDays));
+                    int daysSinceLaid = (int)(DateTime.UtcNow.ToLocalTime().Date - probableLaidDate).TotalDays;
+                    return breedingDateStatus(daysSinceLaid) + (uncertainty.TotalDays > 1 ? " ±" + (int)uncertainty.TotalDays : "");
                 }
-                offspringFound = olderBoxData.whenDataCollectedUtc;
+                whenOffspringFound = olderBoxData.whenDataCollectedUtc;
             }
             return "";
         }
         public static string breedingDateStatus(int daysSinceLaid)
         {
-            try
-            {
-                DateTime estHatch = DateTime.Today.AddDays(37 - daysSinceLaid);
-                if (estHatch.AddDays(3) >= DateTime.Today)
-                    return "Hatch" + getDateString(estHatch);
+            DateTime estHatch = DateTime.Today.AddDays(38 - daysSinceLaid);
+            if (estHatch.AddDays(3) >= DateTime.Today)
+                return "Hatch" + getDateString(estHatch);
 
-                DateTime estPG = DateTime.Today.AddDays(51 - daysSinceLaid);
-                if (estPG.AddDays(3) >= DateTime.Today)
-                    return "PG" + getDateString(estPG);
+            DateTime estPG = DateTime.Today.AddDays(52 - daysSinceLaid);
+            if (estPG.AddDays(3) >= DateTime.Today)
+                return "PG" + getDateString(estPG);
 
-                DateTime chipStart = DateTime.Today.AddDays(79 - daysSinceLaid);
-                if (chipStart.AddDays(3) >= DateTime.Today)
-                    return "Chip" + getDateString(chipStart);
+            DateTime chipStart = DateTime.Today.AddDays(80 - daysSinceLaid);
+            if (chipStart.AddDays(3) >= DateTime.Today)
+                return "Chip" + getDateString(chipStart);
 
-                DateTime estFledge = DateTime.Today.AddDays(86 - daysSinceLaid);
+            DateTime estFledge = DateTime.Today.AddDays(87 - daysSinceLaid);
+            if (estFledge.AddDays(3) >= DateTime.Today)
                 return "Fledge" + getDateString(estFledge);
-            }
-            catch
-            {
-                return "Error calc breed dates";
-            }
+            return "Fail detecting laid date?";
         }
         private static string getDateString(DateTime expectedDate)
         {
@@ -517,7 +510,7 @@ namespace BluePenguinMonitoring.Services
             }
             if (expectedDate > today)
             {
-                return " in " + Math.Ceiling((expectedDate - today).TotalDays) + " days";
+                return " " + Math.Ceiling((expectedDate - today).TotalDays) + " days";
             }
             return " " + Math.Ceiling((today - expectedDate).TotalDays) + " days ago";
         }
