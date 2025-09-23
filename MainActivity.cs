@@ -2090,38 +2090,21 @@ namespace BluePenguinMonitoring
             if (adults > 2) highValues.Add(("adults", adults));
             if (eggs > 2) highValues.Add(("eggs", eggs));
             if (chicks > 2) highValues.Add(("chicks", chicks));
+            if (chicks + eggs > 2 && eggs > 0 && chicks > 0) highValues.Add(("eggs & chicks", chicks + eggs));
 
             if (highValues.Count > 0)
             {
-                ShowHighValueConfirmationDialog(highValues);
+                var message = "Are you sure you have found:\n\n";
+                foreach (var (type, count) in highValues)
+                    message += $"• {count} {type}\n";
+                message += "\nPlease check this is correct.";
+                ShowConfirmationDialog(
+                    "High Value Confirmation",
+                    message,
+                    ("OK", () =>{}),
+                   null
+                );
             }
-        }
-        private void ShowHighValueConfirmationDialog(List<(string type, int count)> highValues)
-        {
-            _isProcessingConfirmation = true;
-
-            var message = "Are you sure you have found:\n\n";
-            foreach (var (type, count) in highValues)
-            {
-                message += $"• {count} {type}\n";
-            }
-            message += "\nThis is a high count. Please confirm this is correct.";
-
-            ShowConfirmationDialog(
-                "High Value Confirmation",
-                message,
-                ("Yes, Correct", () =>
-                {
-                    _isProcessingConfirmation = false;
-                }
-            ),
-                ("No, Let me fix", () =>
-                {
-                    _isProcessingConfirmation = false;
-                    // Don't save, let user modify the values
-                }
-            )
-            );
         }
         private void SaveCurrentBoxData()
         {
