@@ -18,6 +18,7 @@ using BluePenguinMonitoring.Services;
 using BluePenguinMonitoring.UI.Factories;
 using BluePenguinMonitoring.UI.Gestures;
 using BluePenguinMonitoring.UI.Utils;
+using Dalvik.Annotation.Optimization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SmtpAuthenticator;
@@ -621,21 +622,14 @@ namespace BluePenguinMonitoring
         private void ShowBoxDataSummary(int selectedMonitor)
         {
             if (_allMonitorData[selectedMonitor].BoxData.Count == 0)
-            {
-                Toast.MakeText(this, "No box data to display", ToastLength.Short)?.Show();
-                return;
-            }
-
-            string summary = GetMonitorSummaryText(selectedMonitor);
-
-            ShowConfirmationDialog(
-                "📊 Data summary",
-                summary,
-                ("OK", () => { }
-            )
-            );
+                Toast.MakeText(this, "No boxes with data", ToastLength.Short)?.Show();
+            else
+                ShowConfirmationDialog(
+                    "📊 Data summary",
+                    GetMonitorSummaryText(selectedMonitor),
+                    ("OK", () => { }),
+                    null);
         }
-
         private string GetMonitorSummaryText(int selectedMonitor)
         {
             var totalScannedBirds = _allMonitorData[selectedMonitor].BoxData.Values.Sum(box => box.ScannedIds.Count);
@@ -669,9 +663,9 @@ namespace BluePenguinMonitoring
                 for (int i = 0; i < _topButtonLayout.ChildCount; i++)
                 {
                     Button child = (Button)_topButtonLayout.GetChildAt(i);
-                    SetEnabledRecursive(child, _isBoxLocked, _isBoxLocked ? 1.0f : 0.5f);
                     if (child.Text.Equals("Bird stats"))
                     {
+                        SetEnabledRecursive(child, false, 0.5f);
                         child.Text = "Loading data";
                         child.Background = _uiFactory.CreateRoundedBackground(UIFactory.WARNING_YELLOW, 8);
                         _ = Task.Run(async () =>
@@ -690,6 +684,7 @@ namespace BluePenguinMonitoring
                                     _appSettings.CurrentlyVisibleMonitor = 0;
                                 SaveToAppDataDir(false);
                                 DrawPageLayouts();
+                                SetEnabledRecursive(child, true, 1.0f);
                             });
                         });
                     }
@@ -2011,7 +2006,7 @@ namespace BluePenguinMonitoring
         {
             ShowConfirmationDialog(
                 "Clear Box Data",
-                "Are you sure you want to clear data for box " + _currentBox + "?",
+                "Clear data for box " + _currentBox + "?",
                 ("Yes", () =>
                 {
                     _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Remove(_currentBox);
@@ -2026,7 +2021,7 @@ namespace BluePenguinMonitoring
             {
                 ShowConfirmationDialog(
                     "Clear all data",
-                    "Are you sure you want to clear data for ALL boxes? This cannot be undone!",
+                    "Clear data for all boxes?",
                     ("Yes, clear all", new Action(() =>
                     {
                         _allMonitorData[0].BoxData.Clear();
@@ -2038,12 +2033,12 @@ namespace BluePenguinMonitoring
                     ("Cancel", new Action(() => { }))
                 );
             }
-            else
+            else //looking at an old monitor on the server. 
             {
                 ShowConfirmationDialog(
                     "Delete monitoring data",
-                    "Are you sure you want to set this monitor to be ignored on Marks server?",
-                    ("Yes, flag monitor to be ignored", new Action(() =>
+                    "Set this monitor to be ignored on the server?",
+                    ("Yes, flag to be ignored", new Action(() =>
                     {
                         string response = Backend.RequestServerResponse("DeletePenguinMonitor:" + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename + "~~~~" + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved.ToUniversalTime());
                         Toast.MakeText(this, "Response regarding json deletion: " + response, ToastLength.Short);
@@ -2055,24 +2050,17 @@ namespace BluePenguinMonitoring
         }
         private void OnSaveDataClick(object? sender, EventArgs e)
         {
-            ShowSaveConfirmation();
-        }
-        private void ShowSaveConfirmation()
-        {
             var alertDialog = new AlertDialog.Builder(this)
                 .SetTitle("Save data")
                 .SetMessage(GetMonitorSummaryText(0))
                 .SetPositiveButton("Save", (s, e) => ShowSaveFilenameDialog())
-                .SetNeutralButton("Save & upload", (s,e)=> ShowSaveFilenameDialog(true))
+                .SetNeutralButton("Save & upload", (s, e) => ShowSaveFilenameDialog(true))
                 .SetNegativeButton("Cancel", (s, e) => { })
                 .SetCancelable(true)
                 .Create();
-
             alertDialog?.Show();
-
-
         }
-        private void ShowConfirmationDialog(string title, string message, (string text, Action action) positiveButton)
+        private void ShowConfirmationDialog(string title, string message, (string text, Action action) positiveButton, (string text, Action action)? negativeButton = null)
         {
             var alertDialog = new AlertDialog.Builder(this)
                 .SetTitle(title)
@@ -2080,19 +2068,8 @@ namespace BluePenguinMonitoring
                 .SetPositiveButton(positiveButton.text, (s, e) => positiveButton.action())
                 .SetCancelable(true)
                 .Create();
-
-            alertDialog?.Show();
-        }
-        private void ShowConfirmationDialog(string title, string message, (string text, Action action) positiveButton, (string text, Action action) negativeButton)
-        {
-            var alertDialog = new AlertDialog.Builder(this)
-                .SetTitle(title)
-                .SetMessage(message)
-                .SetPositiveButton(positiveButton.text, (s, e) => positiveButton.action())
-                .SetNegativeButton(negativeButton.text, (s, e) => negativeButton.action())
-                .SetCancelable(true)
-                .Create();
-
+            if (null != negativeButton)
+                alertDialog.SetButton((int)DialogButtonType.Negative, negativeButton?.text, (s, e) => negativeButton?.action());
             alertDialog?.Show();
         }
         private void OnDataChanged(object? sender, TextChangedEventArgs e)
