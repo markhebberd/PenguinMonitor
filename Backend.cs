@@ -20,27 +20,6 @@ namespace SmtpAuthenticator
         public static int licenceServerPort = 8080;
 
         internal static readonly string passphrase = "bbnmdsfhsecureafdgsadsadff";
-        private static readonly string eventSource = "SmtpAuthenticator";
-        public static void WriteToApplicationLog(string log, ErrorLevel Logtype, bool allowReportHome = true, bool forceReportHome = false)
-        {
-            Console.WriteLine(Logtype.ToString() + ": " + log);
-            if (allowReportHome && (Logtype != ErrorLevel.Information || forceReportHome))
-            {
-                try
-                {
-                    Backend.reportHome(log);
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine("Error transmitting string to Database server: String: " + log
-                            + Environment.NewLine + e);
-                }
-            }
-        }
-        internal static string reportHome(string message)
-        {
-            return RequestServerResponse("report: " + Environment.MachineName + ": " + message);
-        }
         internal static string RequestServerResponse(string question)
         {
             try
@@ -48,18 +27,16 @@ namespace SmtpAuthenticator
                 using (TcpClient client = new TcpClient(licenceServerIP, licenceServerPort))
                 using (NetworkStream stream = client.GetStream())
                 {
-                    client.ReceiveTimeout = client.SendTimeout = 2000;         
+                    client.ReceiveTimeout = client.SendTimeout = 5000;         
                     using (StreamReader reader = new StreamReader(stream))
                     using (StreamWriter writer = new StreamWriter(stream))
                     {
                         writer.NewLine = "\r\n";
                         writer.AutoFlush = true;
-
                         using (RSACryptoServiceProvider RSAmine = new RSACryptoServiceProvider())
                         {
                             writer.WriteLine(Convert.ToBase64String(RSAmine.ExportParameters(false).Modulus));
                             writer.WriteLine(Convert.ToBase64String(RSAmine.ExportParameters(false).Exponent));
-
                             using (AesManaged aes = new AesManaged { KeySize = 256, Mode = CipherMode.CBC, Padding = PaddingMode.ISO10126 })
                             {
                                 aes.Key = RSAmine.Decrypt(Convert.FromBase64String(reader.ReadLine()), false);
@@ -72,6 +49,7 @@ namespace SmtpAuthenticator
                                     {
                                         cs.Write(passphrasebytes, 0, passphrasebytes.Length);
                                     }
+                                    if (ms == null) return "failed to encrypt passphrase";
                                     writer.WriteLine(Convert.ToBase64String(ms.ToArray()));
                                 }
 
@@ -105,32 +83,8 @@ namespace SmtpAuthenticator
             }
             catch (Exception e)
             {
-                WriteToApplicationLog("requestServerResponse() error on request: " + question + " " + e.ToString(), ErrorLevel.Error, allowReportHome: false);
                 return "fail";
             }
-        }
-        internal static string GetHash(string localPath)
-        {
-            if (!File.Exists(localPath))
-                return "Cannot GetHash of file that does not exist. " + localPath;
-            using (SHA1CryptoServiceProvider cryptoProvider = new SHA1CryptoServiceProvider())
-            using (FileStream fileStream = new FileStream(localPath, FileMode.Open, FileAccess.Read))
-                return BitConverter.ToString(cryptoProvider.ComputeHash(fileStream)).Replace("-", "").ToLowerInvariant();
-        }
-    }
-    public class StringComparerIgnoreCase : IEqualityComparer<string>
-    {
-        public bool Equals(string? a, string? b)
-        {
-            if(a== null && b == null)
-                return true;
-            if(a == null || b == null)
-                return false;
-            return a.ToLower().Trim().Equals(b.ToLower().Trim());
-        }
-        public int GetHashCode(string a)
-        {
-            return a.ToLower().Trim().GetHashCode();
         }
     }
 }

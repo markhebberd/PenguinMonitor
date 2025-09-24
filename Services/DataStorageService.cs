@@ -163,11 +163,11 @@ namespace BluePenguinMonitoring.Services
                             {
                                 if (response == "fail")
                                 {
-                                    Toast.MakeText(context, "Unable to incremental on Marks server.", ToastLength.Short)?.Show();
+                                    Toast.MakeText(context, "Unable to incremental on server.", ToastLength.Short)?.Show();
                                 }
                                 else
                                 {
-                                    Toast.MakeText(context, "Data was " + response + " on Marks server.", ToastLength.Short)?.Show();
+                                    Toast.MakeText(context, "Boxes " + response + " on server.", ToastLength.Short)?.Show();
                                 }
                             });
                         };

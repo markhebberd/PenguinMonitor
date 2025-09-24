@@ -2,20 +2,16 @@ TODO
 
 britta dump
 
-when eggs present = auto BR - but... leave BR, once attained, even when eggs removed (chat)
 returnee no longer chick, adult counter up one, chick counter not
 box confidence add abbreviations back in overview
 no delete content of "box confidence" when subsequently enter regate (just like notes are not deleted when regate)
 3 rows of buttons at top no good, middle row sandwiched, can "prev monitor" buttons etc be moved to under notes?
 how to enter sex for bird, via database, all pengs?
-why not add button to FILES (if name changed) "Save to server"? 
-Then Load from files is rather a "Load from device" etc
 app name = PenguinMonitor.apk
 did not alert for no sex (I think), should it have?
 enter bird ID and get everything that is known about the bird, same for box, maybe that is later db stuff though?
 soon able to scan boxes, translation to box numbers? do you want me to experiment with installing a sample box chip?
 no restriction on boxes labels (eg not only 1-150)
-There is one other item, which is quite central, we already discussed - the concept of a Watch box, maybe a simple sticky tick box?
 
 crash in date time picker
 if expected eggs/chicks incorrect by more than 3 days +- uncertainty box should be red
@@ -37,6 +33,8 @@ Box database query
 
 DONE
 
+when eggs present = auto BR - but... leave BR, once attained, even when eggs removed (chat)
+Then Load from files is rather a "Load from device" etc
 algorithm of first egg estimate when date unknown
 hatch predictions based on egg arrival. 
 NRF calculated based on egg and adult absence. 
@@ -86,6 +84,8 @@ better penguin icon
 
 FIXED BY DESIGN
 
+There is one other item, which is quite central, we already discussed - the concept of a Watch box, maybe a simple sticky tick box?
+why not add button to FILES (if name changed) "Save to server"? 
 server should clean redundant backups. 
 move should adjust the box count of the source and destination boxes
 Brittas GPS bug, accuracy 

@@ -1,4 +1,5 @@
 ﻿using Android;
+using Android.AdServices.Common;
 using Android.Animation;
 using Android.App;
 using Android.Content;
@@ -32,6 +33,7 @@ using System.Runtime.Intrinsics.Arm;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using static System.Net.Mime.MediaTypeNames;
 
@@ -126,7 +128,7 @@ namespace BluePenguinMonitoring
         private MediaPlayer? _alertMediaPlayer;
 
         //Lazy versioning.
-        private static string version = "37.5";
+        private static string version = "37.6";
         private static int numberMonitorBoxes = 150;
 
         //multibox View
@@ -2040,8 +2042,9 @@ namespace BluePenguinMonitoring
                     "Set this monitor to be ignored on the server?",
                     ("Yes, flag to be ignored", new Action(() =>
                     {
-                        string response = Backend.RequestServerResponse("DeletePenguinMonitor:" + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename + "~~~~" + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved.ToUniversalTime());
-                        Toast.MakeText(this, "Response regarding json deletion: " + response, ToastLength.Short);
+                        string question = "DeletePenguinMonitor:" + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename + "~~~~" + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved.ToFileTimeUtc();
+                        string response = Backend.RequestServerResponse(question);
+                        Toast.MakeText(this, "Server response: " + response, ToastLength.Long).Show();
                         OnBirdStatsClick(s, e);
                     })),
                     ("Cancel", new Action(() => { }))
@@ -2077,6 +2080,18 @@ namespace BluePenguinMonitoring
             if (_isProcessingConfirmation)
                 return;
             CheckForHighValueConfirmation();
+            if ((int.TryParse(_eggsEditText?[0].Text ?? "0", out int eggs) && eggs > 0) || (int.TryParse(_chicksEditText?[0].Text ?? "0", out int chicks) && chicks > 0))
+            {
+                var spinner = _breedingChanceSpinner[0];
+                for (int i = 0; i < spinner.Count; i++)
+                {
+                    if (spinner.GetItemAtPosition(i).ToString() == "BR")
+                    {
+                        spinner.SetSelection(i, true);
+                        break;
+                    }
+                }
+            }
         }
         private void CheckForHighValueConfirmation()
         {
@@ -2633,9 +2648,23 @@ namespace BluePenguinMonitoring
         }
         private void ShowSaveFilenameDialog(bool upload = false)
         {
-            var now = DateTime.UtcNow;
-            var defaultFileName = $"PenguinMonitor {now:yyMMdd HHmmss}";
-
+            var now = DateTime.Now;
+            string defaultFileName = $"PenguinMonitor {now:yyMMdd HHmmss}";            
+            if (!string.IsNullOrEmpty(_allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename))
+            {
+                if (!Regex.Match(_allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename, @"-\d\d$").Success)   // string ends with -00 or -37
+                {
+                    defaultFileName = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename + "-01";
+                }
+                else
+                {
+                    defaultFileName = Regex.Replace(_allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename, @"-(\d\d)$", match =>
+                    {
+                        int number = int.Parse(match.Groups[1].Value);
+                        return "-" + (number + 1).ToString("D2");
+                    });
+                }
+            }
             var input = new EditText(this)
             {
                 InputType = Android.Text.InputTypes.ClassText,
@@ -2645,6 +2674,7 @@ namespace BluePenguinMonitoring
             input.SetTextColor(UIFactory.TEXT_PRIMARY);
             input.SetPadding(16, 16, 16, 16);
             input.Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
+
 
             var alertDialog = new AlertDialog.Builder(this)
                 .SetTitle("Save Data File")
@@ -2940,13 +2970,11 @@ namespace BluePenguinMonitoring
             {
                 "📊 Data overview",
                 "💾 Save to file", 
-                "📂 Load from file",
-                "📂 Load from server",
+                "📂 From device",
+                "📂 Active monitor on server",
             };
-
             var builder = new AlertDialog.Builder(this);
-            builder.SetTitle("Data Options");
-            
+            builder.SetTitle("Data Options");            
             builder.SetItems(options, (sender, args) =>
             {
                 switch (args.Which)
@@ -2965,9 +2993,7 @@ namespace BluePenguinMonitoring
                         break;
                 }
             });
-
-            builder.SetNegativeButton("Cancel", (sender, args) => { });
-            
+            builder.SetNegativeButton("Cancel", (sender, args) => { });            
             var dialog = builder.Create();
             dialog?.Show();
         }
