@@ -411,6 +411,14 @@ namespace BluePenguinMonitoring.Services
             for (int i = currentlyVisibleMonitor + 1; i < allMonitorData.Count; i++)
                 if (allMonitorData[i].BoxData.ContainsKey(boxNumber))
                     olderBoxDatas.Add(allMonitorData[i].BoxData[boxNumber]);
+            string? lastBreedingStatus = null;
+            for (int i = olderBoxDatas.Count - 1; i >= 0; i--)
+            {
+                if (olderBoxDatas.ElementAt(i).BreedingChance == null)
+                    olderBoxDatas.ElementAt(i).BreedingChance = lastBreedingStatus;
+                else
+                    lastBreedingStatus = olderBoxDatas.ElementAt(i).BreedingChance;
+            }
             return olderBoxDatas;
         }
         internal static string getPersistentNotes(List<BoxData> olderBoxes)

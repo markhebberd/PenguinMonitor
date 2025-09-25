@@ -1169,54 +1169,29 @@ namespace BluePenguinMonitoring
 
                 if (olderBoxDatas.Count > 0)
                 {
-                    BoxData currentBoxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber) ? _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[boxNumber] : new BoxData();
+                    bool currentBoxDataFound = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.TryGetValue(boxNumber, out BoxData currentBoxData);
                     BoxData olderBoxData = olderBoxDatas.First();
-                    bool showBox = _appSettings.ShowAllBoxesInMultiBoxView
-                                || _appSettings.ShowBoxesWithDataInMultiBoxView && (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber))
-                                || _appSettings.ShowConfidentBoxesInMultiBoxView && (olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("CON") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON")
-                                || _appSettings.ShowPotentialBoxesInMultiBoxView && (olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("POT") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "POT")
-                                || _appSettings.ShowUnlikleyBoxesInMultiBoxView && (olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("UNL") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL")
-                                || _appSettings.ShowNoBoxesInMultiBoxView && (olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("NO") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO")
-                                || _appSettings.ShowBoxesWithNotesInMultiboxView && !String.IsNullOrWhiteSpace(currentBoxData.Notes)
-                                || _appSettings.ShowInterestingBoxesInMultiBoxView && (olderBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes))
-                                || _appSettings.ShowSingleEggBoxesInMultiboxView && (olderBoxData.Eggs == 1);
-
-                    bool hideBoxWithData = _appSettings.HideBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber);
-                    bool hideDCM = _appSettings.HideDCMInMultiBoxView && ((olderBoxData.BreedingChance!=null && olderBoxData.BreedingChance == "DCM") || _remoteBoxData[boxNumber].breedingLikelyhoodText == "DCM");
-
-                    if (showBox && !hideBoxWithData && !hideDCM)
-                    {
-                        View? card;
-                        if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber))
-                            card = CreateBoxSummaryCard(boxNumber, _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[boxNumber], boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
-                        else
-                            card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData, boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
-                        currentRow?.AddView(card);
-                        visibleBoxCount++;
-                    }
-                }
-                else //remoteBoxData (while we still need it...)
-                {
-                    BoxData currentBoxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber) ? _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[boxNumber] : new BoxData();
+                    string persistentNotes = DataStorageService.getPersistentNotes(olderBoxDatas);
                     bool showBox = _appSettings.ShowAllBoxesInMultiBoxView
                                 || _appSettings.ShowBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber)
-                                || _appSettings.ShowConfidentBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "CON"
-                                || _appSettings.ShowPotentialBoxesInMultiBoxView &&_remoteBoxData[boxNumber].breedingLikelyhoodText == "POT"
-                                || _appSettings.ShowUnlikleyBoxesInMultiBoxView &&  _remoteBoxData[boxNumber].breedingLikelyhoodText == "UNL"
-                                || _appSettings.ShowNoBoxesInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "NO"
-                                || _appSettings.ShowInterestingBoxesInMultiBoxView && (!nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(_remoteBoxData[boxNumber].PersistentNotes))
-                                || _appSettings.ShowSingleEggBoxesInMultiboxView && _remoteBoxData[boxNumber].numEggs() == 1;
+                                || _appSettings.ShowConfidentBoxesInMultiBoxView && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("CON") 
+                                || _appSettings.ShowPotentialBoxesInMultiBoxView && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("POT") 
+                                || _appSettings.ShowUnlikleyBoxesInMultiBoxView && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("UNL") 
+                                || _appSettings.ShowNoBoxesInMultiBoxView && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("NO") 
+                                || _appSettings.ShowBoxesWithNotesInMultiboxView && !String.IsNullOrWhiteSpace(currentBoxData.Notes)
+                                || _appSettings.ShowInterestingBoxesInMultiBoxView && (olderBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(persistentNotes))
+                                || _appSettings.ShowSingleEggBoxesInMultiboxView && (currentBoxData.Eggs == 1);
 
                     bool hideBoxWithData = _appSettings.HideBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber);
-                    bool hideDCM = _appSettings.HideDCMInMultiBoxView && _remoteBoxData[boxNumber].breedingLikelyhoodText == "DCM";
+                    bool hideDCM = _appSettings.HideDCMInMultiBoxView && ((olderBoxData.BreedingChance!=null && olderBoxData.BreedingChance == "DCM"));
 
                     if (showBox && !hideBoxWithData && !hideDCM)
                     {
                         View? card;
-                        if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber))
-                            card = CreateBoxSummaryCard(boxNumber, _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[boxNumber], boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
+                        if (currentBoxDataFound)
+                            card = CreateBoxSummaryCard(boxNumber, currentBoxData, boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
                         else
-                            card = CreateBoxRemoteSummaryCard(boxNumber, _remoteBoxData, boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
+                            card = CreateBoxSummaryCard(boxNumber, null, boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
                         currentRow?.AddView(card);
                         visibleBoxCount++;
                     }
@@ -1240,91 +1215,41 @@ namespace BluePenguinMonitoring
             }
             return DateTime.MinValue;
         }
-        private View? CreateBoxRemoteSummaryCard(int boxNumber, Dictionary<int, BoxRemoteData>? _remoteBoxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
+        private View? CreateBoxSummaryCard(int boxNumber, BoxData? thisBoxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
         {
-            var card = new LinearLayout(this)
+            bool currentExists = thisBoxData != null;
+            if (!currentExists)
             {
-                Orientation = Android.Widget.Orientation.Vertical
-            };
-            card.SetPadding(5, 5, 5, 5);
-            card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, UIFactory.WARNING_YELLOW, backgroundColor: selected?UIFactory.WARNING_YELLOW:null);
-
-            var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent, 1f);
-            cardParams.SetMargins(5,5,5,5);
-            card.LayoutParameters = cardParams;
-
-            var title = new TextView(this)
-            {
-                Text = $"Box {boxNumber}",
-                Gravity = GravityFlags.Center,
-                TextSize = 18
-            };
-            title.SetTypeface(Typeface.DefaultBold, TypefaceStyle.Normal);
-            title.SetTextColor(Color.Black);
-
-            var summary = new TextView(this)
-            {
-                Text = "",
-                Gravity = GravityFlags.Center,
-                TextSize = 14
-            };
-            if (olderBoxDatas != null && olderBoxDatas.Count > 0)
-            {
-                string st = $"({string.Concat(Enumerable.Repeat("🥚", olderBoxDatas.First().Eggs))}" +
-                $"{string.Concat(Enumerable.Repeat("🐣", olderBoxDatas.First().Chicks))})\n";
-                st = st.Replace("()", "").Trim();
-                summary.Text += st;
+                thisBoxData = olderBoxDatas.First();
+                olderBoxDatas.RemoveAt(0);
             }
-            summary.Text += !nrfPercentageString.StartsWith("0") ? $" (NRF:{nrfPercentageString})" : "";
-            string persistentNotes = DataStorageService.getPersistentNotes(olderBoxDatas);
-            summary.Text += !string.IsNullOrEmpty(persistentNotes) ? $" ({persistentNotes})" : "";
-            if (_remoteBreedingDates != null && _remoteBreedingDates.ContainsKey(boxNumber))
-            {
-                summary.Text += "\nB:" + _remoteBreedingDates[boxNumber].breedingDateStatus();
-            }
-            string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(boxNumber, null, olderBoxDatas);
-            if (!string.IsNullOrWhiteSpace(calculatedBreedingStatusString))
-                summary.Text += "\nM:" + calculatedBreedingStatusString;
-            summary.SetTextColor(Color.Black);
 
-            card.AddView(title);
-            card.AddView(summary);
-            card.Click += (sender, e) =>
-            {
-                JumpToBox(boxNumber);
-                ScrollToTop();
-            };
-            return card;
-        }
-        private View? CreateBoxSummaryCard(int boxNumber, BoxData thisBoxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
-        {
-            if (selected)
-            {
-                ;
-            }
-            var card = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Vertical
-            };
+            if(thisBoxData.BreedingChance == null)
+                thisBoxData.BreedingChance = _remoteBoxData[boxNumber].breedingLikelyhoodText;
+
+            var card = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             card.SetPadding(5, 5, 5, 5);
             var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent, 1f);
             cardParams.SetMargins(5, 5, 5, 5);
             card.LayoutParameters = cardParams;
-            bool gotRemoteBoxData = _remoteBoxData.TryGetValue(boxNumber, out var thisRemoteBoxData);
             bool differenceFound = false;
-            if (olderBoxDatas.Count > 0
-                && thisBoxData.Eggs + thisBoxData.Chicks < olderBoxDatas.First().Eggs + olderBoxDatas.First().Chicks)
+
+            if(selected)
+                ;
+
+            if (!currentExists)
+            {
+                card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, UIFactory.WARNING_YELLOW, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
+            }
+            else if (olderBoxDatas.Count > 0
+                && thisBoxData.Eggs + thisBoxData.Chicks < olderBoxDatas.First().Eggs + olderBoxDatas.First().Chicks
+                || thisBoxData.BreedingChance != "BR" && thisBoxData.Eggs + thisBoxData.Chicks > 0)
             {
                 differenceFound = true;
                 card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.DANGER_RED, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
             }
             else if (olderBoxDatas.Count > 0
-                && (thisBoxData.Eggs != olderBoxDatas.First().Eggs
-                || thisBoxData.Chicks != olderBoxDatas.First().Chicks
-                || olderBoxDatas.First().BreedingChance != null && olderBoxDatas.First().BreedingChance != ""
-                /*|| (olderBoxDatas.First().BreedingChance != "BR" || olderBoxDatas.First().BreedingChance != "CON") && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0) **/ )
-               
-                )
+                && (thisBoxData.Eggs != olderBoxDatas.First().Eggs || thisBoxData.Chicks != olderBoxDatas.First().Chicks))
             {
                 differenceFound = true;
                 card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.PRIMARY_BLUE, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
@@ -1353,27 +1278,29 @@ namespace BluePenguinMonitoring
             };
             if (boxNumber == 100)
                 ;
-            if (differenceFound && olderBoxDatas.Count > 0) //olderBoxDatas.Count > 0 only needed while sometimes using _remoteboxdata csv data
+            if (differenceFound ) 
             {
                 var previousChicks = olderBoxDatas.First().Chicks;
                 var previousEggs = olderBoxDatas.First().Eggs;
                 if (differenceFound && previousChicks + previousEggs > 0 && (thisBoxData.Eggs != previousEggs || thisBoxData.Chicks != previousChicks))
                     summary.Text += $"({string.Concat(Enumerable.Repeat("🥚", previousEggs))}{string.Concat(Enumerable.Repeat("🐣", previousChicks))})";
             }
+
+            if (thisBoxData.BreedingChance != "BR" || (thisBoxData.BreedingChance == "BR" && thisBoxData.Chicks + thisBoxData.Eggs == 0))
+                summary.Text += $"({thisBoxData.BreedingChance})";
+            
             if (_remoteBreedingDates.ContainsKey(boxNumber))
                 summary.Text += "\nB:" + _remoteBreedingDates[boxNumber].breedingDateStatus();
             string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(boxNumber, thisBoxData, olderBoxDatas);
             if(!string.IsNullOrWhiteSpace(calculatedBreedingStatusString))
                 summary.Text += "\nM:" + calculatedBreedingStatusString ;
-
-            if (differenceFound && thisRemoteBoxData?.breedingLikelyhoodText != "BR" && thisBoxData.Chicks + thisBoxData.Eggs + thisBoxData.Adults != 0)
-                summary.Text += $"({thisRemoteBoxData.breedingLikelyhoodText})";
+            
             summary.SetTextColor(Color.Black);
 
             string gateStatus = thisBoxData.GateStatus;
             string notes = string.IsNullOrWhiteSpace(thisBoxData.Notes) ? "" : "notes";
             string persistentNotes = DataStorageService.getPersistentNotes(olderBoxDatas);
-            notes += gotRemoteBoxData && !string.IsNullOrEmpty(persistentNotes) ? $" ({persistentNotes})" : "";
+            notes += !string.IsNullOrEmpty(persistentNotes) ? $" ({persistentNotes})" : "";
             notes += !nrfPercentageString.StartsWith("0") ? $" (NRF:{nrfPercentageString})" : "";
             string lineThreeStatusText = "";
             if (!string.IsNullOrWhiteSpace(gateStatus) && !string.IsNullOrWhiteSpace(notes))
