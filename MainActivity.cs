@@ -48,6 +48,10 @@ namespace BluePenguinMonitoring
     )]
     public class MainActivity : Activity, ILocationListener
     {
+        //Lazy versioning.
+        private static string version = "37.7";
+        private static int numberMonitorBoxes = 150;
+
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -126,10 +130,6 @@ namespace BluePenguinMonitoring
         // Vibration and sound components
         private Vibrator? _vibrator;
         private MediaPlayer? _alertMediaPlayer;
-
-        //Lazy versioning.
-        private static string version = "37.6";
-        private static int numberMonitorBoxes = 150;
 
         //multibox View
         private LinearLayout? _multiBoxViewCard;
