@@ -49,7 +49,7 @@ namespace BluePenguinMonitoring
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.7";
+        private static string version = "37.8";
         private static int numberMonitorBoxes = 150;
 
         // Bluetooth manager
@@ -1178,7 +1178,7 @@ namespace BluePenguinMonitoring
                                 || _appSettings.ShowPotentialBoxesInMultiBoxView && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("POT") 
                                 || _appSettings.ShowUnlikleyBoxesInMultiBoxView && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("UNL") 
                                 || _appSettings.ShowNoBoxesInMultiBoxView && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("NO") 
-                                || _appSettings.ShowBoxesWithNotesInMultiboxView && !String.IsNullOrWhiteSpace(currentBoxData.Notes)
+                                || _appSettings.ShowBoxesWithNotesInMultiboxView && currentBoxData != null && !String.IsNullOrWhiteSpace(currentBoxData.Notes)
                                 || _appSettings.ShowInterestingBoxesInMultiBoxView && (olderBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(persistentNotes))
                                 || _appSettings.ShowSingleEggBoxesInMultiboxView && (currentBoxData.Eggs == 1);
 
