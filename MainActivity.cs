@@ -1174,16 +1174,16 @@ namespace BluePenguinMonitoring
                     string persistentNotes = DataStorageService.getPersistentNotes(olderBoxDatas);
                     bool showBox = _appSettings.ShowAllBoxesInMultiBoxView
                                 || _appSettings.ShowBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber)
-                                || _appSettings.ShowConfidentBoxesInMultiBoxView && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("CON") 
-                                || _appSettings.ShowPotentialBoxesInMultiBoxView && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("POT") 
-                                || _appSettings.ShowUnlikleyBoxesInMultiBoxView && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("UNL") 
-                                || _appSettings.ShowNoBoxesInMultiBoxView && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("NO") 
+                                || _appSettings.ShowConfidentBoxesInMultiBoxView && olderBoxData != null && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("CON") 
+                                || _appSettings.ShowPotentialBoxesInMultiBoxView && olderBoxData != null && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("POT") 
+                                || _appSettings.ShowUnlikleyBoxesInMultiBoxView && olderBoxData != null && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("UNL") 
+                                || _appSettings.ShowNoBoxesInMultiBoxView && olderBoxData != null && olderBoxData.BreedingChance != null && olderBoxData.BreedingChance.Equals("NO") 
                                 || _appSettings.ShowBoxesWithNotesInMultiboxView && currentBoxData != null && !String.IsNullOrWhiteSpace(currentBoxData.Notes)
-                                || _appSettings.ShowInterestingBoxesInMultiBoxView && (olderBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(persistentNotes))
-                                || _appSettings.ShowSingleEggBoxesInMultiboxView && (currentBoxData.Eggs == 1);
+                                || _appSettings.ShowInterestingBoxesInMultiBoxView && olderBoxData != null && (olderBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(persistentNotes))
+                                || _appSettings.ShowSingleEggBoxesInMultiboxView && currentBoxData != null && (currentBoxData.Eggs == 1);
 
                     bool hideBoxWithData = _appSettings.HideBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber);
-                    bool hideDCM = _appSettings.HideDCMInMultiBoxView && ((olderBoxData.BreedingChance!=null && olderBoxData.BreedingChance == "DCM"));
+                    bool hideDCM = _appSettings.HideDCMInMultiBoxView && olderBoxData != null && ((olderBoxData.BreedingChance!=null && olderBoxData.BreedingChance == "DCM"));
 
                     if (showBox && !hideBoxWithData && !hideDCM)
                     {
