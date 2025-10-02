@@ -25,7 +25,7 @@ namespace BluePenguinMonitoring.Models
         {
             this.filesDir = filesDir;
         }
-        public string boxSetsString;
+        private string boxSetsString;
         public string BoxSetsString
         {
             get => boxSetsString;
@@ -142,6 +142,19 @@ namespace BluePenguinMonitoring.Models
                 }
             }
         }
+        private bool showBreedingBoxesInMultiBoxView;
+        public bool ShowBreedingBoxesInMultiBoxView 
+        { 
+            get => showBreedingBoxesInMultiBoxView;
+            set
+            {
+                if (showBreedingBoxesInMultiBoxView != value)
+                {
+                    showBreedingBoxesInMultiBoxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
         internal bool showBoxesWithNotesInMultiboxView;
         public bool ShowBoxesWithNotesInMultiboxView
         {
@@ -242,6 +255,18 @@ namespace BluePenguinMonitoring.Models
                 if (activeSessionTimeStampActive != value)
                 {
                     activeSessionTimeStampActive = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool hideBeforeCurrentInMultiBoxView;
+        public bool HideBeforeCurrentInMultiBoxView {
+            get => hideBeforeCurrentInMultiBoxView;
+            set
+            {
+                if (hideBeforeCurrentInMultiBoxView != value)
+                {
+                    hideBeforeCurrentInMultiBoxView = value;
                     OnAnyPropertyChanged();
                 }
             }

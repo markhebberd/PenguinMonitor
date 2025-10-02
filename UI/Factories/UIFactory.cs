@@ -132,7 +132,7 @@ namespace BluePenguinMonitoring.UI.Factories
 
             return editText;
         }
-        public Spinner CreateGateStatusSpinner()
+        public Spinner CreateSpinner(string[] options)
         {
             var spinner = new Spinner(_context);
             spinner.SetPadding(16, 20, 16, 20);
@@ -142,14 +142,9 @@ namespace BluePenguinMonitoring.UI.Factories
             var spinnerParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             spinnerParams.SetMargins(4, 0, 4, 0);
             spinner.LayoutParameters = spinnerParams;
-
-            // Create options with actual values (empty string, "gate up", "regate")
-            // but display custom text in dropdown for the first option
-            var gateStatusOptions = new string[] { "", "Gate up", "Regate" };
-            var adapter = new CustomSpinnerAdapter(_context, Android.Resource.Layout.SimpleSpinnerItem, gateStatusOptions);
+            var adapter = new CustomSpinnerAdapter(_context, Android.Resource.Layout.SimpleSpinnerItem, options);
             adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
             spinner.Adapter = adapter;
-
             return spinner;
         }
         private class CustomSpinnerAdapter : ArrayAdapter<string>
