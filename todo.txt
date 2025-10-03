@@ -1,8 +1,10 @@
 TODO
 
+filename should be blank unless already saved. 
 Add text field to delete a monitor
 Show difference between current and previous monitor.
 The app should be able to sort by next relevant date. IE show the next chicks that need chipping
+it was chipped more than 3 month ago its definitely an adult
 
 britta dump
 
@@ -23,7 +25,6 @@ previous data    LAST BOX INSPECTION: Date and Hour #PEC, Notes, Gate status, Pe
 check alert for bird without sex assigned. 
 data summary should show count of new eggs and new chicks. 
 update spanner icons & settings spanner  <-- hamburger menu top right ?
-if numChicks + numEggs ever > 2 alert. 
 Save to file > Saved, when allData[0] matches allData[1]
 penguin reporting under specific name to seperate britta from alternate locations
 Penguin database query, clicking on a scan entry should 
@@ -36,6 +37,8 @@ Box database query
 
 DONE
 
+move monitor navigation buttons under box filters. 
+
 37.9
 Hide lower than current box. 
 Show all Breeding boxes
@@ -45,6 +48,7 @@ DCM selection to bottom
 Remove blank breeding confidence
 Navigate monitor buttons between single and multi box views
 
+if numChicks + numEggs ever > 2 alert. 
 box confidence add abbreviations back in overview
 when eggs present = auto BR - but... leave BR, once attained, even when eggs removed (chat)
 Then Load from files is rather a "Load from device" etc

@@ -25,15 +25,28 @@ namespace BluePenguinMonitoring.Models
         {
             this.filesDir = filesDir;
         }
-        private string boxSetsString;
-        public string BoxSetsString
+        private string allBoxSetsString;
+        public string AllBoxSetsString
         {
-            get => boxSetsString;
+            get => allBoxSetsString;
             set
             {
-                if (boxSetsString != value)
+                if (allBoxSetsString != value)
                 {
-                    boxSetsString = value;
+                    allBoxSetsString = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private string boxSetString;
+        public string BoxSetString
+        {
+            get => boxSetString;
+            set
+            {
+                if (boxSetString != value)
+                {
+                    boxSetString = value;
                     OnAnyPropertyChanged();
                 }
             }

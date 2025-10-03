@@ -373,13 +373,13 @@ namespace BluePenguinMonitoring.Services
                 return null;
             }
         }
-        public async Task<Dictionary<int, BoxPredictedDates>?> loadBreedingDatesFromAppDataDir(Android.Content.Context? context)
+        public async Task<Dictionary<string, BoxPredictedDates>?> loadBreedingDatesFromAppDataDir(Android.Content.Context? context)
         {
             try
             {
                 string breedingDatesPath = Path.Combine(context.FilesDir?.AbsolutePath, BREEDING_DATES_FILENAME);
                 var breedingDatesJson = File.ReadAllText(breedingDatesPath);
-                return JsonConvert.DeserializeObject<Dictionary<int, BoxPredictedDates>>(breedingDatesJson);
+                return JsonConvert.DeserializeObject<Dictionary<string, BoxPredictedDates>>(breedingDatesJson);
             }
             catch (Exception ex)
             {
@@ -405,12 +405,12 @@ namespace BluePenguinMonitoring.Services
                 System.Diagnostics.Debug.WriteLine($"Failed to clear auto-save file: {ex.Message}");
             }
         }
-        internal static List<BoxData> getOlderBoxDatas(Dictionary<int, MonitorDetails> allMonitorData, int currentlyVisibleMonitor, int boxNumber)
+        internal static List<BoxData> getOlderBoxDatas(Dictionary<int, MonitorDetails> allMonitorData, int currentlyVisibleMonitor, string boxName)
         {
             List<BoxData> olderBoxDatas = new List<BoxData>();
             for (int i = currentlyVisibleMonitor + 1; i < allMonitorData.Count; i++)
-                if (allMonitorData[i].BoxData.ContainsKey(boxNumber))
-                    olderBoxDatas.Add(allMonitorData[i].BoxData[boxNumber]);
+                if (allMonitorData[i].BoxData.ContainsKey(boxName))
+                    olderBoxDatas.Add(allMonitorData[i].BoxData[boxName]);
             string? lastBreedingStatus = null;
             for (int i = olderBoxDatas.Count - 1; i >= 0; i--)
             {
@@ -447,7 +447,7 @@ namespace BluePenguinMonitoring.Services
             }
             return labels.Trim();
         }
-        internal static string GetBoxBreedingStatusString(int boxnumber, BoxData? thisBoxData, List<BoxData> olderBoxDatas)
+        internal static string GetBoxBreedingStatusString(string boxName, BoxData? thisBoxData, List<BoxData> olderBoxDatas)
         {
             if(olderBoxDatas.Count == 0)
                 return "";
@@ -459,7 +459,7 @@ namespace BluePenguinMonitoring.Services
                 thisBoxData = olderBoxDatas[0];
                 skip = 1;
             }
-            if (boxnumber == 49)
+            if (boxName == "49")
                 ;
             if (thisBoxData == null || thisBoxData.Eggs + thisBoxData.Chicks == 0 || olderBoxDatas == null || olderBoxDatas.Count==0)
                 return "";

@@ -35,7 +35,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace BluePenguinMonitoring
 {
@@ -50,8 +49,6 @@ namespace BluePenguinMonitoring
     {
         //Lazy versioning.
         private static string version = "37.9";
-        private static int numberMonitorBoxes = 150;
-
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -80,6 +77,7 @@ namespace BluePenguinMonitoring
         private TextView? _interestingBoxTextView;
         private CheckBox _setTimeActiveSessionCheckBox;
         private TextView _boxSavedTimeTextView;
+        private Spinner _boxSetSelector;
 
         // Single box data 
         private bool _isBoxLocked;
@@ -118,15 +116,16 @@ namespace BluePenguinMonitoring
         private DataStorageService _dataStorageService = new DataStorageService();
 
         // Data storage
+        private int _currentBoxIndex = 1;
+        private string _currentBoxName = "";
+        private Dictionary<string, int> _boxNamesAndIndexes;
         Dictionary<int, MonitorDetails> _allMonitorData = new Dictionary<int, MonitorDetails>();
         private AppSettings _appSettings;
         private Dictionary<string, PenguinData>? _remotePenguinData ;
-        private Dictionary<int, BoxRemoteData>? _remoteBoxData;
-        private Dictionary<int, BoxPredictedDates>? _remoteBreedingDates;
-        private int _currentBox = 1;
+        private Dictionary<string, BoxPredictedDates>? _remoteBreedingDates;
 
         // High value confirmation tracking - reset on each entry
-        private DateTime startedProcessingBoxSetsString;
+        private DateTime doNotDisplayBefore;
 
         // Vibration and sound components
         private Vibrator? _vibrator;
@@ -277,9 +276,9 @@ namespace BluePenguinMonitoring
                 Toast.MakeText(this, "Please lock the current box before navigating", ToastLength.Short)?.Show();
                 return;
             }
-            if (_currentBox > 1)
+            if (_currentBoxIndex > 1)
             {
-                NavigateToBox(_currentBox - 1, () => _currentBox > 1);
+                NavigateToBox(_currentBoxIndex - 1, () => _currentBoxIndex > 1);
             }
             else
             {
@@ -293,9 +292,9 @@ namespace BluePenguinMonitoring
                 Toast.MakeText(this, "Please lock the current box before navigating", ToastLength.Short)?.Show();
                 return;
             }
-            if (_currentBox < numberMonitorBoxes)
+            if (_currentBoxIndex < _boxNamesAndIndexes.Count)
             {
-                NavigateToBox(_currentBox + 1, () => _currentBox < numberMonitorBoxes);
+                NavigateToBox(_currentBoxIndex + 1, () => _currentBoxIndex < _boxNamesAndIndexes.Count);
             }
             else
             {
@@ -520,58 +519,14 @@ namespace BluePenguinMonitoring
                     Toast.MakeText(this, "❌ Invalid JSON file format", ToastLength.Long)?.Show();
                     return;
                 }
-                // Open *.json style export. 
-                if (loadedData["Boxes"] != null)
-                {
-                    _allMonitorData[0].BoxData.Clear();
-                    foreach (var boxItem in loadedData["Boxes"])
-                    {
-                        var boxNumber = boxItem?["BoxNumber"]?.Value<int>() ?? 0;
-                        var dataNode = boxItem?["Data"];
-
-                        if (boxNumber > 0 && dataNode != null)
-                        {
-                            var boxData = new BoxData
-                            {
-                                Adults = dataNode["Adults"]?.Value<int>() ?? 0,
-                                Eggs = dataNode["Eggs"]?.Value<int>() ?? 0,
-                                Chicks = dataNode["Chicks"]?.Value<int>() ?? 0,
-                                GateStatus = (dataNode["GateStatus"]?.Value<string>() ?? "").Replace("gate up", "Gate up").Replace("regate", "Regate"),
-                                Notes = dataNode["Notes"]?.Value<string>() ?? "",
-                                whenDataCollectedUtc = dataNode["whenDataCollectedUtc"]?.Value<DateTime>().ToUniversalTime() ?? DateTime.MinValue.ToUniversalTime()
-                            };
-                            // Load scanned IDs
-                            var scannedIdsNode = dataNode["ScannedIds"];
-                            if (scannedIdsNode != null)
-                            {
-                                foreach (var scanItem in scannedIdsNode)
-                                {
-                                    var scanRecord = new ScanRecord
-                                    {
-                                        BirdId = scanItem?["BirdId"]?.Value<string>() ?? "",
-                                        Timestamp = scanItem?["Timestamp"]?.Value<DateTime>() ?? DateTime.MinValue.ToUniversalTime(),
-                                        Latitude = scanItem?["Latitude"]?.Value<double>() ?? 0,
-                                        Longitude = scanItem?["Longitude"]?.Value<double>() ?? 0,
-                                        Accuracy = scanItem?["Accuracy"]?.Value<float>() ?? -1
-                                    };
-
-                                    boxData.ScannedIds.Add(scanRecord);
-                                    birdCount++;
-                                }
-                            }
-                            _allMonitorData[0].BoxData[boxNumber] = boxData;
-                            boxCount++;
-                        }
-                    }
-                }
-                else if (loadedData["BoxData"] != null)
+                if (loadedData["BoxData"] != null)
                 {
                     _allMonitorData[0].BoxData.Clear();
                     
                     var boxDatas = loadedData["BoxData"] as JObject;
                     foreach (var boxItem in boxDatas)
                     {
-                        int boxNumber = int.Parse(boxItem.Key);
+                        string boxName = boxItem.Key;
                         var dataNode = boxItem.Value;
                         var boxData = new BoxData
                         {
@@ -600,7 +555,7 @@ namespace BluePenguinMonitoring
                                 birdCount++;
                             }
                         }
-                        _allMonitorData[0].BoxData[boxNumber] = boxData;
+                        _allMonitorData[0].BoxData[boxName] = boxData;
                         boxCount++;
                     }
                 }
@@ -678,7 +633,6 @@ namespace BluePenguinMonitoring
                         await _dataStorageService.DownloadRemoteData(this, _allMonitorData);
                         _allMonitorData = _dataStorageService.LoadAllMonitorDataFromDisk(this);
                         _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
-                        _remoteBoxData = await _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
                         _remoteBreedingDates = await _dataStorageService.loadBreedingDatesFromAppDataDir(this);
                         new Handler(Looper.MainLooper).Post(() =>
                         {
@@ -697,6 +651,10 @@ namespace BluePenguinMonitoring
         }
         private void CreateUI()
         {
+            // Create box sets dictionary
+            CreateBoxSetsDictionary();
+
+
             _uiFactory = new UIFactory(this);
             selectedPage = UIFactory.selectedPage.BoxDataSingle;
             _isBoxLocked = true;
@@ -816,7 +774,176 @@ namespace BluePenguinMonitoring
             SetContentView(_rootScrollView);
 
             _rootScrollView.SetOnApplyWindowInsetsListener(new ViewInsetsListener());
-        }       
+        }
+        /// <summary>
+        /// designed to create _boxNamesAndIndexes to map box names to indexes which can be used 
+        /// to navigate boxes
+        /// 
+        /// example 1 BoxSetString value: {1-150,AA-AC}
+        /// example 2 BoxSetString value: {N1-N6}
+        /// example 3 BoxSetString value: {1-150,AA-AC},{N1-N6}
+        /// </summary>
+        private void CreateBoxSetsDictionary()
+        {
+            _boxNamesAndIndexes = new Dictionary<string, int>();
+            if (!string.IsNullOrWhiteSpace(_appSettings.AllBoxSetsString))
+            {
+                _boxNamesAndIndexes.Clear();
+                int currentIndex = 1;
+
+                foreach (string boxSetString in _appSettings.AllBoxSetsString.Split(new string[] { "}{", "},{" }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    // Remove curly braces
+                    string cleanedSet = boxSetString.Trim('{', '}');
+
+                    foreach (string boxSetPart in cleanedSet.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        string trimmedPart = boxSetPart.Trim();
+
+                        if (trimmedPart.Contains('-'))
+                        {
+                            // Handle ranges like "1-150", "AA-AC", "N1-N6"
+                            var rangeParts = trimmedPart.Split('-');
+                            if (rangeParts.Length == 2)
+                            {
+                                string start = rangeParts[0].Trim();
+                                string end = rangeParts[1].Trim();
+
+                                // Check if it's a numeric range (e.g., "1-150")
+                                if (int.TryParse(start, out int startNum) && int.TryParse(end, out int endNum))
+                                {
+                                    for (int i = startNum; i <= endNum; i++)
+                                    {
+                                        _boxNamesAndIndexes[i.ToString()] = currentIndex++;
+                                    }
+                                }
+                                else
+                                {
+                                    // Handle alphanumeric ranges (e.g., "AA-AC", "N1-N6")
+                                    var expandedRange = ExpandAlphanumericRange(start, end);
+                                    foreach (string boxName in expandedRange)
+                                    {
+                                        _boxNamesAndIndexes[boxName] = currentIndex++;
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Single box name/number
+                            _boxNamesAndIndexes[trimmedPart] = currentIndex++;
+                        }
+                    }
+                }
+            }
+
+            if (_boxNamesAndIndexes.Count == 0)
+                _boxNamesAndIndexes.Add("1", 1);
+        }
+
+        /// <summary>
+        /// Expands alphanumeric ranges like "AA-AC" or "N1-N6"
+        /// </summary>
+        private List<string> ExpandAlphanumericRange(string start, string end)
+        {
+            var result = new List<string>();
+
+            // Extract prefix and numeric suffix
+            var startMatch = Regex.Match(start, @"^([A-Za-z]*)(\d*)$");
+            var endMatch = Regex.Match(end, @"^([A-Za-z]*)(\d*)$");
+
+            if (!startMatch.Success || !endMatch.Success)
+            {
+                // If pattern doesn't match, just add both as individual items
+                result.Add(start);
+                result.Add(end);
+                return result;
+            }
+
+            string startPrefix = startMatch.Groups[1].Value;
+            string endPrefix = endMatch.Groups[1].Value;
+            string startNumStr = startMatch.Groups[2].Value;
+            string endNumStr = endMatch.Groups[2].Value;
+
+            // Case 1: Pure alphabetic range (e.g., "AA-AC")
+            if (string.IsNullOrEmpty(startNumStr) && string.IsNullOrEmpty(endNumStr) &&
+                startPrefix.Length == endPrefix.Length)
+            {
+                result.AddRange(ExpandAlphabeticRange(startPrefix, endPrefix));
+            }
+            // Case 2: Same prefix with numeric range (e.g., "N1-N6")
+            else if (startPrefix == endPrefix &&
+                     int.TryParse(startNumStr, out int startNum) &&
+                     int.TryParse(endNumStr, out int endNum))
+            {
+                for (int i = startNum; i <= endNum; i++)
+                {
+                    result.Add(startPrefix + i.ToString());
+                }
+            }
+            else
+            {
+                // Fallback: add both as individual items
+                result.Add(start);
+                result.Add(end);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Expands purely alphabetic ranges like "AA-AC"
+        /// </summary>
+        private List<string> ExpandAlphabeticRange(string start, string end)
+        {
+            var result = new List<string>();
+
+            if (start.Length != end.Length)
+            {
+                result.Add(start);
+                result.Add(end);
+                return result;
+            }
+
+            // Convert to base-26 numbers for easier iteration
+            int startValue = AlphaToNumber(start);
+            int endValue = AlphaToNumber(end);
+
+            for (int i = startValue; i <= endValue; i++)
+            {
+                result.Add(NumberToAlpha(i, start.Length));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Convert alphabetic string to number (A=0, B=1, ..., Z=25, AA=26, etc.)
+        /// </summary>
+        private int AlphaToNumber(string alpha)
+        {
+            int result = 0;
+            for (int i = 0; i < alpha.Length; i++)
+            {
+                result = result * 26 + (char.ToUpper(alpha[i]) - 'A');
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Convert number back to alphabetic string of specified length
+        /// </summary>
+        private string NumberToAlpha(int number, int length)
+        {
+            string result = "";
+            for (int i = 0; i < length; i++)
+            {
+                result = (char)('A' + (number % 26)) + result;
+                number /= 26;
+            }
+            return result;
+        }
+
         private void createMultiBoxViewCard()
         {
             _multiBoxViewCard.RemoveAllViews();
@@ -896,51 +1023,6 @@ namespace BluePenguinMonitoring
 
 
             LinearLayout overviewFiltersLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
-
-            //Navigate Monitors
-            var browseOtherMonitorsLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
-            var navigationButtonLayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
-            navigationButtonLayoutParameters.SetMargins(8, 16, 8, 16);
-
-            _gotoPreviousMonitor = _uiFactory.CreateStyledButton("← Prev monitor", UIFactory.PRIMARY_BLUE);
-            _gotoPreviousMonitor.LayoutParameters = navigationButtonLayoutParameters;
-            _gotoPreviousMonitor.Click += (s, e) =>
-            {
-                if (_appSettings.CurrentlyVisibleMonitor < _allMonitorData.Count - 1)
-                    _appSettings.CurrentlyVisibleMonitor++;
-                _appSettings.CurrentlyVisibleMonitor = Math.Min(_appSettings.CurrentlyVisibleMonitor, _allMonitorData.Count - 1);
-                _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
-                _appSettings.ActiveSessionTimeStampActive = true;
-                DrawPageLayouts();
-            };
-            browseOtherMonitorsLayout.AddView(_gotoPreviousMonitor);
-
-            _gotoNextMonitor = _uiFactory.CreateStyledButton("Next monitor →", UIFactory.PRIMARY_BLUE);
-            _gotoNextMonitor.LayoutParameters = navigationButtonLayoutParameters;
-            _gotoNextMonitor.Click += (s, e) =>
-            {
-                if (_appSettings.CurrentlyVisibleMonitor > 0)
-                    _appSettings.CurrentlyVisibleMonitor--;
-                _appSettings.CurrentlyVisibleMonitor = Math.Max(_appSettings.CurrentlyVisibleMonitor, 0);
-                if (_appSettings.CurrentlyVisibleMonitor != 0 && _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
-                    _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
-                else
-                    _appSettings.ActiveSessionTimeStampActive = false;
-                DrawPageLayouts();
-            };
-            browseOtherMonitorsLayout.AddView(_gotoNextMonitor);
-
-            _showLatestMonitorButton = _uiFactory.CreateStyledButton("Latest →|", UIFactory.PRIMARY_BLUE);
-            _showLatestMonitorButton.LayoutParameters = navigationButtonLayoutParameters;
-            _showLatestMonitorButton.Click += (s, e) =>
-            {
-                _appSettings.CurrentlyVisibleMonitor = 0;
-                _appSettings.ActiveSessionTimeStampActive = false;
-                DrawPageLayouts();
-            };
-            browseOtherMonitorsLayout.AddView(_showLatestMonitorButton);
-
-            overviewFiltersLayout.AddView(browseOtherMonitorsLayout);
 
             TextView showBoxesTitle = new TextView(this)
             {
@@ -1041,7 +1123,6 @@ namespace BluePenguinMonitoring
             };
             breedingChanceFilterLayout.AddView(showConfidentBoxesInMultiboxView);
 
-
             CheckBox showBreedingBoxesInMultiboxView = new CheckBox(this)
             {
                 Text = "BR",
@@ -1055,15 +1136,9 @@ namespace BluePenguinMonitoring
                 DrawPageLayouts();
             };
             breedingChanceFilterLayout.AddView(showBreedingBoxesInMultiboxView);
-
-
             overviewFiltersLayout.AddView(breedingChanceFilterLayout);
 
-            var specialBoxFilterLayout = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Horizontal
-            };
-
+            var specialBoxFilterLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
 
             CheckBox showBoxesWithNotesInMultiboxView = new CheckBox(this)
             {
@@ -1164,9 +1239,53 @@ namespace BluePenguinMonitoring
                 DrawPageLayouts();
             };
             hideBoxesLayout.AddView(hideBeforeCurrentCheckbox);
-
-
             overviewFiltersLayout.AddView(hideBoxesLayout);
+
+            //Navigate Monitors
+            var browseOtherMonitorsLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
+            var navigationButtonLayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
+            navigationButtonLayoutParameters.SetMargins(8, 16, 8, 16);
+
+            _gotoPreviousMonitor = _uiFactory.CreateStyledButton("← Prev monitor", UIFactory.PRIMARY_BLUE);
+            _gotoPreviousMonitor.LayoutParameters = navigationButtonLayoutParameters;
+            _gotoPreviousMonitor.Click += (s, e) =>
+            {
+                if (_appSettings.CurrentlyVisibleMonitor < _allMonitorData.Count - 1)
+                    _appSettings.CurrentlyVisibleMonitor++;
+                _appSettings.CurrentlyVisibleMonitor = Math.Min(_appSettings.CurrentlyVisibleMonitor, _allMonitorData.Count - 1);
+                _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
+                _appSettings.ActiveSessionTimeStampActive = true;
+                DrawPageLayouts();
+            };
+            browseOtherMonitorsLayout.AddView(_gotoPreviousMonitor);
+
+            _gotoNextMonitor = _uiFactory.CreateStyledButton("Next monitor →", UIFactory.PRIMARY_BLUE);
+            _gotoNextMonitor.LayoutParameters = navigationButtonLayoutParameters;
+            _gotoNextMonitor.Click += (s, e) =>
+            {
+                if (_appSettings.CurrentlyVisibleMonitor > 0)
+                    _appSettings.CurrentlyVisibleMonitor--;
+                _appSettings.CurrentlyVisibleMonitor = Math.Max(_appSettings.CurrentlyVisibleMonitor, 0);
+                if (_appSettings.CurrentlyVisibleMonitor != 0 && _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
+                    _appSettings.ActiveSessionLocalTimeStamp = getLocalDateTime(_allMonitorData[_appSettings.CurrentlyVisibleMonitor]);
+                else
+                    _appSettings.ActiveSessionTimeStampActive = false;
+                DrawPageLayouts();
+            };
+            browseOtherMonitorsLayout.AddView(_gotoNextMonitor);
+
+            _showLatestMonitorButton = _uiFactory.CreateStyledButton("Latest →|", UIFactory.PRIMARY_BLUE);
+            _showLatestMonitorButton.LayoutParameters = navigationButtonLayoutParameters;
+            _showLatestMonitorButton.Click += (s, e) =>
+            {
+                _appSettings.CurrentlyVisibleMonitor = 0;
+                _appSettings.ActiveSessionTimeStampActive = false;
+                DrawPageLayouts();
+            };
+            browseOtherMonitorsLayout.AddView(_showLatestMonitorButton);
+
+            overviewFiltersLayout.AddView(browseOtherMonitorsLayout);
+
             OverviewHeaderCard.AddView(overviewFiltersLayout);
             _multiBoxViewCard.AddView(OverviewHeaderCard);
 
@@ -1176,7 +1295,7 @@ namespace BluePenguinMonitoring
             LinearLayout? currentRow = null;
 
             int visibleBoxCount = 0;
-            for (int boxNumber = 1; boxNumber <= numberMonitorBoxes; boxNumber++)
+            foreach (string boxName in _boxNamesAndIndexes.Keys)
             {
                 if (visibleBoxCount % boxesPerRow == 0)
                 {
@@ -1194,9 +1313,9 @@ namespace BluePenguinMonitoring
 
                     _multiBoxViewCard.AddView(currentRow);
                 }
-                var olderBoxDatas = DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, boxNumber);
+                var olderBoxDatas = DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, boxName);
                 string nrfPercentageString = olderBoxDatas.Count > 0 && olderBoxDatas.First().Eggs > 0 ? olderBoxDatas.Count(x => x.Adults == 0 && x.Eggs > 0) + "/" + olderBoxDatas.Count(x => x.Eggs > 0) : "0";
-                if (boxNumber == 92)
+                if (boxName == "92")
                     ;
 
                 BoxData mostRecentBoxData = new BoxData();
@@ -1204,13 +1323,13 @@ namespace BluePenguinMonitoring
                 if (olderBoxDatas.Count > 0)
                     mostRecentBoxData = olderBoxDatas.First();
 
-                bool currentBoxDataFound = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.TryGetValue(boxNumber, out BoxData currentBoxData);
+                bool currentBoxDataFound = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.TryGetValue(boxName, out BoxData currentBoxData);
                 if (currentBoxDataFound && currentBoxData != null)
                     mostRecentBoxData = currentBoxData;
                 
                 string persistentNotes = DataStorageService.getPersistentNotes(olderBoxDatas);
                 bool showBox = _appSettings.ShowAllBoxesInMultiBoxView
-                            || _appSettings.ShowBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber)
+                            || _appSettings.ShowBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxName)
                             || _appSettings.ShowBreedingBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("BR")
                             || _appSettings.ShowConfidentBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("CON")
                             || _appSettings.ShowPotentialBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("POT")
@@ -1220,17 +1339,17 @@ namespace BluePenguinMonitoring
                             || _appSettings.ShowInterestingBoxesInMultiBoxView && (mostRecentBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(persistentNotes))
                             || _appSettings.ShowSingleEggBoxesInMultiboxView && (mostRecentBoxData.Eggs == 1);
 
-                bool hideBoxWithData = _appSettings.HideBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxNumber);
+                bool hideBoxWithData = _appSettings.HideBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxName);
                 bool hideDCM = _appSettings.HideDCMInMultiBoxView && ((mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance == "DCM"));
-                bool hideBeforeCurrent = _appSettings.HideBeforeCurrentInMultiBoxView && _currentBox > boxNumber;
+                bool hideBeforeCurrent = _appSettings.HideBeforeCurrentInMultiBoxView && _currentBoxIndex > _boxNamesAndIndexes[boxName];
 
                 if (showBox && !hideBoxWithData && !hideDCM && !hideBeforeCurrent)
                 {
                     View? card;
                     if (currentBoxDataFound)
-                        card = CreateBoxSummaryCard(boxNumber, currentBoxData, boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
+                        card = CreateBoxSummaryCard(boxName, currentBoxData, _boxNamesAndIndexes[boxName] == _currentBoxIndex, olderBoxDatas, nrfPercentageString);
                     else
-                        card = CreateBoxSummaryCard(boxNumber, null, boxNumber == _currentBox, olderBoxDatas, nrfPercentageString);
+                        card = CreateBoxSummaryCard(boxName, null, _boxNamesAndIndexes[boxName] == _currentBoxIndex, olderBoxDatas, nrfPercentageString);
                     currentRow?.AddView(card);
                     visibleBoxCount++;
                 }
@@ -1254,7 +1373,7 @@ namespace BluePenguinMonitoring
             }
             return DateTime.MinValue;
         }
-        private View? CreateBoxSummaryCard(int boxNumber, BoxData? thisBoxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
+        private View? CreateBoxSummaryCard(string boxName, BoxData? thisBoxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
         {
             bool currentExists = thisBoxData != null;
             if (!currentExists)
@@ -1263,9 +1382,6 @@ namespace BluePenguinMonitoring
                 olderBoxDatas.RemoveAt(0);
             }
 
-            if(thisBoxData.BreedingChance == null)
-                thisBoxData.BreedingChance = _remoteBoxData[boxNumber].breedingLikelyhoodText;
-
             var card = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             card.SetPadding(5, 5, 5, 5);
             var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent, 1f);
@@ -1273,7 +1389,7 @@ namespace BluePenguinMonitoring
             card.LayoutParameters = cardParams;
             bool differenceFound = false;
 
-            if(selected)
+            if (selected)
                 ;
 
             if (!currentExists)
@@ -1281,10 +1397,13 @@ namespace BluePenguinMonitoring
                 card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, UIFactory.WARNING_YELLOW, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
             }
             else if (olderBoxDatas.Count > 0
-                && thisBoxData.Eggs + thisBoxData.Chicks < olderBoxDatas.First().Eggs + olderBoxDatas.First().Chicks
-                || thisBoxData.BreedingChance != "BR" && thisBoxData.Eggs + thisBoxData.Chicks > 0)
+                && thisBoxData.Eggs + thisBoxData.Chicks < olderBoxDatas.First().Eggs + olderBoxDatas.First().Chicks)
             {
                 differenceFound = true;
+                card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.DANGER_RED, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
+            }
+            else if (thisBoxData.BreedingChance != "BR" && thisBoxData.Eggs + thisBoxData.Chicks > 0)
+            {
                 card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.DANGER_RED, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
             }
             else if (olderBoxDatas.Count > 0
@@ -1300,7 +1419,7 @@ namespace BluePenguinMonitoring
 
             var title = new TextView(this)
             {
-                Text = $"Box {boxNumber}",
+                Text = $"Box {boxName}",
                 Gravity = GravityFlags.Center,
                 TextSize = 18
             };
@@ -1315,7 +1434,7 @@ namespace BluePenguinMonitoring
                 Gravity = GravityFlags.Center,
                 TextSize = 14
             };
-            if (boxNumber == 100)
+            if (boxName == "100")
                 ;
             if (differenceFound ) 
             {
@@ -1328,9 +1447,9 @@ namespace BluePenguinMonitoring
             if (thisBoxData.BreedingChance != "BR" || (thisBoxData.BreedingChance == "BR" && thisBoxData.Chicks + thisBoxData.Eggs == 0))
                 summary.Text += $"({thisBoxData.BreedingChance})";
             
-            if (_remoteBreedingDates.ContainsKey(boxNumber))
-                summary.Text += "\nB:" + _remoteBreedingDates[boxNumber].breedingDateStatus();
-            string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(boxNumber, thisBoxData, olderBoxDatas);
+            if (_remoteBreedingDates.ContainsKey(boxName))
+                summary.Text += "\nB:" + _remoteBreedingDates[boxName].breedingDateStatus();
+            string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(boxName, thisBoxData, olderBoxDatas);
             if(!string.IsNullOrWhiteSpace(calculatedBreedingStatusString))
                 summary.Text += "\nM:" + calculatedBreedingStatusString ;
             
@@ -1359,7 +1478,7 @@ namespace BluePenguinMonitoring
             if(!string.IsNullOrEmpty(gate_and_notes.Text)) card.AddView(gate_and_notes);
             card.Click += (sender, e) =>
             {
-                JumpToBox(boxNumber);
+                JumpToBox(boxName);
                 ScrollToTop();
             };
             return card;
@@ -1473,7 +1592,7 @@ namespace BluePenguinMonitoring
                 Hint = "{1-150,AA-AC}{N1-N6}...",
                 Gravity = Android.Views.GravityFlags.Top | Android.Views.GravityFlags.Start
             };
-            enterSetStringEditText.Text = _appSettings.BoxSetsString ?? "";
+            enterSetStringEditText.Text = _appSettings.AllBoxSetsString ?? "";
             enterSetStringEditText.SetTextColor(UIFactory.TEXT_PRIMARY);
             enterSetStringEditText.SetHintTextColor(UIFactory.TEXT_SECONDARY);
             enterSetStringEditText.SetPadding(16, 16, 16, 16);
@@ -1482,20 +1601,20 @@ namespace BluePenguinMonitoring
             notesEditParams.SetMargins(0, 0, 0, 8);
             enterSetStringEditText.LayoutParameters = notesEditParams;
             enterSetStringEditText.TextChanged += (s, e) => {
+                int waitMillis = 2000;
                 BackgroundWorker bw = new BackgroundWorker();
                 bw.DoWork += (s2, e2) =>
                 {
-                    startedProcessingBoxSetsString = DateTime.Now;
-                    System.Threading.Thread.Sleep(500); 
+                    doNotDisplayBefore = DateTime.Now.AddMilliseconds(waitMillis);
+                    Thread.Sleep(waitMillis + 10);
                 };
                 bw.RunWorkerCompleted += (s3, e3) =>
                 {
-                    if ((DateTime.Now - startedProcessingBoxSetsString).TotalMilliseconds >= 500)
+                    if (DateTime.Now > doNotDisplayBefore)
                     {
                         RunOnUiThread(() =>
                         {
-                            _appSettings.BoxSetsString = enterSetStringEditText.Text;
-                            //ProcessBoxSetsString();
+                            _appSettings.AllBoxSetsString = enterSetStringEditText.Text;
                             DrawPageLayouts();
                         });
                     }
@@ -1504,10 +1623,26 @@ namespace BluePenguinMonitoring
             };
             _settingsCard.AddView(enterSetStringEditText);
 
-            string[] boxsetstringArrays = (_appSettings.BoxSetsString ?? "").Split(new string[] {"},{", "{", "}" }, StringSplitOptions.RemoveEmptyEntries);
-            Spinner boxSetSelector = _uiFactory.CreateSpinner(boxsetstringArrays);
-            boxSetSelector.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
-            _settingsCard.AddView(boxSetSelector);
+            var selectSetsTitle = new TextView(this)
+            {
+                Text = "Select Penguin Box Sets:",
+                TextSize = 16,
+                Gravity = GravityFlags.CenterHorizontal
+            };
+            selectSetsTitle.SetTextColor(UIFactory.TEXT_PRIMARY);
+            selectSetsTitle.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
+            var notesLabelParams1 = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+            notesLabelParams1.SetMargins(0, 0, 0, 8);
+            selectSetsTitle.LayoutParameters = notesLabelParams1;
+            _settingsCard.AddView(selectSetsTitle);
+
+            _boxSetSelector = _uiFactory.CreateSpinner(new List<string>());
+            _boxSetSelector.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+            _boxSetSelector.ItemSelected += (s, e) =>
+            {
+                _appSettings.BoxSetString = _boxSetSelector.SelectedItem == null ? "All" : (string)_boxSetSelector.SelectedItem;
+            };
+            _settingsCard.AddView(_boxSetSelector);
 
             TextView tv = new TextView(this) { Text = "potato" };
             _settingsCard.AddView(tv);
@@ -1588,12 +1723,19 @@ namespace BluePenguinMonitoring
                     // update settings card
                     _setTimeActiveSessionCheckBox.Checked = _appSettings.ActiveSessionTimeStampActive;
 
+                    //Update box sets selector spinner
+                    List<string> boxSets = (_appSettings.AllBoxSetsString ?? "").Split(new string[] { "},{", "{", "}" }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                    boxSets.Add(_appSettings.AllBoxSetsString);
+                    ArrayAdapter<string> adapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem, boxSets);
+                    adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
+                    _boxSetSelector.Adapter = adapter;
+
                     ///Single Box Card
                     // Update lock icon
                     if (_dataCardLockIconView != null)
                     {
                         _dataCardLockIconView.SetColorFilter(null);
-                        if (_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && !_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) && _isBoxLocked)
+                        if (_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && !_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName ) && _isBoxLocked)
                         {
                             _dataCardLockIconView.SetImageResource(Resource.Drawable.locked_yellow);
                             _dataCardLockIconView.SetColorFilter(
@@ -1620,15 +1762,15 @@ namespace BluePenguinMonitoring
                     }
 
                     if (_dataCardTitleText != null)
-                        _dataCardTitleText.Text = $"Box {_currentBox}";
+                        _dataCardTitleText.Text = $"Box {_currentBoxName}";
 
-                    _boxSavedTimeTextView.Text = _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) ?
-                        _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy\nHH:mm") : "";
+                    _boxSavedTimeTextView.Text = _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName) ?
+                        _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName].whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy\nHH:mm") : "";
                     _boxSavedTimeTextView.SetTextColor(Color.Black);
                     _boxSavedTimeTextView.Gravity = GravityFlags.Right;
 
                     _interestingBoxTextView.Visibility = ViewStates.Gone;
-                    string persistentNotes = DataStorageService.getPersistentNotes(DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, _currentBox));
+                    string persistentNotes = DataStorageService.getPersistentNotes(DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, _currentBoxName));
                     if (!string.IsNullOrWhiteSpace(persistentNotes))
                     {
                         _interestingBoxTextView.Text = "💡 Note: " + persistentNotes;
@@ -1645,16 +1787,16 @@ namespace BluePenguinMonitoring
                         if (editText != null) editText[0].TextChanged -= OnDataChanged;
                     }
 
-                    if (_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+                    if (_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName))
                     {
-                        var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox];
+                        var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName];
                         if (_adultsEditText != null) _adultsEditText[0].Text = boxData.Adults.ToString();
                         if (_eggsEditText != null) _eggsEditText[0].Text = boxData.Eggs.ToString();
                         if (_chicksEditText != null) _chicksEditText[0].Text = boxData.Chicks.ToString();
                         SetSpinnerStatus(_gateStatusSpinner[0], boxData.GateStatus);
                         if (_notesEditText != null) _notesEditText[0].Text = boxData.Notes;
                         buildScannedIdsLayout(boxData.ScannedIds);
-                        SetSpinnerStatus(_breedingChanceSpinner[0], !string.IsNullOrWhiteSpace(boxData.BreedingChance) ? boxData.BreedingChance : _remoteBoxData[_currentBox].breedingLikelyhoodText);
+                        SetSpinnerStatus(_breedingChanceSpinner[0], !string.IsNullOrWhiteSpace(boxData.BreedingChance) ? boxData.BreedingChance : "");
                     }
                     else
                     {
@@ -1664,8 +1806,6 @@ namespace BluePenguinMonitoring
                         SetSpinnerStatus(_gateStatusSpinner[0], null);
                         if (_notesEditText != null) _notesEditText[0].Text = "";
                         buildScannedIdsLayout(new List<ScanRecord>());
-                        if(_remoteBoxData != null)
-                            SetSpinnerStatus(_breedingChanceSpinner[0], _remoteBoxData[_currentBox].breedingLikelyhoodText);
                     }
 
                     foreach (var editText in editTexts)
@@ -1682,7 +1822,7 @@ namespace BluePenguinMonitoring
                             if (!_isBoxLocked || _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Count == 0)
                                 SetEnabledRecursive(child, false, 0.5f); 
                         }
-                        else if (_isBoxLocked && child.Text.Equals("Clear Box") && !_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+                        else if (_isBoxLocked && child.Text.Equals("Clear Box") && !_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName))
                             SetEnabledRecursive(child, false, 0.5f);
                     }
 
@@ -1691,7 +1831,7 @@ namespace BluePenguinMonitoring
                     foreach (var button in buttonsToToggle)
                     {
                         bool canGo = true;
-                        if(button.Text.Contains("rev") && _currentBox == 1 || button.Text.Contains("ext") && _currentBox == numberMonitorBoxes) 
+                        if(button.Text.Contains("rev") && _currentBoxIndex == 1 || button.Text.Contains("ext") && _currentBoxIndex == _boxNamesAndIndexes.Count) 
                         {
                             canGo = false;
                         }
@@ -1763,7 +1903,7 @@ namespace BluePenguinMonitoring
                 }
                 else
                 {
-                    if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox) && dataCardHasZeroData())
+                    if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName) && dataCardHasZeroData())
                     {
                         ShowEmptyBoxDialog(() =>
                         {
@@ -1790,7 +1930,7 @@ namespace BluePenguinMonitoring
             // Box title text
             _dataCardTitleText = new TextView(this)
             {
-                Text = $"Box {_currentBox}  ",
+                Text = $"Box {_currentBoxIndex}  ",
                 TextSize = 30,
                 Gravity = GravityFlags.Center
             };
@@ -1886,12 +2026,12 @@ namespace BluePenguinMonitoring
             spinnerParams.SetMargins(4, 0, 4, 0);
             _breedingChanceSpinner[0].LayoutParameters = spinnerParams;
             _breedingChanceSpinner[0].SetGravity(GravityFlags.Center);
-            List<string> items = new List<string> {  "NO", "UNL", "POT", "CON", "BR", "DCM" };
+            List<string> items = new List<string> { "", "NO", "UNL", "POT", "CON", "BR", "DCM" };
             ArrayAdapter<string> adapter = new(this, Android.Resource.Layout.SimpleSpinnerItem, items);
             adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
             _breedingChanceSpinner[0].Adapter = adapter;
             string? breedingChanceString = "";
-            try { breedingChanceString = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox].BreedingChance; }
+            try { breedingChanceString = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName].BreedingChance; }
             catch { }
             int breedingPercentageIndex = 0;
             if (breedingChanceString != null)
@@ -1996,18 +2136,18 @@ namespace BluePenguinMonitoring
         }
         private void OnPrevBoxClick(object? sender, EventArgs e)
         {
-            NavigateToBox(_currentBox - 1, () => _currentBox > 1);
+            NavigateToBox(_currentBoxIndex - 1, () => _currentBoxIndex > 1);
         }
         private void OnNextBoxClick(object? sender, EventArgs e)
         {
-            NavigateToBox(_currentBox + 1, () => _currentBox < numberMonitorBoxes);
+            NavigateToBox(_currentBoxIndex + 1, () => _currentBoxIndex < _boxNamesAndIndexes.Count);
         }
         private void NavigateToBox(int targetBox, Func<bool> canNavigate)
         {
             if (!canNavigate())
                 return;
 
-            _currentBox = targetBox;
+            _currentBoxIndex = targetBox;
             DrawPageLayouts();
         }
         private void ShowEmptyBoxDialog(Action onConfirm, Action onCancel)
@@ -2023,10 +2163,10 @@ namespace BluePenguinMonitoring
         {
             ShowConfirmationDialog(
                 "Clear Box Data",
-                "Clear data for box " + _currentBox + "?",
+                "Clear data for box " + _currentBoxIndex + "?",
                 ("Yes", () =>
                 {
-                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Remove(_currentBox);
+                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Remove(_currentBoxName);
                     SaveToAppDataDir();
                     DrawPageLayouts();
                 }),
@@ -2042,7 +2182,7 @@ namespace BluePenguinMonitoring
                     ("Yes, clear all", new Action(() =>
                     {
                         _allMonitorData[0].BoxData.Clear();
-                        _currentBox = 1;
+                        _currentBoxIndex = 1;
                         ClearInternalStorageData();
                         SaveToAppDataDir(reportHome:false);
                         DrawPageLayouts();
@@ -2140,9 +2280,9 @@ namespace BluePenguinMonitoring
         }
         private void SaveCurrentBoxData()
         {
-            if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
-                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox] = new BoxData();
-            var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox];
+            if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName))
+                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName] = new BoxData();
+            var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName];
             string boxDataString = boxData.ToString();
             
             int adults, eggs, chicks;
@@ -2163,7 +2303,7 @@ namespace BluePenguinMonitoring
                     _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved = boxData.whenDataCollectedUtc = _appSettings.ActiveSessionLocalTimeStamp.ToUniversalTime();
                 else
                     _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved = boxData.whenDataCollectedUtc = DateTime.UtcNow;
-                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox] = boxData;
+                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName] = boxData;
                 SaveToAppDataDir();
             }
         }
@@ -2364,9 +2504,9 @@ namespace BluePenguinMonitoring
                 $"Are you sure you want to delete the scan for bird {scanToDelete.BirdId}?",
                 ("Yes, Delete", () =>
                 {
-                    if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+                    if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName))
                     {
-                        var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox];
+                        var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName];
                         var scanToRemove = boxData.ScannedIds.FirstOrDefault(s =>
                             s.BirdId == scanToDelete.BirdId &&
                             s.Timestamp == scanToDelete.Timestamp);
@@ -2385,7 +2525,7 @@ namespace BluePenguinMonitoring
                             }
                             SaveCurrentBoxData();
                             buildScannedIdsLayout(boxData.ScannedIds);
-                            Toast.MakeText(this, $"🗑️ Bird {scanToDelete.BirdId} deleted from Box {_currentBox}", ToastLength.Short)?.Show();
+                            Toast.MakeText(this, $"🗑️ Bird {scanToDelete.BirdId} deleted from Box {_currentBoxIndex}", ToastLength.Short)?.Show();
                         }
                     }
                 }
@@ -2403,37 +2543,31 @@ namespace BluePenguinMonitoring
             var input = new EditText(this)
             {
                 InputType = Android.Text.InputTypes.ClassNumber,
-                Hint = $"Enter box number (1-{numberMonitorBoxes})"
+                Hint = $"Enter box name in scope: " + _appSettings.BoxSetString
             };
             input.SetTextColor(UIFactory.TEXT_PRIMARY);
 
             var alertDialog = new AlertDialog.Builder(this)
                 .SetTitle($"Move Bird {scanToMove.BirdId}")
-                .SetMessage($"Move from Box {_currentBox} to:")
+                .SetMessage($"Move from Box { _currentBoxIndex} to:")
                 .SetView(input)
                 .SetPositiveButton("Move", (s, e) =>
                 {
-                    if (int.TryParse(input.Text, out int targetBox))
+                    string targetBox = input.Text?.Trim() ?? "";
+                    if (_boxNamesAndIndexes.ContainsKey(targetBox))
                     {
-                        if (targetBox >= 1 && targetBox <= numberMonitorBoxes)
+                        if (targetBox == _currentBoxName)
                         {
-                            if (targetBox == _currentBox)
-                            {
-                                Toast.MakeText(this, "Bird is already in this box", ToastLength.Short)?.Show();
-                            }
-                            else
-                            {
-                                MoveScanToBox(scanToMove, targetBox);
-                            }
+                            Toast.MakeText(this, "Bird is already in this box", ToastLength.Short)?.Show();
                         }
                         else
                         {
-                            Toast.MakeText(this, $"Box number must be between 1 and {numberMonitorBoxes}", ToastLength.Short)?.Show();
+                            MoveScanToBox(scanToMove, targetBox);
                         }
                     }
                     else
                     {
-                        Toast.MakeText(this, "Please enter a valid box number", ToastLength.Short)?.Show();
+                        Toast.MakeText(this, $"Box name must be in scope {_appSettings.BoxSetString}", ToastLength.Short)?.Show();
                     }
                 })
                 .SetNegativeButton("Cancel", (s, e) => { })
@@ -2445,17 +2579,17 @@ namespace BluePenguinMonitoring
             var inputMethodManager = (Android.Views.InputMethods.InputMethodManager?)GetSystemService(InputMethodService);
             inputMethodManager?.ShowSoftInput(input, Android.Views.InputMethods.ShowFlags.Implicit);
         }
-        private void MoveScanToBox(ScanRecord scanToMove, int targetBox)
+        private void MoveScanToBox(ScanRecord scanToMove, string targetBox)
         {
             ShowConfirmationDialog(
                 "Move Bird Scan",
-                $"Move bird {scanToMove.BirdId} from Box {_currentBox} to Box {targetBox}?",
+                $"Move bird {scanToMove.BirdId} from Box {_currentBoxName} to Box {targetBox}?",
                 ("Yes, Move", () =>
                 {
                     // Remove from current box
-                    if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBox))
+                    if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName))
                     {
-                        var currentBoxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBox];
+                        var currentBoxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName];
                         var scanToRemove = currentBoxData.ScannedIds.FirstOrDefault(s =>
                             s.BirdId == scanToMove.BirdId &&
                             s.Timestamp == scanToMove.Timestamp);
@@ -2489,7 +2623,7 @@ namespace BluePenguinMonitoring
                             }
                             SaveCurrentBoxData();
                             buildScannedIdsLayout(currentBoxData.ScannedIds);
-                            Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} moved from Box {_currentBox} to Box {targetBox}", ToastLength.Long)?.Show();
+                            Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} moved from Box {_currentBoxIndex} to Box {targetBox}", ToastLength.Long)?.Show();
                         }
                     }
                 }),
@@ -2508,11 +2642,10 @@ namespace BluePenguinMonitoring
 
                 // Load remote penguin data.
                 _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
-                _remoteBoxData = await _dataStorageService.loadRemoteBoxInfoFromAppDataDir(this);
                 _remoteBreedingDates = await _dataStorageService.loadBreedingDatesFromAppDataDir(this);
-                if (_remotePenguinData != null && _remoteBoxData != null && _remoteBreedingDates != null)
+                if (_remotePenguinData != null &&  _remoteBreedingDates != null)
                 {
-                    Toast.MakeText(this, $"{_remotePenguinData.Count} bird, {_remoteBoxData.Count} box, {_remoteBreedingDates.Count} breeding dates found.", ToastLength.Short)?.Show();
+                    Toast.MakeText(this, $"{_remotePenguinData.Count} bird, {_remoteBreedingDates.Count} breeding dates found.", ToastLength.Short)?.Show();
                 }
 
                 // Load main app data
@@ -2604,10 +2737,9 @@ namespace BluePenguinMonitoring
             var cleanEid = new String(fullEid.Where(char.IsLetterOrDigit).ToArray());
             var shortId = cleanEid.Length >= 8 ? cleanEid.Substring(cleanEid.Length - 8) : cleanEid;
 
-            // 
-            if (!_allMonitorData[addtoThisMonitor].BoxData.ContainsKey(_currentBox))
-                _allMonitorData[addtoThisMonitor].BoxData[_currentBox] = new BoxData();
-            var boxData = _allMonitorData[addtoThisMonitor].BoxData[_currentBox];
+            if (!_allMonitorData[addtoThisMonitor].BoxData.ContainsKey(_currentBoxName))
+                _allMonitorData[addtoThisMonitor].BoxData[_currentBoxName] = new BoxData();
+            var boxData = _allMonitorData[addtoThisMonitor].BoxData[_currentBoxName];
 
             if (!boxData.ScannedIds.Any(s => s.BirdId == shortId))
             {
@@ -2624,7 +2756,7 @@ namespace BluePenguinMonitoring
                 RunOnUiThread(() =>
                 {
                     // Enhanced toast message with life stage info
-                    string toastMessage = $"🐧 Bird {shortId} added to Box {_currentBox}";
+                    string toastMessage = $"🐧 Bird {shortId} added to Box {_currentBoxIndex}";
                     if (_remotePenguinData.TryGetValue(shortId, out var penguin))
                     {
                         if (penguin.LastKnownLifeStage == LifeStage.Adult || 
@@ -2868,25 +3000,25 @@ namespace BluePenguinMonitoring
         {
             var input = new EditText(this)
             {
-                Text = _currentBox.ToString()
+                Text = _currentBoxIndex.ToString()
             };
-            input.InputType = InputTypes.ClassNumber;      // numeric keyboard
+            input.InputType = InputTypes.ClassText;      // numeric keyboard
             input.SetSelectAllOnFocus(true);               // easy overwrite
             input.ImeOptions = (ImeAction)ImeFlags.NoExtractUi | ImeAction.Go;
 
             var dialog = new AlertDialog.Builder(this)
                 .SetTitle("Jump to Box")
-                .SetMessage($"Enter box number (1–{numberMonitorBoxes}):")
+                .SetMessage($"Enter box name in scope: " + _appSettings.BoxSetString)
                 .SetView(input)
                 .SetPositiveButton("Go", (s, e) =>
                 {
-                    if (int.TryParse(input.Text, out int targetBox) && targetBox >= 1 && targetBox <= numberMonitorBoxes)
+                    if (_boxNamesAndIndexes.ContainsKey(input.Text) )
                     {
-                        JumpToBox(targetBox);
+                        JumpToBox(input.Text); 
                     }
                     else
                     {
-                        Toast.MakeText(this, $"Box number must be between 1 and {numberMonitorBoxes}", ToastLength.Short)?.Show();
+                        Toast.MakeText(this, $"Box number must be in scope: " + _appSettings.BoxSetString, ToastLength.Short)?.Show();
                     }
                 })
                 .SetNegativeButton("Cancel", (s, e) => { })
@@ -2915,11 +3047,11 @@ namespace BluePenguinMonitoring
                 }
             };
         }
-        private void JumpToBox(int targetBox)
+        private void JumpToBox(string targetBox)
         {
-            if (targetBox == _currentBox)
+            if (targetBox == _currentBoxName)
             {
-                Toast.MakeText(this, $"Already at Box {_currentBox}", ToastLength.Short)?.Show();
+                Toast.MakeText(this, $"Already at Box {targetBox}", ToastLength.Short)?.Show();
                 return;
             }
             if (!_isBoxLocked)
@@ -2927,7 +3059,8 @@ namespace BluePenguinMonitoring
                 Toast.MakeText(this, $"Cannot change box while current box is unlocked.", ToastLength.Short)?.Show();
                 return;
             }
-            _currentBox = targetBox;
+            _currentBoxIndex = _boxNamesAndIndexes[targetBox];
+            _currentBoxName = targetBox;
             _singleBoxDataContentLayout.Visibility = ViewStates.Visible;
             DrawPageLayouts();
         }

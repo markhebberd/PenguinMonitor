@@ -132,6 +132,10 @@ namespace BluePenguinMonitoring.UI.Factories
 
             return editText;
         }
+        public Spinner CreateSpinner(List<string> options)
+        {
+            return CreateSpinner(options.ToArray());
+        }
         public Spinner CreateSpinner(string[] options)
         {
             var spinner = new Spinner(_context);
@@ -166,7 +170,7 @@ namespace BluePenguinMonitoring.UI.Factories
                 var view = base.GetDropDownView(position, convertView, parent);
                 
                 // Customize the display text for the first option (empty string)
-                if (view is TextView tv && position == 0)
+                if (view is TextView tv && position == 0 && _values[0] == "")
                 {
                     tv.Text = "Gate-open or no-data";
                 }                
