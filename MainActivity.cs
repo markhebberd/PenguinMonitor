@@ -32,7 +32,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.11";
+        private static string version = "37.12";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -180,14 +180,12 @@ namespace PenguinMonitor
                     // All permissions already granted
                     System.Diagnostics.Debug.WriteLine("All permissions already granted");
                     InitializeGPS();
-                    //InitializeBluetooth();
                 }
             }
             else
             {
                 // Pre-Android 6 or no permissions needed
                 InitializeGPS();
-                //InitializeBluetooth();
             }
         }
         private void InitializeVibrationAndSound()
@@ -1493,7 +1491,6 @@ namespace PenguinMonitor
                 Text = "Enable bluetooth",
             };
             _isBluetoothEnabledCheckBox.SetTextColor(Color.Black);
-            _isBluetoothEnabledCheckBox.Checked = _appSettings.IsBlueToothEnabled;
             _isBluetoothEnabledCheckBox.CheckedChange += (s, e) =>
             {
                 if (_isBluetoothEnabledCheckBox.Checked)
@@ -1509,6 +1506,7 @@ namespace PenguinMonitor
                     UpdateStatusText("Bluetooth Disabled");
                 }
             };
+            _isBluetoothEnabledCheckBox.Checked = _appSettings.IsBlueToothEnabled;
             _settingsCard.AddView(_isBluetoothEnabledCheckBox);
 
             _setTimeActiveSessionCheckBox = new CheckBox(this)
@@ -2923,7 +2921,6 @@ namespace PenguinMonitor
                     if (allPermissionsGranted)
                     {
                         InitializeGPS();
-                        InitializeBluetooth();
                         Toast.MakeText(this, "✅ All permissions granted", ToastLength.Short)?.Show();
                     }
                     else
