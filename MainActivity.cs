@@ -48,7 +48,7 @@ namespace BluePenguinMonitoring
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.9";
+        private static string version = "37.10";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -651,10 +651,6 @@ namespace BluePenguinMonitoring
         }
         private void CreateUI()
         {
-            // Create box sets dictionary
-            CreateBoxSetsDictionary();
-
-
             _uiFactory = new UIFactory(this);
             selectedPage = UIFactory.selectedPage.BoxDataSingle;
             _isBoxLocked = true;
@@ -665,10 +661,7 @@ namespace BluePenguinMonitoring
             _gestureDetector = new GestureDetector(this, new SwipeGestureDetector(this));
             _rootScrollView.Touch += OnScrollViewTouch;
 
-            var parentLinearLayout = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Vertical
-            };
+            var parentLinearLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
 
             var headerStatusSettingsCard = _uiFactory.CreateCard(padding: 20);
             headerStatusSettingsCard.Background = _uiFactory.CreateCardBackground(borderWidth: 4);            
@@ -740,6 +733,7 @@ namespace BluePenguinMonitoring
             //Settings Card
             createSettingsCard();
             headerStatusSettingsCard.AddView(_settingsCard);
+            CreateBoxSetsDictionary();
 
             parentLinearLayout.AddView(headerStatusSettingsCard);
 
@@ -754,12 +748,7 @@ namespace BluePenguinMonitoring
             _topButtonLayout.LayoutParameters = statusParams;
             headerStatusSettingsCard.AddView(_topButtonLayout);
 
-           // Navigation card
-            var boxNavLayout = CreateNavigationLayout();
-            boxNavLayout.LayoutParameters = statusParams;
-            headerStatusSettingsCard.AddView(boxNavLayout);
-
-            // Data card
+           // Data card
             CreateBoxDataCard();
 
             //Create Multi box view card
@@ -769,11 +758,12 @@ namespace BluePenguinMonitoring
             parentLinearLayout.AddView(_singleBoxDataOuterLayout);
             parentLinearLayout.AddView(_multiBoxViewCard);
 
-            DrawPageLayouts();
             _rootScrollView.AddView(parentLinearLayout);
             SetContentView(_rootScrollView);
 
             _rootScrollView.SetOnApplyWindowInsetsListener(new ViewInsetsListener());
+
+           JumpToBox(_boxNamesAndIndexes.First().Key); //Contains DrawPageLayouts()
         }
         /// <summary>
         /// designed to create _boxNamesAndIndexes to map box names to indexes which can be used 
@@ -785,13 +775,19 @@ namespace BluePenguinMonitoring
         /// </summary>
         private void CreateBoxSetsDictionary()
         {
+            string setString;
+            if (string.IsNullOrWhiteSpace(_appSettings.AllBoxSetsString))
+                setString = "1";
+            else
+                setString = _appSettings.BoxSetString.ToLower() == "all" ? _appSettings.AllBoxSetsString : _appSettings.BoxSetString;
+
             _boxNamesAndIndexes = new Dictionary<string, int>();
-            if (!string.IsNullOrWhiteSpace(_appSettings.AllBoxSetsString))
+            if (!string.IsNullOrWhiteSpace(setString))
             {
                 _boxNamesAndIndexes.Clear();
                 int currentIndex = 1;
 
-                foreach (string boxSetString in _appSettings.AllBoxSetsString.Split(new string[] { "}{", "},{" }, StringSplitOptions.RemoveEmptyEntries))
+                foreach (string boxSetString in setString.Split(new string[] { "}{", "},{" }, StringSplitOptions.RemoveEmptyEntries))
                 {
                     // Remove curly braces
                     string cleanedSet = boxSetString.Trim('{', '}');
@@ -836,9 +832,8 @@ namespace BluePenguinMonitoring
                     }
                 }
             }
-
             if (_boxNamesAndIndexes.Count == 0)
-                _boxNamesAndIndexes.Add("1", 1);
+                _boxNamesAndIndexes.Add("fake", 1);
         }
 
         /// <summary>
@@ -954,7 +949,7 @@ namespace BluePenguinMonitoring
                 borderColour: _appSettings.ActiveSessionTimeStampActive ? UIFactory.DANGER_RED : null);
             OverviewHeaderCard.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
 
-            LinearLayout headerTitle = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
+            LinearLayout headerTitle = new LinearLayout(this);
 
             var showFiltersButton = new ImageButton(this);
             showFiltersButton.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
@@ -999,13 +994,13 @@ namespace BluePenguinMonitoring
                 {
                     foreach (ScanRecord sc in box.ScannedIds)
                     {
-                        timeTV.Text += "\n" + sc.Timestamp.ToLocalTime().ToString("d MMM yy, HH:mm");
+                        timeTV.Text += "\n" + sc.Timestamp.ToLocalTime().ToString("d MMM yyyy, HH:mm");
                         timeFound = true;
                         break;
                     }
                     if (!timeFound && box.whenDataCollectedUtc.Year > 2015)
                     {
-                        timeTV.Text += "\n" + box.whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy, HH:mm");
+                        timeTV.Text += "\n" + box.whenDataCollectedUtc.ToLocalTime().ToString("d MMM yyyy, HH:mm");
                         timeFound = true;
                     }
                     if (timeFound) break;
@@ -1035,7 +1030,7 @@ namespace BluePenguinMonitoring
             showBoxesTitle.SetTextColor(Color.Black);
             overviewFiltersLayout.AddView(showBoxesTitle);
 
-            var allAndDataCheckBoxesLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
+            var allAndDataCheckBoxesLayout = new LinearLayout(this);
 
             CheckBox showAllBoxesInMultiBoxView = new CheckBox(this)
             {
@@ -1066,7 +1061,7 @@ namespace BluePenguinMonitoring
             allAndDataCheckBoxesLayout.AddView(showBoxesWithDataInMultiboxView);
             overviewFiltersLayout.AddView(allAndDataCheckBoxesLayout);
             
-            var breedingChanceFilterLayout= new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
+            var breedingChanceFilterLayout= new LinearLayout(this);
             CheckBox showNoBoxesInMultiboxView = new CheckBox(this)
             {
                 Text = "NO",
@@ -1138,7 +1133,7 @@ namespace BluePenguinMonitoring
             breedingChanceFilterLayout.AddView(showBreedingBoxesInMultiboxView);
             overviewFiltersLayout.AddView(breedingChanceFilterLayout);
 
-            var specialBoxFilterLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
+            var specialBoxFilterLayout = new LinearLayout(this);
 
             CheckBox showBoxesWithNotesInMultiboxView = new CheckBox(this)
             {
@@ -1195,15 +1190,11 @@ namespace BluePenguinMonitoring
             hideBoxesTitle.SetTextColor(Color.Black);
             overviewFiltersLayout.AddView(hideBoxesTitle);
 
-            var hideBoxesLayout = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Horizontal
-            };
+            var hideBoxesLayout = new LinearLayout(this);
             CheckBox hideBoxesWithNoDataInMultiboxView = new CheckBox(this)
             {
                 Text = "With data",
                 Checked = _appSettings.HideBoxesWithDataInMultiBoxView
-
             };
             hideBoxesWithNoDataInMultiboxView.SetTextColor(Color.Black);
             hideBoxesWithNoDataInMultiboxView.Click += (s, e) =>
@@ -1242,7 +1233,7 @@ namespace BluePenguinMonitoring
             overviewFiltersLayout.AddView(hideBoxesLayout);
 
             //Navigate Monitors
-            var browseOtherMonitorsLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
+            var browseOtherMonitorsLayout = new LinearLayout(this);
             var navigationButtonLayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             navigationButtonLayoutParameters.SetMargins(8, 16, 8, 16);
 
@@ -1299,10 +1290,7 @@ namespace BluePenguinMonitoring
             {
                 if (visibleBoxCount % boxesPerRow == 0)
                 {
-                    currentRow = new LinearLayout(this)
-                    {
-                        Orientation = Android.Widget.Orientation.Horizontal
-                    };
+                    currentRow = new LinearLayout(this);
                     currentRow.SetPadding(0, 0, 0, 0);
 
                     var rowParams = new LinearLayout.LayoutParams(
@@ -1376,8 +1364,9 @@ namespace BluePenguinMonitoring
         private View? CreateBoxSummaryCard(string boxName, BoxData? thisBoxData, bool selected, List<BoxData> olderBoxDatas, string nrfPercentageString)
         {
             bool currentExists = thisBoxData != null;
-            if (!currentExists)
+            if (!currentExists && olderBoxDatas.Count > 0)
             {
+
                 thisBoxData = olderBoxDatas.First();
                 olderBoxDatas.RemoveAt(0);
             }
@@ -1388,6 +1377,12 @@ namespace BluePenguinMonitoring
             cardParams.SetMargins(5, 5, 5, 5);
             card.LayoutParameters = cardParams;
             bool differenceFound = false;
+
+            card.Click += (sender, e) =>
+            {
+                JumpToBox(boxName);
+                ScrollToTop();
+            };
 
             if (selected)
                 ;
@@ -1425,7 +1420,11 @@ namespace BluePenguinMonitoring
             };
             title.SetTypeface(Typeface.DefaultBold, TypefaceStyle.Normal);
             title.SetTextColor(Color.Black);
+            card.AddView(title);
 
+            if (thisBoxData == null)
+                return card;
+            
             var summary = new TextView(this)
             {
                 Text = $"{string.Concat(Enumerable.Repeat("🐧", thisBoxData.Adults))}" +
@@ -1434,7 +1433,7 @@ namespace BluePenguinMonitoring
                 Gravity = GravityFlags.Center,
                 TextSize = 14
             };
-            if (boxName == "100")
+            if (boxName == "2")
                 ;
             if (differenceFound ) 
             {
@@ -1444,14 +1443,15 @@ namespace BluePenguinMonitoring
                     summary.Text += $"({string.Concat(Enumerable.Repeat("🥚", previousEggs))}{string.Concat(Enumerable.Repeat("🐣", previousChicks))})";
             }
 
-            if (thisBoxData.BreedingChance != "BR" || (thisBoxData.BreedingChance == "BR" && thisBoxData.Chicks + thisBoxData.Eggs == 0))
+            if (thisBoxData.BreedingChance != null && thisBoxData.BreedingChance != "BR" || (thisBoxData.BreedingChance == "BR" && thisBoxData.Chicks + thisBoxData.Eggs == 0))
                 summary.Text += $"({thisBoxData.BreedingChance})";
             
-            if (_remoteBreedingDates.ContainsKey(boxName))
-                summary.Text += "\nB:" + _remoteBreedingDates[boxName].breedingDateStatus();
+            
             string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(boxName, thisBoxData, olderBoxDatas);
-            if(!string.IsNullOrWhiteSpace(calculatedBreedingStatusString))
-                summary.Text += "\nM:" + calculatedBreedingStatusString ;
+            if (!string.IsNullOrWhiteSpace(calculatedBreedingStatusString))
+                summary.Text += "\n" + calculatedBreedingStatusString;
+            else if (_remoteBreedingDates.ContainsKey(boxName))
+                summary.Text += "\nB:" + _remoteBreedingDates[boxName].breedingDateStatus();
             
             summary.SetTextColor(Color.Black);
 
@@ -1473,14 +1473,8 @@ namespace BluePenguinMonitoring
             };
             gate_and_notes.SetTextColor(Color.DarkGray);
 
-            card.AddView(title);
             if(!string.IsNullOrEmpty(summary.Text)) card.AddView(summary);
             if(!string.IsNullOrEmpty(gate_and_notes.Text)) card.AddView(gate_and_notes);
-            card.Click += (sender, e) =>
-            {
-                JumpToBox(boxName);
-                ScrollToTop();
-            };
             return card;
         }
         private void ScrollToTop()
@@ -1573,34 +1567,36 @@ namespace BluePenguinMonitoring
             toggleOverview.Click += (s, e) => _multiBoxViewCard.Visibility = _multiBoxViewCard.Visibility.Equals(ViewStates.Visible) ? ViewStates.Gone : ViewStates.Visible;
             _settingsCard.AddView(toggleOverview);
 
+
+            LinearLayout enterBoxSetsLayout = new LinearLayout(this) ;
+            enterBoxSetsLayout.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+
             var enterSetsTitle = new TextView(this)
             {
-                Text = "Enter Penguin Box Sets:",
-                TextSize = 16,
-                Gravity = GravityFlags.CenterHorizontal
+                Text = "Box sets: ",
+                TextSize = 16
             };
             enterSetsTitle.SetTextColor(UIFactory.TEXT_PRIMARY);
             enterSetsTitle.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
-            var notesLabelParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
-            notesLabelParams.SetMargins(0, 0, 0, 8);
+            var notesLabelParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
+            notesLabelParams.SetMargins(8,8,8,8);
             enterSetsTitle.LayoutParameters = notesLabelParams;
-            _settingsCard.AddView(enterSetsTitle);
+            enterBoxSetsLayout.AddView(enterSetsTitle);
 
             EditText enterSetStringEditText = new EditText(this)
             {
                 InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextFlagMultiLine | Android.Text.InputTypes.TextFlagCapSentences,
-                Hint = "{1-150,AA-AC}{N1-N6}...",
-                Gravity = Android.Views.GravityFlags.Top | Android.Views.GravityFlags.Start
+                Hint = "{1-150,AA-AC},{N1-N6}..."
             };
-            enterSetStringEditText.Text = _appSettings.AllBoxSetsString ?? "";
             enterSetStringEditText.SetTextColor(UIFactory.TEXT_PRIMARY);
             enterSetStringEditText.SetHintTextColor(UIFactory.TEXT_SECONDARY);
             enterSetStringEditText.SetPadding(16, 16, 16, 16);
             enterSetStringEditText.Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
             var notesEditParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
-            notesEditParams.SetMargins(0, 0, 0, 8);
+            notesEditParams.SetMargins(8,8,8,8);
             enterSetStringEditText.LayoutParameters = notesEditParams;
-            enterSetStringEditText.TextChanged += (s, e) => {
+            enterSetStringEditText.TextChanged += (s, e) =>
+            {
                 int waitMillis = 2000;
                 BackgroundWorker bw = new BackgroundWorker();
                 bw.DoWork += (s2, e2) =>
@@ -1615,37 +1611,51 @@ namespace BluePenguinMonitoring
                         RunOnUiThread(() =>
                         {
                             _appSettings.AllBoxSetsString = enterSetStringEditText.Text;
+
+                            //Update box sets selector spinner
+                            List<string> boxSets = (_appSettings.AllBoxSetsString ?? "").Split(new string[] { "},{", "{", "}" }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                            boxSets.Add("All");
+                            ArrayAdapter<string> adapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem, boxSets);
+                            adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
+                            _boxSetSelector.Adapter = adapter;
+
                             DrawPageLayouts();
                         });
                     }
                 };
                 bw.RunWorkerAsync();
             };
-            _settingsCard.AddView(enterSetStringEditText);
+            enterSetStringEditText.Text = _appSettings.AllBoxSetsString ?? "";
+            enterBoxSetsLayout.AddView(enterSetStringEditText);
+            _settingsCard.AddView(enterBoxSetsLayout);
+
+            LinearLayout selectBoxSetsLayout = new LinearLayout(this);
+            selectBoxSetsLayout.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
 
             var selectSetsTitle = new TextView(this)
             {
-                Text = "Select Penguin Box Sets:",
+                Text = "Select box set(s):",
                 TextSize = 16,
                 Gravity = GravityFlags.CenterHorizontal
             };
             selectSetsTitle.SetTextColor(UIFactory.TEXT_PRIMARY);
             selectSetsTitle.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
-            var notesLabelParams1 = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
-            notesLabelParams1.SetMargins(0, 0, 0, 8);
+            var notesLabelParams1 = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
+            notesLabelParams1.SetMargins(8,8,8,8);
             selectSetsTitle.LayoutParameters = notesLabelParams1;
-            _settingsCard.AddView(selectSetsTitle);
+            selectBoxSetsLayout.AddView(selectSetsTitle);
 
             _boxSetSelector = _uiFactory.CreateSpinner(new List<string>());
             _boxSetSelector.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             _boxSetSelector.ItemSelected += (s, e) =>
             {
                 _appSettings.BoxSetString = _boxSetSelector.SelectedItem == null ? "All" : (string)_boxSetSelector.SelectedItem;
+                CreateBoxSetsDictionary();
+                JumpToBox(_boxNamesAndIndexes.First().Key);
+                DrawPageLayouts();
             };
-            _settingsCard.AddView(_boxSetSelector);
-
-            TextView tv = new TextView(this) { Text = "potato" };
-            _settingsCard.AddView(tv);
+            selectBoxSetsLayout.AddView(_boxSetSelector);
+            _settingsCard.AddView(selectBoxSetsLayout);
         }
 
         private void OnScrollViewTouch(object? sender, View.TouchEventArgs e)
@@ -1658,10 +1668,7 @@ namespace BluePenguinMonitoring
         }
         private LinearLayout CreateStyledButtonLayout(params (string text, EventHandler handler, Color color)[] buttons)
         {
-            var layout = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Horizontal
-            };
+            var layout = new LinearLayout(this);
             for (int i = 0; i < buttons.Length; i++)
             {
                 var (text, handler, color) = buttons[i];
@@ -1678,25 +1685,21 @@ namespace BluePenguinMonitoring
         }
         private LinearLayout CreateNavigationLayout()
         {
-            var layout = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Horizontal
-            };
+            var layout = new LinearLayout(this);
+            layout.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             _prevBoxButton = _uiFactory.CreateStyledButton("← Prev box", UIFactory.PRIMARY_BLUE);
             _prevBoxButton.Click += OnPrevBoxClick;
-            var prevParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
-            _prevBoxButton.LayoutParameters = prevParams;
+            var buttonParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
+            buttonParams.SetMargins(8, 16, 8, 16);
+            _prevBoxButton.LayoutParameters = buttonParams;
 
             _selectBoxButton = _uiFactory.CreateStyledButton("Select box", UIFactory.PRIMARY_BLUE);
             _selectBoxButton.Click += (s,e) => ShowBoxJumpDialog();
-            var boxParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
-            boxParams.SetMargins(8, 0, 8, 0);
-            _selectBoxButton.LayoutParameters = boxParams;
+            _selectBoxButton.LayoutParameters = buttonParams;
 
             _nextBoxButton = _uiFactory.CreateStyledButton("Next box →", UIFactory.PRIMARY_BLUE);
             _nextBoxButton.Click += OnNextBoxClick;
-            var nextParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
-            _nextBoxButton.LayoutParameters = nextParams;
+            _nextBoxButton.LayoutParameters = buttonParams;
 
             layout.AddView(_prevBoxButton);
             layout.AddView(_selectBoxButton);
@@ -1722,13 +1725,6 @@ namespace BluePenguinMonitoring
 
                     // update settings card
                     _setTimeActiveSessionCheckBox.Checked = _appSettings.ActiveSessionTimeStampActive;
-
-                    //Update box sets selector spinner
-                    List<string> boxSets = (_appSettings.AllBoxSetsString ?? "").Split(new string[] { "},{", "{", "}" }, StringSplitOptions.RemoveEmptyEntries).ToList();
-                    boxSets.Add(_appSettings.AllBoxSetsString);
-                    ArrayAdapter<string> adapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem, boxSets);
-                    adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
-                    _boxSetSelector.Adapter = adapter;
 
                     ///Single Box Card
                     // Update lock icon
@@ -1765,7 +1761,7 @@ namespace BluePenguinMonitoring
                         _dataCardTitleText.Text = $"Box {_currentBoxName}";
 
                     _boxSavedTimeTextView.Text = _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName) ?
-                        _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName].whenDataCollectedUtc.ToLocalTime().ToString("d MMM yy\nHH:mm") : "";
+                        _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName].whenDataCollectedUtc.ToLocalTime().ToString("d MMM yyyy\nHH:mm") : "";
                     _boxSavedTimeTextView.SetTextColor(Color.Black);
                     _boxSavedTimeTextView.Gravity = GravityFlags.Right;
 
@@ -1868,7 +1864,6 @@ namespace BluePenguinMonitoring
             // Horizontal layout for lock icon + box title
             _singleBoxDataTitleLayout = new LinearLayout(this)
             {
-                Orientation = Android.Widget.Orientation.Horizontal,
                 Clickable = true,
                 Focusable = true
             };
@@ -1879,7 +1874,8 @@ namespace BluePenguinMonitoring
             };
             expandSingleBoxImageButton.SetImageResource(Resource.Drawable.unfold);
             expandSingleBoxImageButton.SetBackgroundColor(Color.Transparent);
-            expandSingleBoxImageButton.Click += (s, e) => {
+            expandSingleBoxImageButton.Click += (s, e) =>
+            {
                 if (_singleBoxDataContentLayout.Visibility == ViewStates.Gone)
                 {
                     _singleBoxDataContentLayout.Visibility = ViewStates.Visible;
@@ -1960,20 +1956,14 @@ namespace BluePenguinMonitoring
             _singleBoxDataTitleLayout.AddView(_boxSavedTimeTextView);
             _singleBoxDataOuterLayout.AddView(_singleBoxDataTitleLayout);
 
-            _singleBoxDataContentLayout = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Vertical
-            };
+            _singleBoxDataContentLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             _interestingBoxTextView = new TextView(this);
             _interestingBoxTextView.Visibility = ViewStates.Gone;
             _singleBoxDataContentLayout.AddView(_interestingBoxTextView);
-            
+
             _scannedIdsLayout = new List<LinearLayout?>();
             // Scanned birds container
-            _scannedIdsLayout.Add(new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Vertical
-            });            
+            _scannedIdsLayout.Add(new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical });
             _scannedIdsLayout[0].SetPadding(16, 16, 16, 16);
             _scannedIdsLayout[0].Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
             var idsParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
@@ -1982,10 +1972,7 @@ namespace BluePenguinMonitoring
             _singleBoxDataContentLayout.AddView(_scannedIdsLayout[0]);
 
             // Headings row: Adults, Eggs, Chicks, Gate Status
-            var headingsLayout = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Horizontal
-            };
+            var headingsLayout = new LinearLayout(this);
             var headingsParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             headingsParams.SetMargins(0, 0, 0, 8);
             headingsLayout.LayoutParameters = headingsParams;
@@ -2004,13 +1991,13 @@ namespace BluePenguinMonitoring
             _singleBoxDataContentLayout.AddView(headingsLayout);
 
             // Input fields row: Adults, Eggs, Chicks inputs, Gate Status spinner
-            var inputFieldsLayout = new LinearLayout(this){ Orientation = Android.Widget.Orientation.Horizontal };
+            var inputFieldsLayout = new LinearLayout(this);
             var inputFieldsParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             inputFieldsParams.SetMargins(0, 0, 0, 16);
             inputFieldsLayout.LayoutParameters = inputFieldsParams;
 
             _adultsEditText = new List<EditText?>();
-            _adultsEditText.Add( _uiFactory.CreateStyledNumberField());
+            _adultsEditText.Add(_uiFactory.CreateStyledNumberField());
             _eggsEditText = new List<EditText?>();
             _eggsEditText.Add(_uiFactory.CreateStyledNumberField());
             _chicksEditText = new List<EditText?>();
@@ -2045,7 +2032,7 @@ namespace BluePenguinMonitoring
             };
             _gateStatusSpinner = new List<Spinner?>();
             _gateStatusSpinner.Add(_uiFactory.CreateSpinner(new string[] { "", "Gate up", "Regate" }));
-            _gateStatusSpinner[0].ItemSelected += (s, e) => 
+            _gateStatusSpinner[0].ItemSelected += (s, e) =>
             {
                 string status = _gateStatusSpinner[0].SelectedItem.ToString();
                 if (status.Equals("Gate up") || status.Equals("Regate"))
@@ -2104,7 +2091,13 @@ namespace BluePenguinMonitoring
             _notesEditText[0].LayoutParameters = notesEditParams;
             _notesEditText[0].TextChanged += OnDataChanged;
             _singleBoxDataContentLayout.AddView(_notesEditText[0]);
+
+            // Navigation card
+            var boxNavLayout = CreateNavigationLayout();
+            _singleBoxDataContentLayout.AddView(boxNavLayout);
+
             _singleBoxDataOuterLayout.AddView(_singleBoxDataContentLayout);
+
         }
         private void SetEnabledRecursive(View view, bool enabled, float alpha)
         {
@@ -2147,8 +2140,12 @@ namespace BluePenguinMonitoring
             if (!canNavigate())
                 return;
 
-            _currentBoxIndex = targetBox;
-            DrawPageLayouts();
+            //foreach 
+            KeyValuePair<string, int>? boxNameAndIndex = _boxNamesAndIndexes.Where(x => x.Value == targetBox).First();
+            if (boxNameAndIndex != null)
+            {
+                JumpToBox(boxNameAndIndex.Value.Key);
+            }            
         }
         private void ShowEmptyBoxDialog(Action onConfirm, Action onCancel)
         {
@@ -2349,10 +2346,7 @@ namespace BluePenguinMonitoring
             }
 
             // Add manual input section at the bottom
-            var manualInputLayout = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Horizontal
-            };
+            var manualInputLayout = new LinearLayout(this);
             var manualInputParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             manualInputParams.SetMargins(0, 12, 0, 0);
             manualInputLayout.LayoutParameters = manualInputParams;
@@ -2395,10 +2389,7 @@ namespace BluePenguinMonitoring
         }
         private LinearLayout CreateScanRecordView(ScanRecord scan, int index)
         {
-            var scanLayout = new LinearLayout(this)
-            {
-                Orientation = Android.Widget.Orientation.Horizontal
-            };
+            var scanLayout = new LinearLayout(this);
 
             var layoutParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             layoutParams.SetMargins(0, 2, 0, 2);

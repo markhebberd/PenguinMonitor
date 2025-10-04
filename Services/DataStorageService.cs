@@ -27,7 +27,6 @@ namespace BluePenguinMonitoring.Services
         // HTTP client for CSV downloads
         private static readonly HttpClient _httpClient = new HttpClient();
         internal const string ALL_PENGS_URL = "https://docs.google.com/spreadsheets/d/1A2j56iz0_VNHiWNJORAzGDqTbZsEd76j-YI_gQZsDEE";
-        internal const string BOX_STATUS_URL = "https://docs.google.com/spreadsheets/d/1B-jWzxb4PhbMerWD36jO3TysTCbNsZ9Lo0gldgYreLc";
         internal const string BREEDING_DATES_URL = "https://docs.google.com/spreadsheets/d/1OZMPnmEm2YAGx8M9Ha_qKoB3KJgSQ4qw";
 
         public void uploadCurrentMonitorDetailsToServer(string currentDataJson)
@@ -204,18 +203,15 @@ namespace BluePenguinMonitoring.Services
             {
                 Task<HttpResponseMessage> responseBirdsTask =
                      _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(ALL_PENGS_URL));
-                Task<HttpResponseMessage> responseBoxesTask =
-                    _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(BOX_STATUS_URL));
                 Task<HttpResponseMessage> responseBreedingDatesTask =
                     _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(BREEDING_DATES_URL));
 
                 Task saveMonitorDataToDiskTask = SaveAllMonitorDataToDisk(context, allMonitorData, reportHome:false, downloadRemoteMonitorData: true);
 
                 // Await them in parallel
-                await Task.WhenAll(responseBirdsTask, responseBoxesTask, responseBreedingDatesTask, saveMonitorDataToDiskTask);
+                await Task.WhenAll(responseBirdsTask, responseBreedingDatesTask, saveMonitorDataToDiskTask);
                 // Retrieve results
                 HttpResponseMessage responseBirds = await responseBirdsTask;
-                HttpResponseMessage responseBoxes = await responseBoxesTask;
                 HttpResponseMessage responseBreedingDates = await responseBreedingDatesTask;
 
                 var csvContentBirds = await responseBirds.Content.ReadAsStringAsync();
@@ -259,22 +255,6 @@ namespace BluePenguinMonitoring.Services
                 var birdJson = JsonConvert.SerializeObject(remotePenguinData, Formatting.Indented);
                 File.WriteAllText(Path.Combine(context.FilesDir?.AbsolutePath, REMOTE_BIRD_DATA_FILENAME), birdJson);
 
-                responseBoxes.EnsureSuccessStatusCode();
-                var csvContent = await responseBoxes.Content.ReadAsStringAsync();
-                List<BoxRemoteData> parsedData = _csvDataService.ParseBoxCsvData(csvContent);
-
-                Dictionary<int, BoxRemoteData> remoteBoxData = new Dictionary<int, BoxRemoteData>();
-                foreach (var row in parsedData)
-                {
-                    if (row.boxNumber != null)
-                    {
-                        remoteBoxData.Add(row.boxNumber, row);
-                    }
-                }
-                var boxJson = JsonConvert.SerializeObject(remoteBoxData, Formatting.Indented);
-                File.WriteAllText(Path.Combine(context.FilesDir?.AbsolutePath, REMOTE_BOX_DATA_FILENAME), boxJson);
-
-
                 responseBreedingDates.EnsureSuccessStatusCode();
                 var csvBreedingContent = await responseBreedingDates.Content.ReadAsStringAsync();
                 List<BoxPredictedDates> parsedBreedingData = _csvDataService.ParseBreedingDatesCsvData(csvBreedingContent);
@@ -296,7 +276,7 @@ namespace BluePenguinMonitoring.Services
 
                 new Handler(Looper.MainLooper).Post(() =>
                 {
-                    Toast.MakeText(context, $"Got {boxDataCount} box monitor, {remotePenguinData.Count} remote bird, {remoteBoxData.Count} remote box, {predictedDates.Count} remote date infos", ToastLength.Long)?.Show();
+                    Toast.MakeText(context, $"Got {boxDataCount} box monitor, {remotePenguinData.Count} remote bird, {predictedDates.Count} remote date infos", ToastLength.Long)?.Show();
                 });
             }
             catch (Exception ex)

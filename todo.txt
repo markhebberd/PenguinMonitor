@@ -37,6 +37,8 @@ Box database query
 
 DONE
 
+Google sheet "Box predictions Mark" completely removed from project. 
+box navigation into box view. 
 move monitor navigation buttons under box filters. 
 
 37.9

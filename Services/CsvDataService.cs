@@ -50,49 +50,6 @@ namespace BluePenguinMonitoring.Services
             }
             return result;
         }
-        internal List<BoxRemoteData> ParseBoxCsvData(string csvContent)
-        {
-            var result = new List<BoxRemoteData>();
-            try
-            {
-                var lines = csvContent.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-
-                if (lines.Length <= 1)
-                {
-                    return result; // No data rows
-                }
-
-                // Skip header row (first line)
-                for (int i = 1; i < lines.Length; i++)
-                {
-                    var line = lines[i].Trim();
-                    if (string.IsNullOrEmpty(line))
-                        continue;
-
-                    var columns = ParseCsvLine(line);
-
-                    // Ensure we have enough columns (should have 36 based on header)
-                    while (columns.Count < 3)
-                    {
-                        columns.Add("");
-                    }
-
-                    BoxRemoteData newBoxStatusData = new BoxRemoteData
-                    {
-                        boxNumber = int.Parse(columns[0]),
-                        eggChickStatusText = columns[1],
-                        breedingLikelyhoodText = columns[2],
-                        PersistentNotes = columns[3],
-                    };
-                    result.Add(newBoxStatusData);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"CSV parsing error: {ex.Message}");
-            }
-            return result;
-        }
         public List<BirdCsvRowData> ParseBirdCsvData(string csvContent)
         {
             var result = new List<BirdCsvRowData>();
