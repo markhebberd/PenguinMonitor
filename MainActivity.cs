@@ -48,7 +48,7 @@ namespace BluePenguinMonitoring
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.10";
+        private static string version = "37.11";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -85,6 +85,7 @@ namespace BluePenguinMonitoring
         private LinearLayout? _singleBoxDataOuterLayout;
         private LinearLayout? _singleBoxDataTitleLayout;
         private LinearLayout _singleBoxDataContentLayout;
+        private LinearLayout _boxNavigationButtonsLayout;
         private TextView? _dataCardTitleText;
         private ImageView? _dataCardLockIconView;
 
@@ -613,7 +614,6 @@ namespace BluePenguinMonitoring
             return summary;
         }
         private bool _isDownloadingCsvData = false;
-
         private void OnBirdStatsClick(object? sender, EventArgs e)
         {
             if (_isDownloadingCsvData)
@@ -938,7 +938,6 @@ namespace BluePenguinMonitoring
             }
             return result;
         }
-
         private void createMultiBoxViewCard()
         {
             _multiBoxViewCard.RemoveAllViews();
@@ -1822,24 +1821,24 @@ namespace BluePenguinMonitoring
                             SetEnabledRecursive(child, false, 0.5f);
                     }
 
-                    // Enable/Disable navigation and data buttons when available
-                    List<Button> buttonsToToggle = new List<Button> { _prevBoxButton, _selectBoxButton, _nextBoxButton };
-                    foreach (var button in buttonsToToggle)
-                    {
-                        bool canGo = true;
-                        if(button.Text.Contains("rev") && _currentBoxIndex == 1 || button.Text.Contains("ext") && _currentBoxIndex == _boxNamesAndIndexes.Count) 
-                        {
-                            canGo = false;
-                        }
-                        button.Enabled = _isBoxLocked && canGo;
-                        button.Alpha = (_isBoxLocked && canGo) ? 1.0f : 0.5f; // Grey out when unlocked
-                    }
-
                     // title Layout "Box n" is item 0, which we don't want to disable!
                     for (int i = 1; i < _singleBoxDataOuterLayout.ChildCount; i++)
                     {
                         var child = _singleBoxDataOuterLayout.GetChildAt(i);
                         SetEnabledRecursive(child, !_isBoxLocked, _isBoxLocked ? 0.8f : 1.0f);
+                    }
+
+                    // Enable/Disable navigation and data buttons when available
+                    List<Button> buttonsToToggle = new List<Button> { _prevBoxButton, _selectBoxButton, _nextBoxButton };
+                    foreach (var button in buttonsToToggle)
+                    {
+                        bool canGo = true;
+                        if(button.Text.Contains("rev box") && _currentBoxIndex == 1 || button.Text.Contains("ext box") && _currentBoxIndex == _boxNamesAndIndexes.Count) 
+                        {
+                            canGo = false;
+                        }
+                        button.Enabled = _isBoxLocked && canGo;
+                        button.Alpha = button.Enabled ? 2.0f : 0.5f; // Grey out when unlocked
                     }
                     createMultiBoxViewCard();
                 });
@@ -1879,11 +1878,13 @@ namespace BluePenguinMonitoring
                 if (_singleBoxDataContentLayout.Visibility == ViewStates.Gone)
                 {
                     _singleBoxDataContentLayout.Visibility = ViewStates.Visible;
+                    _boxNavigationButtonsLayout.Visibility = ViewStates.Visible;
                     expandSingleBoxImageButton.SetImageResource(Resource.Drawable.fold);
                 }
                 else
                 {
                     _singleBoxDataContentLayout.Visibility = ViewStates.Gone;
+                    _boxNavigationButtonsLayout.Visibility = ViewStates.Gone;
                     expandSingleBoxImageButton.SetImageResource(Resource.Drawable.unfold);
                 }
             };
@@ -2091,13 +2092,11 @@ namespace BluePenguinMonitoring
             _notesEditText[0].LayoutParameters = notesEditParams;
             _notesEditText[0].TextChanged += OnDataChanged;
             _singleBoxDataContentLayout.AddView(_notesEditText[0]);
-
-            // Navigation card
-            var boxNavLayout = CreateNavigationLayout();
-            _singleBoxDataContentLayout.AddView(boxNavLayout);
-
             _singleBoxDataOuterLayout.AddView(_singleBoxDataContentLayout);
 
+            // Navigation card
+            _boxNavigationButtonsLayout = CreateNavigationLayout();
+            _singleBoxDataOuterLayout.AddView(_boxNavigationButtonsLayout);
         }
         private void SetEnabledRecursive(View view, bool enabled, float alpha)
         {
@@ -2601,16 +2600,18 @@ namespace BluePenguinMonitoring
                             var targetBoxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox];
                             targetBoxData.ScannedIds.Add(scanToMove);
 
-                            _remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData);
-                            if (LifeStage.Adult == penguinData.LastKnownLifeStage || LifeStage.Returnee == penguinData.LastKnownLifeStage)
+                            if (_remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData))
                             {
-                                _adultsEditText[0].Text = "" + Math.Max(0, int.Parse(_adultsEditText[0].Text ?? "0") - 1);
-                                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Adults++;
-                            }
-                            else if (LifeStage.Chick == penguinData.LastKnownLifeStage)
-                            {
-                                _chicksEditText[0].Text = "" + Math.Max(0, int.Parse(_chicksEditText[0].Text ?? "0") - 1);
-                                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Chicks++;
+                                if (LifeStage.Adult == penguinData.LastKnownLifeStage || LifeStage.Returnee == penguinData.LastKnownLifeStage)
+                                {
+                                    _adultsEditText[0].Text = "" + Math.Max(0, int.Parse(_adultsEditText[0].Text ?? "0") - 1);
+                                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Adults++;
+                                }
+                                else if (LifeStage.Chick == penguinData.LastKnownLifeStage)
+                                {
+                                    _chicksEditText[0].Text = "" + Math.Max(0, int.Parse(_chicksEditText[0].Text ?? "0") - 1);
+                                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Chicks++;
+                                }
                             }
                             SaveCurrentBoxData();
                             buildScannedIdsLayout(currentBoxData.ScannedIds);
