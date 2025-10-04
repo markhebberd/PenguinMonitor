@@ -1,11 +1,7 @@
-﻿using Android;
-using Android.AdServices.Common;
-using Android.Animation;
-using Android.App;
+﻿using Android.Animation;
 using Android.Content;
 using Android.Content.PM;
 using Android.Graphics;
-using Android.Graphics.Drawables;
 using Android.Locations;
 using Android.Media;
 using Android.OS;
@@ -13,30 +9,18 @@ using Android.Text;
 using Android.Views;
 using Android.Views.Animations;
 using Android.Views.InputMethods;
-using Android.Widget;
-using BluePenguinMonitoring.Models;
-using BluePenguinMonitoring.Services;
-using BluePenguinMonitoring.UI.Factories;
-using BluePenguinMonitoring.UI.Gestures;
-using BluePenguinMonitoring.UI.Utils;
-using Dalvik.Annotation.Optimization;
+using PenguinMonitor.Models;
+using PenguinMonitor.Services;
+using PenguinMonitor.UI.Factories;
+using PenguinMonitor.UI.Gestures;
+using PenguinMonitor.UI.Utils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SmtpAuthenticator;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
-using System.Reflection.Emit;
-using System.Runtime.Intrinsics.Arm;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
-namespace BluePenguinMonitoring
+namespace PenguinMonitor
 {
     [Activity(
         Label = "@string/app_name",
@@ -346,7 +330,7 @@ namespace BluePenguinMonitoring
 
                     if (OperatingSystem.IsAndroidVersionAtLeast(30)) // Android 11+
                     {
-                        Toast.MakeText(this, "⚠️ Android 11+ detected!\n\nFor file access, please:\n1. Go to Settings > Apps > BluePenguinMonitoring\n2. Enable 'All files access'", ToastLength.Long)?.Show();
+                        Toast.MakeText(this, "⚠️ Android 11+ detected!\n\nFor file access, please:\n1. Go to Settings > Apps > PenguinMonitor\n2. Enable 'All files access'", ToastLength.Long)?.Show();
 
                         // Try to open the manage storage settings
                         try
@@ -832,6 +816,9 @@ namespace BluePenguinMonitoring
                     }
                 }
             }
+            if (_boxNamesAndIndexes.Count > 1000)
+                _boxNamesAndIndexes = _boxNamesAndIndexes.Take(1000).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
             if (_boxNamesAndIndexes.Count == 0)
                 _boxNamesAndIndexes.Add("fake", 1);
         }
@@ -2505,7 +2492,7 @@ namespace BluePenguinMonitoring
                         {
                             boxData.ScannedIds.Remove(scanToRemove);
                             _remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData);
-                            if (penguinData!=null && LifeStage.Adult == penguinData.LastKnownLifeStage)
+                            if (penguinData!=null && LifeStage.Adult == penguinData.LastKnownLifeStage || LifeStage.Returnee == penguinData.LastKnownLifeStage || DateTime.Now > penguinData.ChipDate.AddMonths(3))
                             {
                                 _adultsEditText[0].Text = "" + Math.Max(0, int.Parse(_adultsEditText[0].Text ?? "0") - 1);
                             }
@@ -2602,7 +2589,7 @@ namespace BluePenguinMonitoring
 
                             if (_remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData))
                             {
-                                if (LifeStage.Adult == penguinData.LastKnownLifeStage || LifeStage.Returnee == penguinData.LastKnownLifeStage)
+                                if (LifeStage.Adult == penguinData.LastKnownLifeStage || LifeStage.Returnee == penguinData.LastKnownLifeStage || DateTime.Now > penguinData.ChipDate.AddMonths(3))
                                 {
                                     _adultsEditText[0].Text = "" + Math.Max(0, int.Parse(_adultsEditText[0].Text ?? "0") - 1);
                                     _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Adults++;
@@ -2766,10 +2753,18 @@ namespace BluePenguinMonitoring
                         }
                         else if (penguin.LastKnownLifeStage == LifeStage.Chick)
                         {
-                            _chicksEditText[0].Text = (int.Parse(_chicksEditText[0].Text ?? "0") + 1).ToString();
+                            if (DateTime.Today > penguin.ChipDate.AddMonths(3))
+                            {
+                                _adultsEditText[0].Text = (int.Parse(_adultsEditText[0].Text ?? "0") + 1).ToString();
+                                toastMessage += $" (+1 Adult)";
+                            }
+                            else
+                            {
+                                _chicksEditText[0].Text = (int.Parse(_chicksEditText[0].Text ?? "0") + 1).ToString();
+                                toastMessage += $" (+1 Chick)";
+                            }
                             SaveCurrentBoxData();
                             triggerAlertAsync();
-                            toastMessage += $" (+1 Chick)";
                         }
                         else
                         {

@@ -1,6 +1,6 @@
 using System;
 
-namespace BluePenguinMonitoring.Models
+namespace PenguinMonitor.Models
 {
     public class ScanRecord
     {

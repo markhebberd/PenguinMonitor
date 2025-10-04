@@ -1,6 +1,6 @@
 using Android.Views;
 
-namespace BluePenguinMonitoring.UI.Gestures
+namespace PenguinMonitor.UI.Gestures
 {
     public class SwipeGestureDetector : GestureDetector.SimpleOnGestureListener
     {

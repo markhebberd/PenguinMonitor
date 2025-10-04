@@ -1,4 +1,4 @@
-namespace BluePenguinMonitoring.Models
+namespace PenguinMonitor.Models
 {
     public enum LifeStage
     {
@@ -11,6 +11,7 @@ namespace BluePenguinMonitoring.Models
     {
         public string ScannedId { get; set; } = "";
         public LifeStage LastKnownLifeStage { get; set; }
+        public DateTime ChipDate { get; set; }
         public string Sex { get; set; } = "";
         public string VidForScanner { get; set; } = "";
     }

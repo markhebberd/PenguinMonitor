@@ -1,6 +1,6 @@
-# BluePenguinMonitoring
+# PenguinMonitor
 
-**BluePenguinMonitoring** is a Visual Studio .NET Android application created to document Bluetooth connectivity with the **Gallagher HR5 EID Reader**. This code _might_ also support the **Gallagher HR4 EID Reader** but this is, as yet not tested.
+**PenguinMonitor** is a Visual Studio .NET Android application created to document Bluetooth connectivity with the **Gallagher HR5 EID Reader**. This code _might_ also support the **Gallagher HR4 EID Reader** but this is, as yet not tested.
 
 ## Overview
 This project demonstrates how to:

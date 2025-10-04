@@ -1,41 +1,33 @@
 TODO
 
-filename should be blank unless already saved. 
-Add text field to delete a monitor
-Show difference between current and previous monitor.
-The app should be able to sort by next relevant date. IE show the next chicks that need chipping
-it was chipped more than 3 month ago its definitely an adult
+- Add text field to include a reason when you delete a monitor
+- Mode/setting to show difference between current and previous monitor to help deleting. 
+- crash in date time picker
+- Force all entries to be on same date. 
+- if expected eggs/chicks incorrect by more than 3 days +- uncertainty box should be red
+- Data summary should show count of new eggs and new chicks. 
+- Show box history
+- Penguin database query, clicking on a scan entry should 
+	- show all known data about the bird 
+	- prompt to enter optional information connected with the scan result, i.e. Sex, weight, etc.
+	- Have move/delete contained. 
+	- Scanned entries should be bigger and easier to click
+- enter bird ID and get everything that is known about the bird, same for box, maybe that is later db stuff though?
+- The app should be able to sort by next relevant date. IE show the next chicks that need chipping
+- penguin reporting under specific name to seperate britta from alternate locations (i.e. wellington?)
 
-britta dump
-
-did not alert for no sex (I think), should it have?
-returnee no longer chick, adult counter up one, chick counter not
-no delete content of "box confidence" when subsequently enter regate (just like notes are not deleted when regate)
-3 rows of buttons at top no good, middle row sandwiched, can "prev monitor" buttons etc be moved to under notes?
-how to enter sex for bird, via database, all pengs?
-app name = PenguinMonitor.apk
-enter bird ID and get everything that is known about the bird, same for box, maybe that is later db stuff though?
-soon able to scan boxes, translation to box numbers? do you want me to experiment with installing a sample box chip?
-no restriction on boxes labels (eg not only 1-150)
-
-crash in date time picker
-if expected eggs/chicks incorrect by more than 3 days +- uncertainty box should be red
-Force all entries to be on same date. 
-previous data    LAST BOX INSPECTION: Date and Hour #PEC, Notes, Gate status, PersistentNotes, penguin scans M&F ? 
-check alert for bird without sex assigned. 
-data summary should show count of new eggs and new chicks. 
-update spanner icons & settings spanner  <-- hamburger menu top right ?
-Save to file > Saved, when allData[0] matches allData[1]
-penguin reporting under specific name to seperate britta from alternate locations
-Penguin database query, clicking on a scan entry should 
-	show all known data about the bird 
-	prompt to enter optional information connected with the scan result, i.e. Sex, weight, etc.
-	Have move/delete contained. 
-	Scanned entries should be bigger and easier to click
-Box database query
-	Show box history
 
 DONE
+
+37.12
+- Application renamed to PenguinMonitor (will reset your settings)
+- rework scanned chick/returnee/unsexed alerts
+- bird chipped more than 3 months ago counted as adult
+
+37.11
+- move chicks addition fix
+- don't crash on move unknown bird
+- box navigation button enabled when box locked. 
 
 37.10
 - Box sets and box set selection
@@ -53,6 +45,16 @@ DCM selection to bottom
 Remove blank breeding confidence
 Navigate monitor buttons between single and multi box views
 
+app name = PenguinMonitor.apk
+it was chipped more than 3 month ago its definitely an adult
+did not alert for no sex (I think), should it have?
+check alert for bird without sex assigned. 
+returnee no longer chick, adult counter up one, chick counter not
+no delete content of "box confidence" when subsequently enter regate (just like notes are not deleted when regate)
+3 rows of buttons at top no good, middle row sandwiched, can "prev monitor" buttons etc be moved to under notes?
+update spanner icons & settings spanner  <-- hamburger menu top right ?
+Save to file > Saved, when allData[0] matches allData[1]
+no restriction on boxes labels (eg not only 1-150)
 if numChicks + numEggs ever > 2 alert. 
 box confidence add abbreviations back in overview
 when eggs present = auto BR - but... leave BR, once attained, even when eggs removed (chat)

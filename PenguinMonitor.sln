@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36408.4
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BluePenguinMonitoring", "BluePenguinMonitoring.csproj", "{3D575309-A76D-4508-8974-3867516CE0ED}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PenguinMonitor", "PenguinMonitor.csproj", "{3D575309-A76D-4508-8974-3867516CE0ED}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

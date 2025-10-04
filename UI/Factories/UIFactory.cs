@@ -4,7 +4,7 @@ using Android.Graphics.Drawables;
 using Android.Views;
 using Android.Widget;
 
-namespace BluePenguinMonitoring.UI.Factories
+namespace PenguinMonitor.UI.Factories
 {
     public class UIFactory
     {

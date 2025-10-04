@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using Android.Bluetooth;
 using Java.Util;
 
-namespace BluePenguinMonitoring
+namespace PenguinMonitor
 {
     public class BluetoothManager : IDisposable
     {

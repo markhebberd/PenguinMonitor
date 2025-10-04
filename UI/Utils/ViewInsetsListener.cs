@@ -1,7 +1,7 @@
 using Android.OS;
 using Android.Views;
 
-namespace BluePenguinMonitoring.UI.Utils
+namespace PenguinMonitor.UI.Utils
 {
     public class ViewInsetsListener : Java.Lang.Object, View.IOnApplyWindowInsetsListener
     {

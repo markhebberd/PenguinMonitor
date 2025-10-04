@@ -11,7 +11,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 	  
-    <ApplicationId>com.companyname.BluePenguinMonitoring</ApplicationId>
+    <ApplicationId>PenguinMonitor</ApplicationId>
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 

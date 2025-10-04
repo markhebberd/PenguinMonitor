@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace BluePenguinMonitoring.Models
+namespace PenguinMonitor.Models
 {
     public class MonitorDetails
     {

@@ -1,7 +1,7 @@
 ﻿using Android.App.SdkSandbox;
 using Android.Content;
 using Android.OS;
-using BluePenguinMonitoring.Models;
+using PenguinMonitor.Models;
 using Newtonsoft.Json;
 using SmtpAuthenticator;
 using System;
@@ -12,7 +12,7 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace BluePenguinMonitoring.Services
+namespace PenguinMonitor.Services
 {
     public class DataStorageService
     {

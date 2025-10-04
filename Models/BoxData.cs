@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
 
-namespace BluePenguinMonitoring.Models
+namespace PenguinMonitor.Models
 {
     public class BoxData
     {

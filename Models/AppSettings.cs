@@ -1,5 +1,5 @@
-﻿using BluePenguinMonitoring.Services;
-using BluePenguinMonitoring.UI.Factories;
+﻿using PenguinMonitor.Services;
+using PenguinMonitor.UI.Factories;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -11,7 +11,7 @@ using static Android.Renderscripts.Sampler;
 using Newtonsoft.Json;
 
 
-namespace BluePenguinMonitoring.Models
+namespace PenguinMonitor.Models
 {
     public class AppSettings : INotifyPropertyChanged
     {
