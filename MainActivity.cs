@@ -2602,7 +2602,7 @@ namespace BluePenguinMonitoring
                             targetBoxData.ScannedIds.Add(scanToMove);
 
                             _remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData);
-                            if (LifeStage.Adult == penguinData.LastKnownLifeStage)
+                            if (LifeStage.Adult == penguinData.LastKnownLifeStage || LifeStage.Returnee == penguinData.LastKnownLifeStage)
                             {
                                 _adultsEditText[0].Text = "" + Math.Max(0, int.Parse(_adultsEditText[0].Text ?? "0") - 1);
                                 _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Adults++;
@@ -2610,7 +2610,7 @@ namespace BluePenguinMonitoring
                             else if (LifeStage.Chick == penguinData.LastKnownLifeStage)
                             {
                                 _chicksEditText[0].Text = "" + Math.Max(0, int.Parse(_chicksEditText[0].Text ?? "0") - 1);
-                                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Adults++;
+                                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Chicks++;
                             }
                             SaveCurrentBoxData();
                             buildScannedIdsLayout(currentBoxData.ScannedIds);

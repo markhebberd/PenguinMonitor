@@ -37,9 +37,12 @@ Box database query
 
 DONE
 
-Google sheet "Box predictions Mark" completely removed from project. 
-box navigation into box view. 
-move monitor navigation buttons under box filters. 
+37.10
+- Box sets and box set selection
+- Britta dates hidden if calculated date available
+- Google sheet "Box predictions Mark" completely removed from project. 
+- box navigation into box view. 
+- move monitor navigation buttons under box filters. 
 
 37.9
 Hide lower than current box. 
