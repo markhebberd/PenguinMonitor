@@ -18,11 +18,14 @@ TODO
 
 
 DONE
+37.13
+- disable default bluetooth status string.
 
 37.12
 - Application renamed to PenguinMonitor (will reset your settings)
 - rework scanned chick/returnee/unsexed alerts
 - bird chipped more than 3 months ago counted as adult
+- don't enable bluetooth on bluetooth permission result. 
 
 37.11
 - move chicks addition fix

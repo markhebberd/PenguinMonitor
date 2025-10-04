@@ -701,7 +701,6 @@ namespace PenguinMonitor
 
             _statusText = new TextView(this)
             {
-                Text = "Connecting to HR5... | GPS: No signal",
                 TextSize = 14,
                 Gravity = GravityFlags.Center
             };
