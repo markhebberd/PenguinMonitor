@@ -32,7 +32,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.13";
+        private static string version = "37.14";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -696,6 +696,10 @@ namespace PenguinMonitor
             titleText.SetTextColor(UIFactory.PRIMARY_BLUE);
             titleText.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
             titleCard.AddView(titleText);
+
+            var spacer2 = new View(this);
+            spacer2.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
+            titleCard.AddView(spacer2);
 
             headerStatusSettingsCard.AddView(titleCard);
 
@@ -1510,7 +1514,7 @@ namespace PenguinMonitor
 
             _setTimeActiveSessionCheckBox = new CheckBox(this)
             {
-                Text = "Set time for active session",
+                Text = "Set time for monitor: " + _appSettings.ActiveSessionLocalTimeStamp.ToString("HH:mm, d MMM yyyy"),
                 Checked = _appSettings.ActiveSessionTimeStampActive
             };
             _setTimeActiveSessionCheckBox.SetTextColor(Color.Black);
@@ -1521,27 +1525,33 @@ namespace PenguinMonitor
                 _appSettings.ActiveSessionTimeStampActive = _setTimeActiveSessionCheckBox.Checked;
                 if (_setTimeActiveSessionCheckBox.Checked)
                 {
-                    var timePicker = new TimePickerDialog(this,
-                        (sender, e) =>
+                    var timePicker = new TimePickerDialog(
+                        this,
+                        Android.Resource.Style.ThemeHoloLightDialogNoActionBar, 
+                        (s, ex) =>
                         {
-                            _appSettings.ActiveSessionLocalTimeStamp = _appSettings.ActiveSessionLocalTimeStamp.Date.AddHours(e.HourOfDay).AddMinutes(e.Minute);
+                            _appSettings.ActiveSessionLocalTimeStamp = _appSettings.ActiveSessionLocalTimeStamp.Date.AddHours(ex.HourOfDay).AddMinutes(ex.Minute);
+                            _setTimeActiveSessionCheckBox.Text = "Set time for monitor: " + _appSettings.ActiveSessionLocalTimeStamp.ToString("HH:mm, d MMM yyyy");
                         },
                         _appSettings.ActiveSessionLocalTimeStamp.Hour,
                         _appSettings.ActiveSessionLocalTimeStamp.Minute,
-                        true); // true = 24 hour format
-                    var datePicker = new DatePickerDialog(this, (sender, e) =>
-                    {
-                        _appSettings.ActiveSessionLocalTimeStamp = e.Date + _appSettings.ActiveSessionLocalTimeStamp.TimeOfDay;
-                        // e.Date is the selected date
-                        Toast.MakeText(this, $"Date picked: {e.Date.ToShortDateString()}", ToastLength.Short).Show();
-                        timePicker.Show();
-                    },
-                    _appSettings.ActiveSessionLocalTimeStamp.Year,
-                    _appSettings.ActiveSessionLocalTimeStamp.Month - 1, // Month is 0-based in Android
-                    _appSettings.ActiveSessionLocalTimeStamp.Day);
+                        true // 24 hour format
+                    );
+                    var datePicker = new DatePickerDialog(
+                        this,
+                        Android.Resource.Style.ThemeHoloLightDialogNoActionBar,
+                        (sender, e) =>
+                            {
+                                _appSettings.ActiveSessionLocalTimeStamp = e.Date + _appSettings.ActiveSessionLocalTimeStamp.TimeOfDay;
+                                // e.Date is the selected date
+                                Toast.MakeText(this, $"Date picked: {e.Date.ToShortDateString()}", ToastLength.Short).Show();
+                                timePicker.Show();
+                            },
+                        _appSettings.ActiveSessionLocalTimeStamp.Year,
+                        _appSettings.ActiveSessionLocalTimeStamp.Month - 1, // Month is 0-based in Android
+                        _appSettings.ActiveSessionLocalTimeStamp.Day);
                     datePicker.Show();
                 }
-
                 DrawPageLayouts();
             };
             _settingsCard.AddView(_setTimeActiveSessionCheckBox);
