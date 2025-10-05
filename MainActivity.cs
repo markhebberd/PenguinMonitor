@@ -32,7 +32,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.12";
+        private static string version = "37.13";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -1433,7 +1433,7 @@ namespace PenguinMonitor
             string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(boxName, thisBoxData, olderBoxDatas);
             if (!string.IsNullOrWhiteSpace(calculatedBreedingStatusString))
                 summary.Text += "\n" + calculatedBreedingStatusString;
-            else if (_remoteBreedingDates.ContainsKey(boxName))
+            else if (_remoteBreedingDates != null && _remoteBreedingDates.ContainsKey(boxName))
                 summary.Text += "\nB:" + _remoteBreedingDates[boxName].breedingDateStatus();
             
             summary.SetTextColor(Color.Black);
@@ -2733,7 +2733,7 @@ namespace PenguinMonitor
                 {
                     // Enhanced toast message with life stage info
                     string toastMessage = $"🐧 Bird {shortId} added to Box {_currentBoxIndex}";
-                    if (_remotePenguinData.TryGetValue(shortId, out var penguin))
+                    if (_remotePenguinData != null && _remotePenguinData.TryGetValue(shortId, out var penguin))
                     {
                         if (penguin.LastKnownLifeStage == LifeStage.Adult || 
                             penguin.LastKnownLifeStage == LifeStage.Returnee)

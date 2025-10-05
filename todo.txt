@@ -18,8 +18,10 @@ TODO
 
 
 DONE
+
 37.13
 - disable default bluetooth status string.
+- crash fix for when no bird stats downloaded
 
 37.12
 - Application renamed to PenguinMonitor (will reset your settings)
