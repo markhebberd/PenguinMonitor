@@ -1,8 +1,7 @@
 TODO
 
 - Add text field to include a reason when you delete a monitor
-- Mode/setting to show difference between current and previous monitor to help deleting. 
-
+- Mode/setting to show difference between current and previous monitor to help deleting
 - Force all entries to be on same date. 
 - if expected eggs/chicks incorrect by more than 3 days +- uncertainty box should be red
 - Data summary should show count of new eggs and new chicks. 
@@ -19,8 +18,12 @@ TODO
 
 DONE
 
+37.15
+- Update timestamp text in settings checkbox text on monitor change
+
 37.14
 - crash in date time picker fixed? Needs verification.
+- monitor timestamp shown in settings checkbox text
 
 37.13
 - disable default bluetooth status string.

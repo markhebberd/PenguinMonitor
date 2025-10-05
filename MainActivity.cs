@@ -32,7 +32,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.14";
+        private static string version = "37.15";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -673,7 +673,7 @@ namespace PenguinMonitor
 
             // Add a spacer that expands to fill available space
             var spacer = new View(this);
-            spacer.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
+            spacer.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 3f);
             titleCard.AddView(spacer);
 
             ImageView iconView = new ImageView(this);
@@ -698,7 +698,7 @@ namespace PenguinMonitor
             titleCard.AddView(titleText);
 
             var spacer2 = new View(this);
-            spacer2.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
+            spacer2.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 3f);
             titleCard.AddView(spacer2);
 
             headerStatusSettingsCard.AddView(titleCard);
@@ -1552,7 +1552,6 @@ namespace PenguinMonitor
                         _appSettings.ActiveSessionLocalTimeStamp.Day);
                     datePicker.Show();
                 }
-                DrawPageLayouts();
             };
             _settingsCard.AddView(_setTimeActiveSessionCheckBox);
 
@@ -1718,6 +1717,7 @@ namespace PenguinMonitor
 
                     // update settings card
                     _setTimeActiveSessionCheckBox.Checked = _appSettings.ActiveSessionTimeStampActive;
+                    _setTimeActiveSessionCheckBox.Text = "Set time for monitor: " + _appSettings.ActiveSessionLocalTimeStamp.ToString("HH:mm, d MMM yyyy");
 
                     ///Single Box Card
                     // Update lock icon
