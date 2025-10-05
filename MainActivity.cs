@@ -698,7 +698,7 @@ namespace PenguinMonitor
             titleCard.AddView(titleText);
 
             var spacer2 = new View(this);
-            spacer2.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 3f);
+            spacer2.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 7f);
             titleCard.AddView(spacer2);
 
             headerStatusSettingsCard.AddView(titleCard);
