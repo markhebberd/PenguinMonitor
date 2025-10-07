@@ -81,7 +81,7 @@ Seperate from monitor settings, this is application settings
 	Selected Filter options. 
 box with data summary change to egg before chick. 
 Current state of the app to be saved in same format as save/load data.
-renaming everything to penguin monitor
+renaming everything to Penguin Monitor
 don't save to server if there is no box data. 
 save summary should be identical to normal summary. 
 Allow Britta to specify data collection time

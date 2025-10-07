@@ -32,7 +32,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.15";
+        private static string version = "37.16";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -688,7 +688,7 @@ namespace PenguinMonitor
 
             var titleText = new TextView(this)
             {
-                Text = "Penguin Monitor",
+                Text = "Penguin Nestcheck",
                 TextSize = 28,
                 Gravity = GravityFlags.Center
             };
