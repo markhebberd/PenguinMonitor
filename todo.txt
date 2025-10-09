@@ -1,5 +1,6 @@
 TODO
 
+- create multibox view card different from draw multibox view card. 
 - Add text field to include a reason when you delete a monitor
 - Mode/setting to show difference between current and previous monitor to help deleting
 - Force all entries to be on same date. 
@@ -17,6 +18,10 @@ TODO
 
 
 DONE
+
+37.18
+- button to apply box set string. 
+- remember which BoxSet was open. 
 
 37.17
 - Fixed parsing of ChipDate, chicks detected as chicks

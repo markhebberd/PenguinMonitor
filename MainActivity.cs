@@ -33,7 +33,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.17";
+        private static string version = "37.18";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -1585,41 +1585,31 @@ namespace PenguinMonitor
             enterSetStringEditText.SetHintTextColor(UIFactory.TEXT_SECONDARY);
             enterSetStringEditText.SetPadding(16, 16, 16, 16);
             enterSetStringEditText.Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
-            var notesEditParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+            var notesEditParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent, 1.0f);
             notesEditParams.SetMargins(8,8,8,8);
             enterSetStringEditText.LayoutParameters = notesEditParams;
-            enterSetStringEditText.TextChanged += (s, e) =>
-            {
-                int waitMillis = 2000;
-                BackgroundWorker bw = new BackgroundWorker();
-                bw.DoWork += (s2, e2) =>
-                {
-                    doNotDisplayBefore = DateTime.Now.AddMilliseconds(waitMillis);
-                    Thread.Sleep(waitMillis + 10);
-                };
-                bw.RunWorkerCompleted += (s3, e3) =>
-                {
-                    if (DateTime.Now > doNotDisplayBefore)
-                    {
-                        RunOnUiThread(() =>
-                        {
-                            _appSettings.AllBoxSetsString = enterSetStringEditText.Text;
-
-                            //Update box sets selector spinner
-                            List<string> boxSets = (_appSettings.AllBoxSetsString ?? "").Split(new string[] { "},{", "{", "}" }, StringSplitOptions.RemoveEmptyEntries).ToList();
-                            boxSets.Add("All");
-                            ArrayAdapter<string> adapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem, boxSets);
-                            adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
-                            _boxSetSelector.Adapter = adapter;
-
-                            DrawPageLayouts();
-                        });
-                    }
-                };
-                bw.RunWorkerAsync();
-            };
             enterSetStringEditText.Text = _appSettings.AllBoxSetsString ?? "";
             enterBoxSetsLayout.AddView(enterSetStringEditText);
+
+            var applyButton = new Button(this)
+            {
+                Text = "Apply",
+                TextSize = 12
+            };
+            applyButton.Click += (s, e) =>
+            {
+                _appSettings.AllBoxSetsString = enterSetStringEditText.Text;
+                UpdateBoxSetsSelector();
+            };
+            applyButton.SetTextColor(Color.White);
+            applyButton.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
+            applyButton.SetPadding(12, 8, 12, 8);
+            applyButton.Background = _uiFactory.CreateRoundedBackground(UIFactory.SUCCESS_GREEN, 8);
+            applyButton.SetAllCaps(false);
+            var applyButtonParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
+            //applyButtonParams.SetMargins(8, 0, 4, 0);
+            applyButton.LayoutParameters = applyButtonParams;
+            enterBoxSetsLayout.AddView(applyButton);
             _settingsCard.AddView(enterBoxSetsLayout);
 
             LinearLayout selectBoxSetsLayout = new LinearLayout(this);
@@ -1639,7 +1629,8 @@ namespace PenguinMonitor
             selectBoxSetsLayout.AddView(selectSetsTitle);
 
             _boxSetSelector = _uiFactory.CreateSpinner(new List<string>());
-            _boxSetSelector.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+            _boxSetSelector.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
+            UpdateBoxSetsSelector();
             _boxSetSelector.ItemSelected += (s, e) =>
             {
                 _appSettings.BoxSetString = _boxSetSelector.SelectedItem == null ? "All" : (string)_boxSetSelector.SelectedItem;
@@ -1649,6 +1640,18 @@ namespace PenguinMonitor
             };
             selectBoxSetsLayout.AddView(_boxSetSelector);
             _settingsCard.AddView(selectBoxSetsLayout);
+        }
+
+        private void UpdateBoxSetsSelector()
+        {
+            //Update box sets selector spinner
+            List<string> boxSets = (_appSettings.AllBoxSetsString ?? "").Split(new string[] { "},{", "{", "}" }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            boxSets.Add("All");
+            ArrayAdapter<string> adapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem, boxSets);
+            adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
+            _boxSetSelector.Adapter = adapter;
+            if (_appSettings.BoxSetString != null && boxSets.Contains(_appSettings.BoxSetString))
+                _boxSetSelector.SetSelection(boxSets.IndexOf(_appSettings.BoxSetString));
         }
 
         private void OnScrollViewTouch(object? sender, View.TouchEventArgs e)
