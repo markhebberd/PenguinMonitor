@@ -241,12 +241,16 @@ namespace PenguinMonitor.Services
                                     throw new Exception("Unknown life stage: " + row.LastKnownLifeStage);
                                 }
                             }
+
+                            
+
                             var penguinData = new PenguinData
                             {
                                 ScannedId = eightDigitId,
                                 LastKnownLifeStage = lifeStage,
                                 Sex = row.Sex ?? "",
-                                VidForScanner = row.VidForScanner ?? ""
+                                VidForScanner = row.VidForScanner ?? "",
+                                ChipDate = DateTime.TryParse(row.ChipDate, out DateTime chipDateFound) ? chipDateFound : DateTime.MinValue
                             };
                             remotePenguinData[eightDigitId] = penguinData;
                         }

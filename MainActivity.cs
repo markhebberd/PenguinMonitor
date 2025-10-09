@@ -9,16 +9,17 @@ using Android.Text;
 using Android.Views;
 using Android.Views.Animations;
 using Android.Views.InputMethods;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using PenguinMonitor.Models;
 using PenguinMonitor.Services;
 using PenguinMonitor.UI.Factories;
 using PenguinMonitor.UI.Gestures;
 using PenguinMonitor.UI.Utils;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using SmtpAuthenticator;
 using System.ComponentModel;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace PenguinMonitor
 {
@@ -32,7 +33,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.16";
+        private static string version = "37.17";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -48,15 +49,15 @@ namespace PenguinMonitor
         private LinearLayout? _topButtonLayout; //Clear, bird stats and save/load. 
 
         private Button _showLatestMonitorButton;
-        private Button _gotoNextMonitor;
-        private Button _gotoPreviousMonitor;
+        private Button _gotoNextMonitorButton;
+        private Button _gotoPreviousMonitorButton;
 
         private Button? _prevBoxButton;
         private Button? _selectBoxButton;
         private Button? _nextBoxButton;
 
-
         private LinearLayout? _settingsCard;
+        private LinearLayout _overviewFiltersLayout;
         private CheckBox? _isBluetoothEnabledCheckBox;
         private TextView? _interestingBoxTextView;
         private CheckBox _setTimeActiveSessionCheckBox;
@@ -941,11 +942,12 @@ namespace PenguinMonitor
             var showFiltersButton = new ImageButton(this);
             showFiltersButton.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
             showFiltersButton.SetPadding(0, 0, 0, 0);
-            showFiltersButton.SetImageResource(_appSettings.ShowMultiboxFilterCard ? Resource.Drawable.fold : Resource.Drawable.unfold); 
-            showFiltersButton.SetBackgroundColor(Color.Transparent); 
+            showFiltersButton.SetImageResource(_appSettings.ShowMultiboxFilterCard ? Resource.Drawable.fold : Resource.Drawable.unfold);
+            showFiltersButton.SetBackgroundColor(Color.Transparent);
             showFiltersButton.Click += (sender, e) =>
             {
                 _appSettings.ShowMultiboxFilterCard = !_appSettings.ShowMultiboxFilterCard;
+                //_overviewFiltersLayout.Visibility = _appSettings.ShowMultiboxFilterCard ? ViewStates.Visible : ViewStates.Gone;
                 DrawPageLayouts();
             };
             headerTitle.AddView(showFiltersButton);
@@ -992,19 +994,18 @@ namespace PenguinMonitor
                     }
                     if (timeFound) break;
                 }
-            if(!timeFound)
-                timeTV.Text += "\nNo date in data" ;
+            if (!timeFound)
+                timeTV.Text += "\nNo date in data";
             timeTV.Text = timeTV.Text.Trim();
             timeTV.SetTextColor(Color.Black);
-            timeTV.SetPadding(0,0,0,0);
+            timeTV.SetPadding(0, 0, 0, 0);
             timeTV.Gravity = GravityFlags.Right | GravityFlags.Bottom;
             timeTV.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.MatchParent);
             headerTitle.AddView(timeTV);
 
             OverviewHeaderCard.AddView(headerTitle);
 
-
-            LinearLayout overviewFiltersLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
+            _overviewFiltersLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
 
             TextView showBoxesTitle = new TextView(this)
             {
@@ -1015,7 +1016,7 @@ namespace PenguinMonitor
             };
             showBoxesTitle.SetTypeface(null, TypefaceStyle.Bold);
             showBoxesTitle.SetTextColor(Color.Black);
-            overviewFiltersLayout.AddView(showBoxesTitle);
+            _overviewFiltersLayout.AddView(showBoxesTitle);
 
             var allAndDataCheckBoxesLayout = new LinearLayout(this);
 
@@ -1046,9 +1047,9 @@ namespace PenguinMonitor
                 DrawPageLayouts();
             };
             allAndDataCheckBoxesLayout.AddView(showBoxesWithDataInMultiboxView);
-            overviewFiltersLayout.AddView(allAndDataCheckBoxesLayout);
-            
-            var breedingChanceFilterLayout= new LinearLayout(this);
+            _overviewFiltersLayout.AddView(allAndDataCheckBoxesLayout);
+
+            var breedingChanceFilterLayout = new LinearLayout(this);
             CheckBox showNoBoxesInMultiboxView = new CheckBox(this)
             {
                 Text = "NO",
@@ -1118,7 +1119,7 @@ namespace PenguinMonitor
                 DrawPageLayouts();
             };
             breedingChanceFilterLayout.AddView(showBreedingBoxesInMultiboxView);
-            overviewFiltersLayout.AddView(breedingChanceFilterLayout);
+            _overviewFiltersLayout.AddView(breedingChanceFilterLayout);
 
             var specialBoxFilterLayout = new LinearLayout(this);
 
@@ -1164,7 +1165,7 @@ namespace PenguinMonitor
                 DrawPageLayouts();
             };
             specialBoxFilterLayout.AddView(showSingleEggBoxesInMultiboxView);
-            overviewFiltersLayout.AddView(specialBoxFilterLayout);
+            _overviewFiltersLayout.AddView(specialBoxFilterLayout);
 
             TextView hideBoxesTitle = new TextView(this)
             {
@@ -1175,7 +1176,7 @@ namespace PenguinMonitor
             };
             hideBoxesTitle.SetTypeface(null, TypefaceStyle.Bold);
             hideBoxesTitle.SetTextColor(Color.Black);
-            overviewFiltersLayout.AddView(hideBoxesTitle);
+            _overviewFiltersLayout.AddView(hideBoxesTitle);
 
             var hideBoxesLayout = new LinearLayout(this);
             CheckBox hideBoxesWithNoDataInMultiboxView = new CheckBox(this)
@@ -1217,16 +1218,16 @@ namespace PenguinMonitor
                 DrawPageLayouts();
             };
             hideBoxesLayout.AddView(hideBeforeCurrentCheckbox);
-            overviewFiltersLayout.AddView(hideBoxesLayout);
+            _overviewFiltersLayout.AddView(hideBoxesLayout);
 
             //Navigate Monitors
             var browseOtherMonitorsLayout = new LinearLayout(this);
             var navigationButtonLayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             navigationButtonLayoutParameters.SetMargins(8, 16, 8, 16);
 
-            _gotoPreviousMonitor = _uiFactory.CreateStyledButton("← Prev monitor", UIFactory.PRIMARY_BLUE);
-            _gotoPreviousMonitor.LayoutParameters = navigationButtonLayoutParameters;
-            _gotoPreviousMonitor.Click += (s, e) =>
+            _gotoPreviousMonitorButton = _uiFactory.CreateStyledButton("← Prev monitor", UIFactory.PRIMARY_BLUE);
+            _gotoPreviousMonitorButton.LayoutParameters = navigationButtonLayoutParameters;
+            _gotoPreviousMonitorButton.Click += (s, e) =>
             {
                 if (_appSettings.CurrentlyVisibleMonitor < _allMonitorData.Count - 1)
                     _appSettings.CurrentlyVisibleMonitor++;
@@ -1235,11 +1236,12 @@ namespace PenguinMonitor
                 _appSettings.ActiveSessionTimeStampActive = true;
                 DrawPageLayouts();
             };
-            browseOtherMonitorsLayout.AddView(_gotoPreviousMonitor);
-
-            _gotoNextMonitor = _uiFactory.CreateStyledButton("Next monitor →", UIFactory.PRIMARY_BLUE);
-            _gotoNextMonitor.LayoutParameters = navigationButtonLayoutParameters;
-            _gotoNextMonitor.Click += (s, e) =>
+            bool olderMonitorAvailable = _allMonitorData.Count > _appSettings.CurrentlyVisibleMonitor + 1;
+            SetEnabledRecursive(_gotoPreviousMonitorButton, olderMonitorAvailable, olderMonitorAvailable ? 1.0f : 0.5f);
+            browseOtherMonitorsLayout.AddView(_gotoPreviousMonitorButton);
+            _gotoNextMonitorButton = _uiFactory.CreateStyledButton("Next monitor →", UIFactory.PRIMARY_BLUE);
+            _gotoNextMonitorButton.LayoutParameters = navigationButtonLayoutParameters;
+            _gotoNextMonitorButton.Click += (s, e) =>
             {
                 if (_appSettings.CurrentlyVisibleMonitor > 0)
                     _appSettings.CurrentlyVisibleMonitor--;
@@ -1250,8 +1252,9 @@ namespace PenguinMonitor
                     _appSettings.ActiveSessionTimeStampActive = false;
                 DrawPageLayouts();
             };
-            browseOtherMonitorsLayout.AddView(_gotoNextMonitor);
-
+            bool newerMonitorAvailable = _appSettings.CurrentlyVisibleMonitor != 0;
+            SetEnabledRecursive(_gotoNextMonitorButton, newerMonitorAvailable, newerMonitorAvailable ? 1.0f : 0.5f);
+            browseOtherMonitorsLayout.AddView(_gotoNextMonitorButton);
             _showLatestMonitorButton = _uiFactory.CreateStyledButton("Latest →|", UIFactory.PRIMARY_BLUE);
             _showLatestMonitorButton.LayoutParameters = navigationButtonLayoutParameters;
             _showLatestMonitorButton.Click += (s, e) =>
@@ -1260,14 +1263,14 @@ namespace PenguinMonitor
                 _appSettings.ActiveSessionTimeStampActive = false;
                 DrawPageLayouts();
             };
+            SetEnabledRecursive(_showLatestMonitorButton, newerMonitorAvailable, newerMonitorAvailable ? 1.0f : 0.5f);
             browseOtherMonitorsLayout.AddView(_showLatestMonitorButton);
+            _overviewFiltersLayout.AddView(browseOtherMonitorsLayout);
 
-            overviewFiltersLayout.AddView(browseOtherMonitorsLayout);
-
-            OverviewHeaderCard.AddView(overviewFiltersLayout);
+            OverviewHeaderCard.AddView(_overviewFiltersLayout);
             _multiBoxViewCard.AddView(OverviewHeaderCard);
 
-            overviewFiltersLayout.Visibility = _appSettings.ShowMultiboxFilterCard ? ViewStates.Visible : ViewStates.Gone;
+            _overviewFiltersLayout.Visibility = _appSettings.ShowMultiboxFilterCard ? ViewStates.Visible : ViewStates.Gone;
 
             int boxesPerRow = 3;
             LinearLayout? currentRow = null;
@@ -1301,7 +1304,7 @@ namespace PenguinMonitor
                 bool currentBoxDataFound = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.TryGetValue(boxName, out BoxData currentBoxData);
                 if (currentBoxDataFound && currentBoxData != null)
                     mostRecentBoxData = currentBoxData;
-                
+
                 string persistentNotes = DataStorageService.getPersistentNotes(olderBoxDatas);
                 bool showBox = _appSettings.ShowAllBoxesInMultiBoxView
                             || _appSettings.ShowBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxName)
@@ -1328,7 +1331,6 @@ namespace PenguinMonitor
                     currentRow?.AddView(card);
                     visibleBoxCount++;
                 }
-                
             }
             if (visibleBoxCount == 0)
             {
@@ -1431,7 +1433,7 @@ namespace PenguinMonitor
             }
 
             if (thisBoxData.BreedingChance != null && thisBoxData.BreedingChance != "BR" || (thisBoxData.BreedingChance == "BR" && thisBoxData.Chicks + thisBoxData.Eggs == 0))
-                summary.Text += $"({thisBoxData.BreedingChance})";
+                summary.Text += $"{thisBoxData.BreedingChance}";
             
             
             string calculatedBreedingStatusString = DataStorageService.GetBoxBreedingStatusString(boxName, thisBoxData, olderBoxDatas);
@@ -1558,7 +1560,6 @@ namespace PenguinMonitor
             Button toggleOverview = _uiFactory.CreateStyledButton("Toggle overview visibility", UIFactory.PRIMARY_BLUE);
             toggleOverview.Click += (s, e) => _multiBoxViewCard.Visibility = _multiBoxViewCard.Visibility.Equals(ViewStates.Visible) ? ViewStates.Gone : ViewStates.Visible;
             _settingsCard.AddView(toggleOverview);
-
 
             LinearLayout enterBoxSetsLayout = new LinearLayout(this) ;
             enterBoxSetsLayout.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
@@ -1709,12 +1710,6 @@ namespace PenguinMonitor
                     if (_appSettings.CurrentlyVisibleMonitor < 0)
                         _appSettings.CurrentlyVisibleMonitor = 0;
 
-                    bool olderAvailable = _allMonitorData.Count > _appSettings.CurrentlyVisibleMonitor + 1;
-                    SetEnabledRecursive(_gotoPreviousMonitor, olderAvailable, olderAvailable ? 1.0f : 0.5f);
-                    bool newerAvailable = _appSettings.CurrentlyVisibleMonitor != 0;
-                    SetEnabledRecursive(_gotoNextMonitor, newerAvailable, newerAvailable ? 1.0f : 0.5f);
-                    SetEnabledRecursive(_showLatestMonitorButton, newerAvailable, newerAvailable ? 1.0f : 0.5f);
-
                     // update settings card
                     _setTimeActiveSessionCheckBox.Checked = _appSettings.ActiveSessionTimeStampActive;
                     _setTimeActiveSessionCheckBox.Text = "Set time for monitor: " + _appSettings.ActiveSessionLocalTimeStamp.ToString("HH:mm, d MMM yyyy");
@@ -1795,6 +1790,16 @@ namespace PenguinMonitor
                         SetSpinnerStatus(_gateStatusSpinner[0], null);
                         if (_notesEditText != null) _notesEditText[0].Text = "";
                         buildScannedIdsLayout(new List<ScanRecord>());
+
+                        SetSpinnerStatus(_breedingChanceSpinner[0], "");
+                        var olderBoxDatas = DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, _currentBoxName);
+                        int iterator = -1;
+                        while (iterator++ < olderBoxDatas.Count-1)
+                            if (!string.IsNullOrEmpty(olderBoxDatas[iterator].BreedingChance))
+                            {
+                                SetSpinnerStatus(_breedingChanceSpinner[0], olderBoxDatas[iterator].BreedingChance);
+                                break;
+                            }
                     }
 
                     foreach (var editText in editTexts)
@@ -2153,7 +2158,7 @@ namespace PenguinMonitor
         {
             ShowConfirmationDialog(
                 "Clear Box Data",
-                "Clear data for box " + _currentBoxIndex + "?",
+                "Clear data for box " + _currentBoxName + "?",
                 ("Yes", () =>
                 {
                     _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.Remove(_currentBoxName);
@@ -2498,8 +2503,10 @@ namespace PenguinMonitor
                         if (scanToRemove != null)
                         {
                             boxData.ScannedIds.Remove(scanToRemove);
-                            _remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData);
-                            if (penguinData!=null && LifeStage.Adult == penguinData.LastKnownLifeStage || LifeStage.Returnee == penguinData.LastKnownLifeStage || DateTime.Now > penguinData.ChipDate.AddMonths(3))
+                            if (_remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData) && (
+                                LifeStage.Adult == penguinData.LastKnownLifeStage || 
+                                LifeStage.Returnee == penguinData.LastKnownLifeStage || 
+                                DateTime.Now > penguinData.ChipDate.AddMonths(3)))
                             {
                                 _adultsEditText[0].Text = "" + Math.Max(0, int.Parse(_adultsEditText[0].Text ?? "0") - 1);
                             }
@@ -2510,6 +2517,7 @@ namespace PenguinMonitor
                             SaveCurrentBoxData();
                             buildScannedIdsLayout(boxData.ScannedIds);
                             Toast.MakeText(this, $"🗑️ Bird {scanToDelete.BirdId} deleted from Box {_currentBoxIndex}", ToastLength.Short)?.Show();
+                            DrawPageLayouts();
                         }
                     }
                 }
@@ -2526,27 +2534,27 @@ namespace PenguinMonitor
         {
             var input = new EditText(this)
             {
-                InputType = Android.Text.InputTypes.ClassNumber,
+                InputType = Android.Text.InputTypes.ClassText,
                 Hint = $"Enter box name in scope: " + _appSettings.BoxSetString
             };
             input.SetTextColor(UIFactory.TEXT_PRIMARY);
 
             var alertDialog = new AlertDialog.Builder(this)
                 .SetTitle($"Move Bird {scanToMove.BirdId}")
-                .SetMessage($"Move from Box { _currentBoxIndex} to:")
+                .SetMessage($"Move from Box { _currentBoxName} to:")
                 .SetView(input)
                 .SetPositiveButton("Move", (s, e) =>
                 {
-                    string targetBox = input.Text?.Trim() ?? "";
-                    if (_boxNamesAndIndexes.ContainsKey(targetBox))
+                    string targetBoxName = input.Text?.Trim() ?? "";
+                    if (_boxNamesAndIndexes.ContainsKey(targetBoxName))
                     {
-                        if (targetBox == _currentBoxName)
+                        if (targetBoxName == _currentBoxName)
                         {
                             Toast.MakeText(this, "Bird is already in this box", ToastLength.Short)?.Show();
                         }
                         else
                         {
-                            MoveScanToBox(scanToMove, targetBox);
+                            MoveScanToBox(scanToMove, targetBoxName);
                         }
                     }
                     else
@@ -2563,11 +2571,11 @@ namespace PenguinMonitor
             var inputMethodManager = (Android.Views.InputMethods.InputMethodManager?)GetSystemService(InputMethodService);
             inputMethodManager?.ShowSoftInput(input, Android.Views.InputMethods.ShowFlags.Implicit);
         }
-        private void MoveScanToBox(ScanRecord scanToMove, string targetBox)
+        private void MoveScanToBox(ScanRecord scanToMove, string targetBoxName)
         {
             ShowConfirmationDialog(
                 "Move Bird Scan",
-                $"Move bird {scanToMove.BirdId} from Box {_currentBoxName} to Box {targetBox}?",
+                $"Move bird {scanToMove.BirdId} from Box {_currentBoxName} to Box {targetBoxName}?",
                 ("Yes, Move", () =>
                 {
                     // Remove from current box
@@ -2578,38 +2586,38 @@ namespace PenguinMonitor
                             s.BirdId == scanToMove.BirdId &&
                             s.Timestamp == scanToMove.Timestamp);
 
-                        if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(targetBox) 
-                        && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].ScannedIds.Any(s => s.BirdId == scanToMove.BirdId))
+                        if (_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(targetBoxName) 
+                        && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBoxName].ScannedIds.Any(s => s.BirdId == scanToMove.BirdId))
                         {
-                            Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} exists already in Box {targetBox}", ToastLength.Long)?.Show();
+                            Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} exists already in Box {targetBoxName}", ToastLength.Long)?.Show();
                         }
                         else if (scanToRemove != null)
                         {
                             currentBoxData.ScannedIds.Remove(scanToRemove);
 
                             // Add to target box
-                            if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(targetBox))
-                                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox] = new BoxData();
+                            if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(targetBoxName))
+                                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBoxName] = new BoxData();
 
-                            var targetBoxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox];
-                            targetBoxData.ScannedIds.Add(scanToMove);
+                            _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBoxName].ScannedIds.Add(scanToMove);
 
                             if (_remotePenguinData.TryGetValue(scanToRemove.BirdId, out var penguinData))
                             {
                                 if (LifeStage.Adult == penguinData.LastKnownLifeStage || LifeStage.Returnee == penguinData.LastKnownLifeStage || DateTime.Now > penguinData.ChipDate.AddMonths(3))
                                 {
                                     _adultsEditText[0].Text = "" + Math.Max(0, int.Parse(_adultsEditText[0].Text ?? "0") - 1);
-                                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Adults++;
+                                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBoxName].Adults++;
                                 }
                                 else if (LifeStage.Chick == penguinData.LastKnownLifeStage)
                                 {
                                     _chicksEditText[0].Text = "" + Math.Max(0, int.Parse(_chicksEditText[0].Text ?? "0") - 1);
-                                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBox].Chicks++;
+                                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[targetBoxName].Chicks++;
                                 }
                             }
                             SaveCurrentBoxData();
                             buildScannedIdsLayout(currentBoxData.ScannedIds);
-                            Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} moved from Box {_currentBoxIndex} to Box {targetBox}", ToastLength.Long)?.Show();
+                            Toast.MakeText(this, $"🔄 Bird {scanToMove.BirdId} moved from Box {_currentBoxName} to Box {targetBoxName}", ToastLength.Long)?.Show();
+                            DrawPageLayouts();
                         }
                     }
                 }),
@@ -2760,7 +2768,7 @@ namespace PenguinMonitor
                         }
                         else if (penguin.LastKnownLifeStage == LifeStage.Chick)
                         {
-                            if (DateTime.Today > penguin.ChipDate.AddMonths(3))
+                            if (penguin.ChipDate > DateTime.Today.AddYears(-20) && DateTime.Today > penguin.ChipDate.AddMonths(3))
                             {
                                 _adultsEditText[0].Text = (int.Parse(_adultsEditText[0].Text ?? "0") + 1).ToString();
                                 toastMessage += $" (+1 Adult)";
