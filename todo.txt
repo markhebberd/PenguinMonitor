@@ -16,8 +16,6 @@ TODO
 - penguin reporting under specific name to seperate britta from alternate locations (i.e. wellington?)
 
 
-AA-AC,1-150 puts numbering 3 off.
-
 DONE
 
 37.17
@@ -27,6 +25,7 @@ DONE
 - Breeding confidence should be displayed current box from old data if available. 
 - Breeding confidence, check the most recent box (it was skipped)
 - Breeding confidence, update to blank if not known/detected. 
+- fix move/delete logic which was stating index, not box name.
 
 37.16
 - trialling Penguin Nestcheck
