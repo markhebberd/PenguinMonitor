@@ -36,7 +36,7 @@ DONE
 - trialling Penguin Nestcheck
 
 37.15
-- Update timestamp text in settings checkbox text on monitor change
+- Update timestamp text in settings checkbox text on monitor changed
 
 37.14
 - crash in date time picker fixed? Needs verification.
