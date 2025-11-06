@@ -405,31 +405,31 @@ namespace PenguinMonitor.Services
             }
             return olderBoxDatas;
         }
-        internal static string getPersistentNotes(List<BoxData> olderBoxes)
+        internal static string getStickyNotes(List<BoxData> olderBoxes)
         {
-            List<string> removedLabels = new List<string>();
-            string labels = "";
+            List<string> removedStickies = new List<string>();
+            string stickies = "";
             foreach (BoxData boxData in olderBoxes)
             {
                 foreach (string part in boxData.Notes.Split(" ", StringSplitOptions.RemoveEmptyEntries))
                 {
                     if (part.StartsWith("l-"))
                     {
-                        removedLabels.Add(part);
+                        removedStickies.Add(part);
                     }
                     else if (part.StartsWith("l=") && part.Length > 2)
                     {
-                        string label = part.Substring(2);
-                        if (!removedLabels.Contains(label))
-                            labels += label + " ";
+                        string sticky = part.Substring(2);
+                        if (!removedStickies.Contains(sticky))
+                            stickies += sticky + " ";
                     }
                     else if (part.StartsWith("l="))
                     {
-                        return labels.Trim();
+                        return stickies.Trim();
                     }
                 }
             }
-            return labels.Trim();
+            return stickies.Trim();
         }
         internal static string GetBoxBreedingStatusString(string boxName, BoxData? thisBoxData, List<BoxData> olderBoxDatas)
         {

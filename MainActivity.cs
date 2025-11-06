@@ -291,8 +291,18 @@ namespace PenguinMonitor
         {
             if (eidData.Length != 15)
                 ;// new Handler(Looper.MainLooper).Post(() => Toast.MakeText(this, "EID length " + eidData.Length + ", '" + eidData + "'", ToastLength.Long)?.Show());
+
+            var cleanEid = new String(eidData.Where(char.IsLetterOrDigit).ToArray());
+
+            // Don't auto-unlock for box tag scans - let HandleBoxTagScan manage the lock state
+            bool isBoxTag = BoxTagService.IsBoxTag(cleanEid);
+
             AddScannedId(eidData, 0);
-            _isBoxLocked = false;
+
+            if (!isBoxTag)
+            {
+                _isBoxLocked = false;
+            }
             DrawPageLayouts();
         }
         private void UpdateStatusText(string? bluetoothStatus = null)
@@ -1307,7 +1317,7 @@ namespace PenguinMonitor
                 if (currentBoxDataFound && currentBoxData != null)
                     mostRecentBoxData = currentBoxData;
 
-                string persistentNotes = DataStorageService.getPersistentNotes(olderBoxDatas);
+                string stickyNotes = DataStorageService.getStickyNotes(olderBoxDatas);
                 bool showBox = _appSettings.ShowAllBoxesInMultiBoxView
                             || _appSettings.ShowBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxName)
                             || _appSettings.ShowBreedingBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("BR")
@@ -1316,7 +1326,7 @@ namespace PenguinMonitor
                             || _appSettings.ShowUnlikleyBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("UNL")
                             || _appSettings.ShowNoBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("NO")
                             || _appSettings.ShowBoxesWithNotesInMultiboxView && mostRecentBoxData != null && !String.IsNullOrWhiteSpace(mostRecentBoxData.Notes)
-                            || _appSettings.ShowInterestingBoxesInMultiBoxView && (mostRecentBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(persistentNotes))
+                            || _appSettings.ShowInterestingBoxesInMultiBoxView && (mostRecentBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(stickyNotes))
                             || _appSettings.ShowSingleEggBoxesInMultiboxView && (mostRecentBoxData.Eggs == 1);
 
                 bool hideBoxWithData = _appSettings.HideBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxName);
@@ -1448,8 +1458,8 @@ namespace PenguinMonitor
 
             string gateStatus = thisBoxData.GateStatus;
             string notes = string.IsNullOrWhiteSpace(thisBoxData.Notes) ? "" : "notes";
-            string persistentNotes = DataStorageService.getPersistentNotes(olderBoxDatas);
-            notes += !string.IsNullOrEmpty(persistentNotes) ? $" ({persistentNotes})" : "";
+            string stickyNotes = DataStorageService.getStickyNotes(olderBoxDatas);
+            notes += !string.IsNullOrEmpty(stickyNotes) ? $" ({stickyNotes})" : "";
             notes += !nrfPercentageString.StartsWith("0") ? $" (NRF:{nrfPercentageString})" : "";
             string lineThreeStatusText = "";
             if (!string.IsNullOrWhiteSpace(gateStatus) && !string.IsNullOrWhiteSpace(notes))
@@ -1780,10 +1790,10 @@ namespace PenguinMonitor
                     _boxSavedTimeTextView.Gravity = GravityFlags.Right;
 
                     _interestingBoxTextView.Visibility = ViewStates.Gone;
-                    string persistentNotes = DataStorageService.getPersistentNotes(DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, _currentBoxName));
-                    if (!string.IsNullOrWhiteSpace(persistentNotes))
+                    string stickyNotes = DataStorageService.getStickyNotes(DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, _currentBoxName));
+                    if (!string.IsNullOrWhiteSpace(stickyNotes))
                     {
-                        _interestingBoxTextView.Text = "💡 Note: " + persistentNotes;
+                        _interestingBoxTextView.Text = "💡 Note: " + stickyNotes;
                         _interestingBoxTextView.Visibility = ViewStates.Visible;
                         _interestingBoxTextView.Gravity = GravityFlags.Center;
                         _interestingBoxTextView.SetBackgroundColor(UIFactory.LIGHT_GRAY);
@@ -2142,18 +2152,18 @@ namespace PenguinMonitor
             _notesEditText[0].TextChanged += OnDataChanged;
             _singleBoxDataContentLayout.AddView(_notesEditText[0]);
 
-            // Add button to manage persistent notes
-            var managePersistentNotesButton = new Button(this)
+            // Add button to manage sticky notes
+            var manageStickyNotesButton = new Button(this)
             {
-                Text = "📌 Manage Persistent Notes"
+                Text = "📌 Manage Sticky Notes"
             };
-            managePersistentNotesButton.SetTextColor(Color.White);
-            managePersistentNotesButton.SetBackgroundColor(UIFactory.PRIMARY_BLUE);
+            manageStickyNotesButton.SetTextColor(Color.White);
+            manageStickyNotesButton.SetBackgroundColor(UIFactory.PRIMARY_BLUE);
             var manageNotesButtonParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             manageNotesButtonParams.SetMargins(0, 0, 0, 16);
-            managePersistentNotesButton.LayoutParameters = manageNotesButtonParams;
-            managePersistentNotesButton.Click += (s, e) => ShowPersistentNotesDialog();
-            _singleBoxDataContentLayout.AddView(managePersistentNotesButton);
+            manageStickyNotesButton.LayoutParameters = manageNotesButtonParams;
+            manageStickyNotesButton.Click += (s, e) => ShowStickyNotesDialog();
+            _singleBoxDataContentLayout.AddView(manageStickyNotesButton);
             _singleBoxDataOuterLayout.AddView(_singleBoxDataContentLayout);
 
             // Navigation card
@@ -2289,15 +2299,15 @@ namespace PenguinMonitor
             alertDialog?.Show();
         }
 
-        private void ShowPersistentNotesDialog()
+        private void ShowStickyNotesDialog()
         {
-            // Get current persistent notes for this box
+            // Get current sticky notes for this box
             var olderBoxDatas = DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, _currentBoxName);
-            string persistentNotesString = DataStorageService.getPersistentNotes(olderBoxDatas);
+            string stickyNotesString = DataStorageService.getStickyNotes(olderBoxDatas);
             var currentNotes = new List<string>();
-            if (!string.IsNullOrWhiteSpace(persistentNotesString))
+            if (!string.IsNullOrWhiteSpace(stickyNotesString))
             {
-                currentNotes = persistentNotesString.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+                currentNotes = stickyNotesString.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
             }
 
             // Create main container
@@ -2310,7 +2320,7 @@ namespace PenguinMonitor
             // Title for current notes
             var titleText = new TextView(this)
             {
-                Text = "Current Persistent Notes:",
+                Text = "Current Sticky Notes:",
                 TextSize = 14
             };
             titleText.SetTextColor(UIFactory.TEXT_PRIMARY);
@@ -2336,7 +2346,7 @@ namespace PenguinMonitor
             {
                 var emptyText = new TextView(this)
                 {
-                    Text = "No persistent notes yet",
+                    Text = "No sticky notes yet",
                     TextSize = 14
                 };
                 emptyText.SetTextColor(UIFactory.TEXT_SECONDARY);
@@ -2387,10 +2397,10 @@ namespace PenguinMonitor
                         _notesEditText[0].Text = currentNotesText;
 
                         SaveCurrentBoxData();
-                        Toast.MakeText(this, $"Removed persistent note: {noteToRemove}", ToastLength.Short)?.Show();
+                        Toast.MakeText(this, $"Removed sticky note: {noteToRemove}", ToastLength.Short)?.Show();
 
                         // Close and reopen dialog to refresh
-                        ShowPersistentNotesDialog();
+                        ShowStickyNotesDialog();
                     };
 
                     noteLayout.AddView(noteText);
@@ -2412,7 +2422,7 @@ namespace PenguinMonitor
 
             var addLabel = new TextView(this)
             {
-                Text = "Add New Persistent Note:",
+                Text = "Add New Sticky Note:",
                 TextSize = 14
             };
             addLabel.SetTextColor(UIFactory.TEXT_PRIMARY);
@@ -2462,10 +2472,10 @@ namespace PenguinMonitor
                 _notesEditText[0].Text = currentNotesText;
 
                 SaveCurrentBoxData();
-                Toast.MakeText(this, $"Added persistent note: {newNote}", ToastLength.Short)?.Show();
+                Toast.MakeText(this, $"Added sticky note: {newNote}", ToastLength.Short)?.Show();
 
                 // Close and reopen dialog to refresh
-                ShowPersistentNotesDialog();
+                ShowStickyNotesDialog();
             };
             addSectionLayout.AddView(addButton);
 
@@ -2473,7 +2483,7 @@ namespace PenguinMonitor
 
             // Create and show dialog
             var dialog = new AlertDialog.Builder(this)
-                .SetTitle($"Persistent Notes - Box {_currentBoxName}")
+                .SetTitle($"Sticky Notes - Box {_currentBoxName}")
                 .SetView(mainLayout)
                 .SetNegativeButton("Close", (s, e) => { })
                 .Create();

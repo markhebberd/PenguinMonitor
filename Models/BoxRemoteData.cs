@@ -5,7 +5,7 @@
         public int boxNumber { get; set; }
         public string eggChickStatusText { get; set; }
         public string breedingLikelyhoodText { get; set; }
-        public string PersistentNotes { get; set; }        
+        public string StickyNotes { get; set; }        
         public int numEggs()
         {
             return string.IsNullOrWhiteSpace(eggChickStatusText) ? 0 : eggChickStatusText.Trim().Replace("  ", " ").Split(" ")[0].Count(c => c == 'x') - numChicks();
