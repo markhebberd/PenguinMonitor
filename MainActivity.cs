@@ -291,8 +291,18 @@ namespace PenguinMonitor
         {
             if (eidData.Length != 15)
                 ;// new Handler(Looper.MainLooper).Post(() => Toast.MakeText(this, "EID length " + eidData.Length + ", '" + eidData + "'", ToastLength.Long)?.Show());
+
+            var cleanEid = new String(eidData.Where(char.IsLetterOrDigit).ToArray());
+
+            // Don't auto-unlock for box tag scans - let HandleBoxTagScan manage the lock state
+            bool isBoxTag = BoxTagService.IsBoxTag(cleanEid);
+
             AddScannedId(eidData, 0);
-            _isBoxLocked = false;
+
+            if (!isBoxTag)
+            {
+                _isBoxLocked = false;
+            }
             DrawPageLayouts();
         }
         private void UpdateStatusText(string? bluetoothStatus = null)
