@@ -1988,7 +1988,7 @@ namespace PenguinMonitor
                 Visibility = ViewStates.Gone
             };
             _deleteBoxTagButton.SetTextColor(Color.White);
-            _deleteBoxTagButton.SetBackgroundColor(UIFactory.ERROR_RED);
+            _deleteBoxTagButton.SetBackgroundColor(UIFactory.DANGER_RED);
             var deleteButtonParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
             deleteButtonParams.SetMargins(8, 0, 0, 0);
             _deleteBoxTagButton.LayoutParameters = deleteButtonParams;
