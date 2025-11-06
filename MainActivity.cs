@@ -73,6 +73,7 @@ namespace PenguinMonitor
         private LinearLayout _boxNavigationButtonsLayout;
         private TextView? _dataCardTitleText;
         private ImageView? _dataCardLockIconView;
+        private Button? _deleteBoxTagButton;
 
         private ScrollView? _prevBoxDataScrollView;
 
@@ -109,6 +110,7 @@ namespace PenguinMonitor
         private AppSettings _appSettings;
         private Dictionary<string, PenguinData>? _remotePenguinData ;
         private Dictionary<string, BoxPredictedDates>? _remoteBreedingDates;
+        private Dictionary<string, BoxTag> _boxTags;
 
         // High value confirmation tracking - reset on each entry
         private DateTime doNotDisplayBefore;
@@ -1561,6 +1563,20 @@ namespace PenguinMonitor
             toggleOverview.Click += (s, e) => _multiBoxViewCard.Visibility = _multiBoxViewCard.Visibility.Equals(ViewStates.Visible) ? ViewStates.Gone : ViewStates.Visible;
             _settingsCard.AddView(toggleOverview);
 
+            // Box tag delete button visibility setting
+            var showBoxTagDeleteCheckBox = new CheckBox(this)
+            {
+                Text = "Show box tag delete button",
+                Checked = _appSettings.ShowBoxTagDeleteButton
+            };
+            showBoxTagDeleteCheckBox.SetTextColor(Color.Black);
+            showBoxTagDeleteCheckBox.Click += (s, e) =>
+            {
+                _appSettings.ShowBoxTagDeleteButton = showBoxTagDeleteCheckBox.Checked;
+                DrawPageLayouts(); // Refresh UI to show/hide delete button
+            };
+            _settingsCard.AddView(showBoxTagDeleteCheckBox);
+
             LinearLayout enterBoxSetsLayout = new LinearLayout(this) ;
             enterBoxSetsLayout.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
 
@@ -1750,6 +1766,13 @@ namespace PenguinMonitor
 
                     if (_dataCardTitleText != null)
                         _dataCardTitleText.Text = $"Box {_currentBoxName}";
+
+                    // Update box tag delete button visibility
+                    if (_deleteBoxTagButton != null)
+                    {
+                        bool boxHasTag = _boxTags != null && _boxTags.ContainsKey(_currentBoxName);
+                        _deleteBoxTagButton.Visibility = (_appSettings.ShowBoxTagDeleteButton && boxHasTag) ? ViewStates.Visible : ViewStates.Gone;
+                    }
 
                     _boxSavedTimeTextView.Text = _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName) ?
                         _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName].whenDataCollectedUtc.ToLocalTime().ToString("d MMM yyyy\nHH:mm") : "";
@@ -1957,6 +1980,30 @@ namespace PenguinMonitor
 
             _boxSavedTimeTextView = new TextView(this);
             _singleBoxDataTitleLayout.AddView(_boxSavedTimeTextView);
+
+            // Box tag delete button (visible only if setting is enabled and box has a tag)
+            _deleteBoxTagButton = new Button(this)
+            {
+                Text = "✕",
+                Visibility = ViewStates.Gone
+            };
+            _deleteBoxTagButton.SetTextColor(Color.White);
+            _deleteBoxTagButton.SetBackgroundColor(UIFactory.ERROR_RED);
+            var deleteButtonParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
+            deleteButtonParams.SetMargins(8, 0, 0, 0);
+            _deleteBoxTagButton.LayoutParameters = deleteButtonParams;
+            _deleteBoxTagButton.Click += (s, e) =>
+            {
+                var internalPath = this.FilesDir?.AbsolutePath;
+                if (!string.IsNullOrEmpty(internalPath))
+                {
+                    BoxTagService.RemoveBoxTag(_boxTags, _currentBoxName, internalPath);
+                    Toast.MakeText(this, $"Box tag removed from Box {_currentBoxName}", ToastLength.Short)?.Show();
+                    DrawPageLayouts(); // Refresh to hide the button
+                }
+            };
+            _singleBoxDataTitleLayout.AddView(_deleteBoxTagButton);
+
             _singleBoxDataOuterLayout.AddView(_singleBoxDataTitleLayout);
 
             _singleBoxDataContentLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
@@ -2847,6 +2894,9 @@ namespace PenguinMonitor
                 _appSettings = DataStorageService.loadAppSettingsFromDir(internalPath);
                 _appSettings.PropertyChanged += (s, e) => DataStorageService.saveApplicationSettings(_appSettings);
 
+                // Load box tags
+                _boxTags = BoxTagService.LoadBoxTags(internalPath);
+
                 // Load remote penguin data.
                 _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
                 _remoteBreedingDates = await _dataStorageService.loadBreedingDatesFromAppDataDir(this);
@@ -2939,9 +2989,93 @@ namespace PenguinMonitor
                 System.Diagnostics.Debug.WriteLine($"Failed to clear auto-save file: {ex.Message}");
             }
         }
+
+        private void HandleBoxTagScan(string cleanTagId)
+        {
+            RunOnUiThread(() =>
+            {
+                // Check if this tag is already assigned to a box
+                string? assignedBoxId = BoxTagService.GetBoxIdByTag(_boxTags, cleanTagId);
+
+                if (!_isBoxLocked)
+                {
+                    // Current box is UNLOCKED
+                    if (assignedBoxId != null && assignedBoxId != _currentBoxName)
+                    {
+                        // Tag belongs to a different box - error!
+                        TriggerAlert();
+                        Toast.MakeText(this, $"⚠️ ERROR: Tag belongs to Box {assignedBoxId}!\nCurrent box is {_currentBoxName}", ToastLength.Long)?.Show();
+                        return;
+                    }
+
+                    // Assign this tag to the current box
+                    var internalPath = this.FilesDir?.AbsolutePath;
+                    if (!string.IsNullOrEmpty(internalPath))
+                    {
+                        BoxTagService.AssignBoxTag(
+                            _boxTags,
+                            _currentBoxName,
+                            cleanTagId,
+                            _currentLocation?.Latitude ?? 0,
+                            _currentLocation?.Longitude ?? 0,
+                            _currentLocation?.Accuracy ?? -1,
+                            internalPath
+                        );
+                        Toast.MakeText(this, $"📌 Box tag assigned to Box {_currentBoxName}", ToastLength.Short)?.Show();
+                        DrawPageLayouts(); // Refresh UI to show delete button if enabled
+                    }
+                }
+                else
+                {
+                    // Current box is LOCKED
+                    if (assignedBoxId != null)
+                    {
+                        // This tag is assigned to a box - jump to it and unlock
+                        if (assignedBoxId == _currentBoxName)
+                        {
+                            // Same box - just unlock
+                            _isBoxLocked = false;
+                            DrawPageLayouts();
+                            Toast.MakeText(this, $"🔓 Box {_currentBoxName} unlocked", ToastLength.Short)?.Show();
+                        }
+                        else
+                        {
+                            // Different box - jump to it and unlock
+                            if (_boxNamesAndIndexes.ContainsKey(assignedBoxId))
+                            {
+                                _currentBoxIndex = _boxNamesAndIndexes[assignedBoxId];
+                                _currentBoxName = assignedBoxId;
+                                _isBoxLocked = false;
+                                DrawPageLayouts();
+                                Toast.MakeText(this, $"📍 Jumped to Box {assignedBoxId} and unlocked", ToastLength.Short)?.Show();
+                            }
+                            else
+                            {
+                                Toast.MakeText(this, $"⚠️ Box {assignedBoxId} not in current scope", ToastLength.Long)?.Show();
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Unassigned box tag scanned while locked - error
+                        TriggerAlert();
+                        Toast.MakeText(this, $"⚠️ Unknown box tag!\nUnlock a box first to assign this tag.", ToastLength.Long)?.Show();
+                    }
+                }
+            });
+        }
+
         private void AddScannedId(String fullEid, int addtoThisMonitor )
         {
             var cleanEid = new String(fullEid.Where(char.IsLetterOrDigit).ToArray());
+
+            // Check if this is a box tag scan (LA9000250*)
+            if (BoxTagService.IsBoxTag(cleanEid))
+            {
+                HandleBoxTagScan(cleanEid);
+                return;
+            }
+
             var shortId = cleanEid.Length >= 8 ? cleanEid.Substring(cleanEid.Length - 8) : cleanEid;
 
             if (!_allMonitorData[addtoThisMonitor].BoxData.ContainsKey(_currentBoxName))
