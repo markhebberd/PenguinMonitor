@@ -33,7 +33,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.19";
+        private static string version = "37.21";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -1024,20 +1024,24 @@ namespace PenguinMonitor
             var filterButtonParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             filterButtonParams.SetMargins(8, 8, 8, 8);
 
-            Button showFiltersToggleButton = _uiFactory.CreateStyledButton("Show boxes", UIFactory.PRIMARY_BLUE);
+            Button showFiltersToggleButton = _uiFactory.CreateStyledButton(!_appSettings.ShowFiltersVisible ? "Show show box filters" : "Show show box filters", UIFactory.PRIMARY_BLUE);
             showFiltersToggleButton.LayoutParameters = filterButtonParams;
             showFiltersToggleButton.Click += (s, e) =>
             {
                 _appSettings.ShowFiltersVisible = !_appSettings.ShowFiltersVisible;
+                _appSettings.HideFiltersVisible = false;
+                showFiltersToggleButton.Text = !_appSettings.ShowFiltersVisible ? "Show show box filters" : "Show show box filters";
                 DrawPageLayouts();
             };
             filterButtonsLayout.AddView(showFiltersToggleButton);
 
-            Button hideFiltersToggleButton = _uiFactory.CreateStyledButton("Hide boxes", UIFactory.PRIMARY_BLUE);
+            Button hideFiltersToggleButton = _uiFactory.CreateStyledButton(!_appSettings.HideFiltersVisible ? "Show hide box filters" : "Hide hide box filters", UIFactory.PRIMARY_BLUE);
             hideFiltersToggleButton.LayoutParameters = filterButtonParams;
             hideFiltersToggleButton.Click += (s, e) =>
             {
                 _appSettings.HideFiltersVisible = !_appSettings.HideFiltersVisible;
+                _appSettings.ShowFiltersVisible = false;
+                hideFiltersToggleButton.Text = !_appSettings.HideFiltersVisible ? "Show hide box filters" : "Hide hide box filters";
                 DrawPageLayouts();
             };
             filterButtonsLayout.AddView(hideFiltersToggleButton);
@@ -1047,7 +1051,7 @@ namespace PenguinMonitor
             TextView filterTextView = new TextView(this)
             {
                 Text = GetFilterTextRepresentation(),
-                TextSize = 18,
+                TextSize = 14,
                 Gravity = GravityFlags.Center
             };
             filterTextView.SetTypeface(null, TypefaceStyle.Bold);
@@ -1061,7 +1065,7 @@ namespace PenguinMonitor
 
             TextView showBoxesTitle = new TextView(this)
             {
-                Text = "Show Boxes",
+                Text = "Show box filters",
                 TextSize = 16,
                 Gravity = GravityFlags.Center,
             };
@@ -1145,7 +1149,7 @@ namespace PenguinMonitor
 
             TextView hideBoxesTitle = new TextView(this)
             {
-                Text = "Hide Boxes",
+                Text = "Hide box filters",
                 TextSize = 16,
                 Gravity = GravityFlags.Center,
             };
