@@ -1103,7 +1103,7 @@ namespace PenguinMonitor
             showBoxesWithNotesInMultiboxView.Click += (s, e) => { _appSettings.showBoxesWithNotesInMultiboxView = showBoxesWithNotesInMultiboxView.Checked; if (_appSettings.showBoxesWithNotesInMultiboxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
             showRow3.AddView(showBoxesWithNotesInMultiboxView);
 
-            CheckBox showSpecialBoxesInMultiboxView = new CheckBox(this) { Text = "Has sticky", Checked = _appSettings.ShowInterestingBoxesInMultiBoxView };
+            CheckBox showSpecialBoxesInMultiboxView = new CheckBox(this) { Text = "Has sticky notes", Checked = _appSettings.ShowInterestingBoxesInMultiBoxView };
             showSpecialBoxesInMultiboxView.SetTextColor(Color.Black);
             showSpecialBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowInterestingBoxesInMultiBoxView = showSpecialBoxesInMultiboxView.Checked; if (_appSettings.ShowInterestingBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
             showRow3.AddView(showSpecialBoxesInMultiboxView);
@@ -1172,7 +1172,7 @@ namespace PenguinMonitor
             hideBoxesWithNotesInMultiboxView.Click += (s, e) => { _appSettings.HideBoxesWithNotesInMultiboxView = hideBoxesWithNotesInMultiboxView.Checked; DrawPageLayouts(); };
             hideRow3.AddView(hideBoxesWithNotesInMultiboxView);
 
-            CheckBox hideSpecialBoxesInMultiBoxView = new CheckBox(this) { Text = "Has sticky", Checked = _appSettings.HideInterestingBoxesInMultiBoxView };
+            CheckBox hideSpecialBoxesInMultiBoxView = new CheckBox(this) { Text = "Has sticky notes", Checked = _appSettings.HideInterestingBoxesInMultiBoxView };
             hideSpecialBoxesInMultiBoxView.SetTextColor(Color.Black);
             hideSpecialBoxesInMultiBoxView.Click += (s, e) => { _appSettings.HideInterestingBoxesInMultiBoxView = hideSpecialBoxesInMultiBoxView.Checked; DrawPageLayouts(); };
             hideRow3.AddView(hideSpecialBoxesInMultiBoxView);
@@ -1729,7 +1729,7 @@ namespace PenguinMonitor
                 if (_appSettings.ShowConfidentBoxesInMultiBoxView) showFilters.Add("CON");
                 if (_appSettings.ShowBreedingBoxesInMultiBoxView) showFilters.Add("BR");
                 if (_appSettings.showBoxesWithNotesInMultiboxView) showFilters.Add("has notes");
-                if (_appSettings.ShowInterestingBoxesInMultiBoxView) showFilters.Add("has sticky");
+                if (_appSettings.ShowInterestingBoxesInMultiBoxView) showFilters.Add("has sticky notes");
                 if (_appSettings.ShowSingleEggBoxesInMultiboxView) showFilters.Add("single egg");
                 if (_appSettings.ShowDoubleEggBoxesInMultiboxView) showFilters.Add("double egg");
                 if (_appSettings.ShowDCMBoxesInMultiboxView) showFilters.Add("decommissioned");
@@ -1743,7 +1743,7 @@ namespace PenguinMonitor
             if (_appSettings.HideConfidentBoxesInMultiBoxView) hideFilters.Add("CON");
             if (_appSettings.HideBreedingBoxesInMultiBoxView) hideFilters.Add("BR");
             if (_appSettings.HideBoxesWithNotesInMultiboxView) hideFilters.Add("has notes");
-            if (_appSettings.HideInterestingBoxesInMultiBoxView) hideFilters.Add("has sticky");
+            if (_appSettings.HideInterestingBoxesInMultiBoxView) hideFilters.Add("has sticky notes");
             if (_appSettings.HideSingleEggBoxesInMultiboxView) hideFilters.Add("single egg");
             if (_appSettings.HideDoubleEggBoxesInMultiboxView) hideFilters.Add("double egg");
             if (_appSettings.HideDCMInMultiBoxView) hideFilters.Add("decommissioned");
