@@ -1024,7 +1024,7 @@ namespace PenguinMonitor
             var filterButtonParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             filterButtonParams.SetMargins(8, 8, 8, 8);
 
-            Button showFiltersToggleButton = _uiFactory.CreateStyledButton("Show", UIFactory.PRIMARY_BLUE);
+            Button showFiltersToggleButton = _uiFactory.CreateStyledButton("Show boxes", UIFactory.PRIMARY_BLUE);
             showFiltersToggleButton.LayoutParameters = filterButtonParams;
             showFiltersToggleButton.Click += (s, e) =>
             {
@@ -1033,7 +1033,7 @@ namespace PenguinMonitor
             };
             filterButtonsLayout.AddView(showFiltersToggleButton);
 
-            Button hideFiltersToggleButton = _uiFactory.CreateStyledButton("Hide", UIFactory.PRIMARY_BLUE);
+            Button hideFiltersToggleButton = _uiFactory.CreateStyledButton("Hide boxes", UIFactory.PRIMARY_BLUE);
             hideFiltersToggleButton.LayoutParameters = filterButtonParams;
             hideFiltersToggleButton.Click += (s, e) =>
             {
@@ -1047,9 +1047,10 @@ namespace PenguinMonitor
             TextView filterTextView = new TextView(this)
             {
                 Text = GetFilterTextRepresentation(),
-                TextSize = 12,
+                TextSize = 18,
                 Gravity = GravityFlags.Center
             };
+            filterTextView.SetTypeface(null, TypefaceStyle.Bold);
             filterTextView.SetTextColor(Color.Black);
             filterTextView.SetPadding(16, 8, 16, 8);
             _overviewFiltersLayout.AddView(filterTextView);
@@ -1057,6 +1058,16 @@ namespace PenguinMonitor
             // Show filters checkboxes layout
             var showFiltersCheckboxLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             showFiltersCheckboxLayout.Visibility = _appSettings.ShowFiltersVisible ? ViewStates.Visible : ViewStates.Gone;
+
+            TextView showBoxesTitle = new TextView(this)
+            {
+                Text = "Show Boxes",
+                TextSize = 16,
+                Gravity = GravityFlags.Center,
+            };
+            showBoxesTitle.SetTypeface(null, TypefaceStyle.Bold);
+            showBoxesTitle.SetTextColor(Color.Black);
+            showFiltersCheckboxLayout.AddView(showBoxesTitle);
 
             var showRow1 = new LinearLayout(this);
             CheckBox showAllBoxesInMultiBoxView = new CheckBox(this) { Text = "All", Checked = _appSettings.ShowAllBoxesInMultiBoxView };
@@ -1131,6 +1142,16 @@ namespace PenguinMonitor
             // Hide filters checkboxes layout
             var hideFiltersCheckboxLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             hideFiltersCheckboxLayout.Visibility = _appSettings.HideFiltersVisible ? ViewStates.Visible : ViewStates.Gone;
+
+            TextView hideBoxesTitle = new TextView(this)
+            {
+                Text = "Hide Boxes",
+                TextSize = 16,
+                Gravity = GravityFlags.Center,
+            };
+            hideBoxesTitle.SetTypeface(null, TypefaceStyle.Bold);
+            hideBoxesTitle.SetTextColor(Color.Black);
+            hideFiltersCheckboxLayout.AddView(hideBoxesTitle);
 
             var hideRow1 = new LinearLayout(this);
             CheckBox hideBoxesWithDataInMultiboxView = new CheckBox(this) { Text = "With data", Checked = _appSettings.HideBoxesWithDataInMultiBoxView };
