@@ -33,7 +33,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.18";
+        private static string version = "37.19";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -2256,7 +2256,7 @@ namespace PenguinMonitor
             // Create main container
             var mainLayout = new LinearLayout(this)
             {
-                Orientation = Orientation.Vertical
+                Orientation = Android.Widget.Orientation.Vertical
             };
             mainLayout.SetPadding(40, 20, 40, 20);
 
@@ -2277,7 +2277,7 @@ namespace PenguinMonitor
             var notesScrollView = new ScrollView(this);
             var notesContainer = new LinearLayout(this)
             {
-                Orientation = Orientation.Vertical
+                Orientation = Android.Widget.Orientation.Vertical
             };
             notesScrollView.AddView(notesContainer);
             var scrollParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1.0f);
@@ -2302,7 +2302,7 @@ namespace PenguinMonitor
                 {
                     var noteLayout = new LinearLayout(this)
                     {
-                        Orientation = Orientation.Horizontal
+                        Orientation = Android.Widget.Orientation.Horizontal
                     };
                     var noteLayoutParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
                     noteLayoutParams.SetMargins(0, 4, 0, 4);
@@ -2325,7 +2325,7 @@ namespace PenguinMonitor
                         Text = "✕"
                     };
                     deleteButton.SetTextColor(Color.White);
-                    deleteButton.SetBackgroundColor(UIFactory.ERROR_RED);
+                    deleteButton.SetBackgroundColor(UIFactory.DANGER_RED);
                     var deleteParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
                     deleteButton.LayoutParameters = deleteParams;
 
@@ -2357,7 +2357,7 @@ namespace PenguinMonitor
             // Add new note section
             var addSectionLayout = new LinearLayout(this)
             {
-                Orientation = Orientation.Vertical
+                Orientation = Android.Widget.Orientation.Vertical
             };
             var addSectionParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
             addSectionParams.SetMargins(0, 16, 0, 0);
