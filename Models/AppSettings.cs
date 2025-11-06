@@ -284,5 +284,18 @@ namespace PenguinMonitor.Models
                 }
             }
         }
+        private bool showBoxTagDeleteButton;
+        public bool ShowBoxTagDeleteButton
+        {
+            get => showBoxTagDeleteButton;
+            set
+            {
+                if (showBoxTagDeleteButton != value)
+                {
+                    showBoxTagDeleteButton = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
     }
 }
