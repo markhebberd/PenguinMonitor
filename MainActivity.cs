@@ -1019,218 +1019,177 @@ namespace PenguinMonitor
 
             _overviewFiltersLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
 
-            TextView showBoxesTitle = new TextView(this)
+            // Show/Hide buttons layout
+            var filterButtonsLayout = new LinearLayout(this);
+            var filterButtonParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
+            filterButtonParams.SetMargins(8, 8, 8, 8);
+
+            Button showFiltersToggleButton = _uiFactory.CreateStyledButton("Show", UIFactory.PRIMARY_BLUE);
+            showFiltersToggleButton.LayoutParameters = filterButtonParams;
+            showFiltersToggleButton.Click += (s, e) =>
             {
-                Text = "Show Boxes",
-                TextSize = 16,
-                Gravity = GravityFlags.Center,
-
+                _appSettings.ShowFiltersVisible = !_appSettings.ShowFiltersVisible;
+                DrawPageLayouts();
             };
-            showBoxesTitle.SetTypeface(null, TypefaceStyle.Bold);
-            showBoxesTitle.SetTextColor(Color.Black);
-            _overviewFiltersLayout.AddView(showBoxesTitle);
+            filterButtonsLayout.AddView(showFiltersToggleButton);
 
-            var allAndDataCheckBoxesLayout = new LinearLayout(this);
-
-            CheckBox showAllBoxesInMultiBoxView = new CheckBox(this)
+            Button hideFiltersToggleButton = _uiFactory.CreateStyledButton("Hide", UIFactory.PRIMARY_BLUE);
+            hideFiltersToggleButton.LayoutParameters = filterButtonParams;
+            hideFiltersToggleButton.Click += (s, e) =>
             {
-                Text = "All",
-                Checked = _appSettings.ShowAllBoxesInMultiBoxView
+                _appSettings.HideFiltersVisible = !_appSettings.HideFiltersVisible;
+                DrawPageLayouts();
             };
+            filterButtonsLayout.AddView(hideFiltersToggleButton);
+            _overviewFiltersLayout.AddView(filterButtonsLayout);
+
+            // Show filters checkboxes layout
+            var showFiltersCheckboxLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
+            showFiltersCheckboxLayout.Visibility = _appSettings.ShowFiltersVisible ? ViewStates.Visible : ViewStates.Gone;
+
+            var showRow1 = new LinearLayout(this);
+            CheckBox showAllBoxesInMultiBoxView = new CheckBox(this) { Text = "All", Checked = _appSettings.ShowAllBoxesInMultiBoxView };
             showAllBoxesInMultiBoxView.SetTextColor(Color.Black);
-            showAllBoxesInMultiBoxView.Click += (s, e) =>
-            {
-                _appSettings.ShowAllBoxesInMultiBoxView = showAllBoxesInMultiBoxView.Checked;
-                DrawPageLayouts();
-            };
-            allAndDataCheckBoxesLayout.AddView(showAllBoxesInMultiBoxView);
+            showAllBoxesInMultiBoxView.Click += (s, e) => { _appSettings.ShowAllBoxesInMultiBoxView = showAllBoxesInMultiBoxView.Checked; DrawPageLayouts(); };
+            showRow1.AddView(showAllBoxesInMultiBoxView);
 
-            CheckBox showBoxesWithDataInMultiboxView = new CheckBox(this)
-            {
-                Text = "With data",
-                Checked = _appSettings.ShowBoxesWithDataInMultiBoxView
-
-            };
+            CheckBox showBoxesWithDataInMultiboxView = new CheckBox(this) { Text = "With data", Checked = _appSettings.ShowBoxesWithDataInMultiBoxView };
             showBoxesWithDataInMultiboxView.SetTextColor(Color.Black);
-            showBoxesWithDataInMultiboxView.Click += (s, e) =>
-            {
-                _appSettings.ShowBoxesWithDataInMultiBoxView = showBoxesWithDataInMultiboxView.Checked;
-                if (_appSettings.ShowBoxesWithDataInMultiBoxView) _appSettings.HideBoxesWithDataInMultiBoxView = false;
-                DrawPageLayouts();
-            };
-            allAndDataCheckBoxesLayout.AddView(showBoxesWithDataInMultiboxView);
-            _overviewFiltersLayout.AddView(allAndDataCheckBoxesLayout);
+            showBoxesWithDataInMultiboxView.Click += (s, e) => { _appSettings.ShowBoxesWithDataInMultiBoxView = showBoxesWithDataInMultiboxView.Checked; if (_appSettings.ShowBoxesWithDataInMultiBoxView) _appSettings.HideBoxesWithDataInMultiBoxView = false; DrawPageLayouts(); };
+            showRow1.AddView(showBoxesWithDataInMultiboxView);
 
-            var breedingChanceFilterLayout = new LinearLayout(this);
-            CheckBox showNoBoxesInMultiboxView = new CheckBox(this)
-            {
-                Text = "NO",
-                Checked = _appSettings.ShowNoBoxesInMultiBoxView,
-            };
+            CheckBox showNoBoxesInMultiboxView = new CheckBox(this) { Text = "NO", Checked = _appSettings.ShowNoBoxesInMultiBoxView };
             showNoBoxesInMultiboxView.SetTextColor(Color.Black);
-            showNoBoxesInMultiboxView.Click += (s, e) =>
-            {
-                _appSettings.ShowNoBoxesInMultiBoxView = showNoBoxesInMultiboxView.Checked;
-                if (_appSettings.ShowNoBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
-                DrawPageLayouts();
-            };
-            breedingChanceFilterLayout.AddView(showNoBoxesInMultiboxView);
+            showNoBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowNoBoxesInMultiBoxView = showNoBoxesInMultiboxView.Checked; if (_appSettings.ShowNoBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
+            showRow1.AddView(showNoBoxesInMultiboxView);
+            showFiltersCheckboxLayout.AddView(showRow1);
 
-            CheckBox showUnlikelyBoxesInMultiboxView = new CheckBox(this)
-            {
-                Text = "UNL",
-                Checked = _appSettings.ShowUnlikleyBoxesInMultiBoxView,
-            };
+            var showRow2 = new LinearLayout(this);
+            CheckBox showUnlikelyBoxesInMultiboxView = new CheckBox(this) { Text = "UNL", Checked = _appSettings.ShowUnlikleyBoxesInMultiBoxView };
             showUnlikelyBoxesInMultiboxView.SetTextColor(Color.Black);
-            showUnlikelyBoxesInMultiboxView.Click += (s, e) =>
-            {
-                _appSettings.ShowUnlikleyBoxesInMultiBoxView = showUnlikelyBoxesInMultiboxView.Checked;
-                if (_appSettings.ShowUnlikleyBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
-                DrawPageLayouts();
-            };
-            breedingChanceFilterLayout.AddView(showUnlikelyBoxesInMultiboxView);
+            showUnlikelyBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowUnlikleyBoxesInMultiBoxView = showUnlikelyBoxesInMultiboxView.Checked; if (_appSettings.ShowUnlikleyBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
+            showRow2.AddView(showUnlikelyBoxesInMultiboxView);
 
-            CheckBox showPotentialBoxesInMultiboxView = new CheckBox(this)
-            {
-                Text = "POT",
-                Checked = _appSettings.ShowPotentialBoxesInMultiBoxView,
-            };
+            CheckBox showPotentialBoxesInMultiboxView = new CheckBox(this) { Text = "POT", Checked = _appSettings.ShowPotentialBoxesInMultiBoxView };
             showPotentialBoxesInMultiboxView.SetTextColor(Color.Black);
-            showPotentialBoxesInMultiboxView.Click += (s, e) =>
-            {
-                _appSettings.ShowPotentialBoxesInMultiBoxView = showPotentialBoxesInMultiboxView.Checked;
-                if (_appSettings.ShowPotentialBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
-                DrawPageLayouts();
-            };
-            breedingChanceFilterLayout.AddView(showPotentialBoxesInMultiboxView);
+            showPotentialBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowPotentialBoxesInMultiBoxView = showPotentialBoxesInMultiboxView.Checked; if (_appSettings.ShowPotentialBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
+            showRow2.AddView(showPotentialBoxesInMultiboxView);
 
-            CheckBox showConfidentBoxesInMultiboxView = new CheckBox(this)
-            {
-                Text = "CON",
-                Checked = _appSettings.ShowConfidentBoxesInMultiBoxView,
-            };
+            CheckBox showConfidentBoxesInMultiboxView = new CheckBox(this) { Text = "CON", Checked = _appSettings.ShowConfidentBoxesInMultiBoxView };
             showConfidentBoxesInMultiboxView.SetTextColor(Color.Black);
-            showConfidentBoxesInMultiboxView.Click += (s, e) =>
-            {
-                _appSettings.ShowConfidentBoxesInMultiBoxView = showConfidentBoxesInMultiboxView.Checked;
-                if (_appSettings.ShowConfidentBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
-                DrawPageLayouts();
-            };
-            breedingChanceFilterLayout.AddView(showConfidentBoxesInMultiboxView);
+            showConfidentBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowConfidentBoxesInMultiBoxView = showConfidentBoxesInMultiboxView.Checked; if (_appSettings.ShowConfidentBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
+            showRow2.AddView(showConfidentBoxesInMultiboxView);
+            showFiltersCheckboxLayout.AddView(showRow2);
 
-            CheckBox showBreedingBoxesInMultiboxView = new CheckBox(this)
-            {
-                Text = "BR",
-                Checked = _appSettings.ShowBreedingBoxesInMultiBoxView,
-            };
+            var showRow3 = new LinearLayout(this);
+            CheckBox showBreedingBoxesInMultiboxView = new CheckBox(this) { Text = "BR", Checked = _appSettings.ShowBreedingBoxesInMultiBoxView };
             showBreedingBoxesInMultiboxView.SetTextColor(Color.Black);
-            showBreedingBoxesInMultiboxView.Click += (s, e) =>
-            {
-                _appSettings.ShowBreedingBoxesInMultiBoxView = showBreedingBoxesInMultiboxView.Checked;
-                if (_appSettings.ShowBreedingBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
-                DrawPageLayouts();
-            };
-            breedingChanceFilterLayout.AddView(showBreedingBoxesInMultiboxView);
-            _overviewFiltersLayout.AddView(breedingChanceFilterLayout);
+            showBreedingBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowBreedingBoxesInMultiBoxView = showBreedingBoxesInMultiboxView.Checked; if (_appSettings.ShowBreedingBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
+            showRow3.AddView(showBreedingBoxesInMultiboxView);
 
-            var specialBoxFilterLayout = new LinearLayout(this);
-
-            CheckBox showBoxesWithNotesInMultiboxView = new CheckBox(this)
-            {
-                Text = "Has notes",
-                Checked = _appSettings.showBoxesWithNotesInMultiboxView
-            };
+            CheckBox showBoxesWithNotesInMultiboxView = new CheckBox(this) { Text = "Has notes", Checked = _appSettings.showBoxesWithNotesInMultiboxView };
             showBoxesWithNotesInMultiboxView.SetTextColor(Color.Black);
-            showBoxesWithNotesInMultiboxView.Click += (s, e) =>
-            {
-                _appSettings.showBoxesWithNotesInMultiboxView = showBoxesWithNotesInMultiboxView.Checked;
-                if (_appSettings.showBoxesWithNotesInMultiboxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
-                DrawPageLayouts();
-            };
-            specialBoxFilterLayout.AddView(showBoxesWithNotesInMultiboxView);
+            showBoxesWithNotesInMultiboxView.Click += (s, e) => { _appSettings.showBoxesWithNotesInMultiboxView = showBoxesWithNotesInMultiboxView.Checked; if (_appSettings.showBoxesWithNotesInMultiboxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
+            showRow3.AddView(showBoxesWithNotesInMultiboxView);
 
-            CheckBox showSpecialBoxesInMultiboxView = new CheckBox(this)
-            {
-                Text = "has label",
-                Checked = _appSettings.ShowInterestingBoxesInMultiBoxView
-            };
+            CheckBox showSpecialBoxesInMultiboxView = new CheckBox(this) { Text = "Has sticky", Checked = _appSettings.ShowInterestingBoxesInMultiBoxView };
             showSpecialBoxesInMultiboxView.SetTextColor(Color.Black);
-            showSpecialBoxesInMultiboxView.Click += (s, e) =>
-            {
-                _appSettings.ShowInterestingBoxesInMultiBoxView = showSpecialBoxesInMultiboxView.Checked;
-                if (_appSettings.ShowInterestingBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
-                DrawPageLayouts();
-            };
-            specialBoxFilterLayout.AddView(showSpecialBoxesInMultiboxView);
+            showSpecialBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowInterestingBoxesInMultiBoxView = showSpecialBoxesInMultiboxView.Checked; if (_appSettings.ShowInterestingBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
+            showRow3.AddView(showSpecialBoxesInMultiboxView);
+            showFiltersCheckboxLayout.AddView(showRow3);
 
-            CheckBox showSingleEggBoxesInMultiboxView = new CheckBox(this)
-            {
-                Text = "Single egg",
-                Checked = _appSettings.ShowSingleEggBoxesInMultiboxView
-            };
-            showSingleEggBoxesInMultiboxView.SetPadding(0, 0, 0, 0);
+            var showRow4 = new LinearLayout(this);
+            CheckBox showSingleEggBoxesInMultiboxView = new CheckBox(this) { Text = "Single egg", Checked = _appSettings.ShowSingleEggBoxesInMultiboxView };
             showSingleEggBoxesInMultiboxView.SetTextColor(Color.Black);
-            showSingleEggBoxesInMultiboxView.Click += (s, e) =>
-            {
-                _appSettings.ShowSingleEggBoxesInMultiboxView = showSingleEggBoxesInMultiboxView.Checked;
-                if (_appSettings.ShowSingleEggBoxesInMultiboxView) _appSettings.ShowAllBoxesInMultiBoxView = false;
-                DrawPageLayouts();
-            };
-            specialBoxFilterLayout.AddView(showSingleEggBoxesInMultiboxView);
-            _overviewFiltersLayout.AddView(specialBoxFilterLayout);
+            showSingleEggBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowSingleEggBoxesInMultiboxView = showSingleEggBoxesInMultiboxView.Checked; if (_appSettings.ShowSingleEggBoxesInMultiboxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
+            showRow4.AddView(showSingleEggBoxesInMultiboxView);
 
-            TextView hideBoxesTitle = new TextView(this)
-            {
-                Text = "Hide Boxes",
-                TextSize = 16,
-                Gravity = GravityFlags.Center,
+            CheckBox showDoubleEggBoxesInMultiboxView = new CheckBox(this) { Text = "Double egg", Checked = _appSettings.ShowDoubleEggBoxesInMultiboxView };
+            showDoubleEggBoxesInMultiboxView.SetTextColor(Color.Black);
+            showDoubleEggBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowDoubleEggBoxesInMultiboxView = showDoubleEggBoxesInMultiboxView.Checked; if (_appSettings.ShowDoubleEggBoxesInMultiboxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
+            showRow4.AddView(showDoubleEggBoxesInMultiboxView);
 
-            };
-            hideBoxesTitle.SetTypeface(null, TypefaceStyle.Bold);
-            hideBoxesTitle.SetTextColor(Color.Black);
-            _overviewFiltersLayout.AddView(hideBoxesTitle);
+            CheckBox showDCMBoxesInMultiboxView = new CheckBox(this) { Text = "Decommissioned", Checked = _appSettings.ShowDCMBoxesInMultiboxView };
+            showDCMBoxesInMultiboxView.SetTextColor(Color.Black);
+            showDCMBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowDCMBoxesInMultiboxView = showDCMBoxesInMultiboxView.Checked; if (_appSettings.ShowDCMBoxesInMultiboxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
+            showRow4.AddView(showDCMBoxesInMultiboxView);
+            showFiltersCheckboxLayout.AddView(showRow4);
 
-            var hideBoxesLayout = new LinearLayout(this);
-            CheckBox hideBoxesWithNoDataInMultiboxView = new CheckBox(this)
-            {
-                Text = "With data",
-                Checked = _appSettings.HideBoxesWithDataInMultiBoxView
-            };
-            hideBoxesWithNoDataInMultiboxView.SetTextColor(Color.Black);
-            hideBoxesWithNoDataInMultiboxView.Click += (s, e) =>
-            {
-                _appSettings.HideBoxesWithDataInMultiBoxView = hideBoxesWithNoDataInMultiboxView.Checked;
-                if (_appSettings.HideBoxesWithDataInMultiBoxView) _appSettings.ShowBoxesWithDataInMultiBoxView = false;
-                DrawPageLayouts();
-            };
-            hideBoxesLayout.AddView(hideBoxesWithNoDataInMultiboxView);
+            _overviewFiltersLayout.AddView(showFiltersCheckboxLayout);
 
-            CheckBox hideDCMInMultiboxView = new CheckBox(this)
-            {
-                Text = "Decomissioned",
-                Checked = _appSettings.HideDCMInMultiBoxView
-            };
+            // Hide filters checkboxes layout
+            var hideFiltersCheckboxLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
+            hideFiltersCheckboxLayout.Visibility = _appSettings.HideFiltersVisible ? ViewStates.Visible : ViewStates.Gone;
+
+            var hideRow1 = new LinearLayout(this);
+            CheckBox hideBoxesWithDataInMultiboxView = new CheckBox(this) { Text = "With data", Checked = _appSettings.HideBoxesWithDataInMultiBoxView };
+            hideBoxesWithDataInMultiboxView.SetTextColor(Color.Black);
+            hideBoxesWithDataInMultiboxView.Click += (s, e) => { _appSettings.HideBoxesWithDataInMultiBoxView = hideBoxesWithDataInMultiboxView.Checked; if (_appSettings.HideBoxesWithDataInMultiBoxView) _appSettings.ShowBoxesWithDataInMultiBoxView = false; DrawPageLayouts(); };
+            hideRow1.AddView(hideBoxesWithDataInMultiboxView);
+
+            CheckBox hideNoBoxesInMultiBoxView = new CheckBox(this) { Text = "NO", Checked = _appSettings.HideNoBoxesInMultiBoxView };
+            hideNoBoxesInMultiBoxView.SetTextColor(Color.Black);
+            hideNoBoxesInMultiBoxView.Click += (s, e) => { _appSettings.HideNoBoxesInMultiBoxView = hideNoBoxesInMultiBoxView.Checked; DrawPageLayouts(); };
+            hideRow1.AddView(hideNoBoxesInMultiBoxView);
+
+            CheckBox hideUnlikelyBoxesInMultiBoxView = new CheckBox(this) { Text = "UNL", Checked = _appSettings.HideUnlikelyBoxesInMultiBoxView };
+            hideUnlikelyBoxesInMultiBoxView.SetTextColor(Color.Black);
+            hideUnlikelyBoxesInMultiBoxView.Click += (s, e) => { _appSettings.HideUnlikelyBoxesInMultiBoxView = hideUnlikelyBoxesInMultiBoxView.Checked; DrawPageLayouts(); };
+            hideRow1.AddView(hideUnlikelyBoxesInMultiBoxView);
+            hideFiltersCheckboxLayout.AddView(hideRow1);
+
+            var hideRow2 = new LinearLayout(this);
+            CheckBox hidePotentialBoxesInMultiBoxView = new CheckBox(this) { Text = "POT", Checked = _appSettings.HidePotentialBoxesInMultiBoxView };
+            hidePotentialBoxesInMultiBoxView.SetTextColor(Color.Black);
+            hidePotentialBoxesInMultiBoxView.Click += (s, e) => { _appSettings.HidePotentialBoxesInMultiBoxView = hidePotentialBoxesInMultiBoxView.Checked; DrawPageLayouts(); };
+            hideRow2.AddView(hidePotentialBoxesInMultiBoxView);
+
+            CheckBox hideConfidentBoxesInMultiBoxView = new CheckBox(this) { Text = "CON", Checked = _appSettings.HideConfidentBoxesInMultiBoxView };
+            hideConfidentBoxesInMultiBoxView.SetTextColor(Color.Black);
+            hideConfidentBoxesInMultiBoxView.Click += (s, e) => { _appSettings.HideConfidentBoxesInMultiBoxView = hideConfidentBoxesInMultiBoxView.Checked; DrawPageLayouts(); };
+            hideRow2.AddView(hideConfidentBoxesInMultiBoxView);
+
+            CheckBox hideBreedingBoxesInMultiBoxView = new CheckBox(this) { Text = "BR", Checked = _appSettings.HideBreedingBoxesInMultiBoxView };
+            hideBreedingBoxesInMultiBoxView.SetTextColor(Color.Black);
+            hideBreedingBoxesInMultiBoxView.Click += (s, e) => { _appSettings.HideBreedingBoxesInMultiBoxView = hideBreedingBoxesInMultiBoxView.Checked; DrawPageLayouts(); };
+            hideRow2.AddView(hideBreedingBoxesInMultiBoxView);
+            hideFiltersCheckboxLayout.AddView(hideRow2);
+
+            var hideRow3 = new LinearLayout(this);
+            CheckBox hideBoxesWithNotesInMultiboxView = new CheckBox(this) { Text = "Has notes", Checked = _appSettings.HideBoxesWithNotesInMultiboxView };
+            hideBoxesWithNotesInMultiboxView.SetTextColor(Color.Black);
+            hideBoxesWithNotesInMultiboxView.Click += (s, e) => { _appSettings.HideBoxesWithNotesInMultiboxView = hideBoxesWithNotesInMultiboxView.Checked; DrawPageLayouts(); };
+            hideRow3.AddView(hideBoxesWithNotesInMultiboxView);
+
+            CheckBox hideSpecialBoxesInMultiBoxView = new CheckBox(this) { Text = "Has sticky", Checked = _appSettings.HideInterestingBoxesInMultiBoxView };
+            hideSpecialBoxesInMultiBoxView.SetTextColor(Color.Black);
+            hideSpecialBoxesInMultiBoxView.Click += (s, e) => { _appSettings.HideInterestingBoxesInMultiBoxView = hideSpecialBoxesInMultiBoxView.Checked; DrawPageLayouts(); };
+            hideRow3.AddView(hideSpecialBoxesInMultiBoxView);
+
+            CheckBox hideSingleEggBoxesInMultiboxView = new CheckBox(this) { Text = "Single egg", Checked = _appSettings.HideSingleEggBoxesInMultiboxView };
+            hideSingleEggBoxesInMultiboxView.SetTextColor(Color.Black);
+            hideSingleEggBoxesInMultiboxView.Click += (s, e) => { _appSettings.HideSingleEggBoxesInMultiboxView = hideSingleEggBoxesInMultiboxView.Checked; DrawPageLayouts(); };
+            hideRow3.AddView(hideSingleEggBoxesInMultiboxView);
+            hideFiltersCheckboxLayout.AddView(hideRow3);
+
+            var hideRow4 = new LinearLayout(this);
+            CheckBox hideDoubleEggBoxesInMultiboxView = new CheckBox(this) { Text = "Double egg", Checked = _appSettings.HideDoubleEggBoxesInMultiboxView };
+            hideDoubleEggBoxesInMultiboxView.SetTextColor(Color.Black);
+            hideDoubleEggBoxesInMultiboxView.Click += (s, e) => { _appSettings.HideDoubleEggBoxesInMultiboxView = hideDoubleEggBoxesInMultiboxView.Checked; DrawPageLayouts(); };
+            hideRow4.AddView(hideDoubleEggBoxesInMultiboxView);
+
+            CheckBox hideDCMInMultiboxView = new CheckBox(this) { Text = "Decommissioned", Checked = _appSettings.HideDCMInMultiBoxView };
             hideDCMInMultiboxView.SetTextColor(Color.Black);
-            hideDCMInMultiboxView.Click += (s, e) =>
-            {
-                _appSettings.HideDCMInMultiBoxView = hideDCMInMultiboxView.Checked;
-                DrawPageLayouts();
-            };
-            hideBoxesLayout.AddView(hideDCMInMultiboxView);
+            hideDCMInMultiboxView.Click += (s, e) => { _appSettings.HideDCMInMultiBoxView = hideDCMInMultiboxView.Checked; DrawPageLayouts(); };
+            hideRow4.AddView(hideDCMInMultiboxView);
 
-            CheckBox hideBeforeCurrentCheckbox = new CheckBox(this)
-            {
-                Text = "< current",
-                Checked = _appSettings.HideBeforeCurrentInMultiBoxView
-            };
+            CheckBox hideBeforeCurrentCheckbox = new CheckBox(this) { Text = "< current", Checked = _appSettings.HideBeforeCurrentInMultiBoxView };
             hideBeforeCurrentCheckbox.SetTextColor(Color.Black);
-            hideBeforeCurrentCheckbox.Click += (s, e) =>
-            {
-                _appSettings.HideBeforeCurrentInMultiBoxView = hideBeforeCurrentCheckbox.Checked;
-                DrawPageLayouts();
-            };
-            hideBoxesLayout.AddView(hideBeforeCurrentCheckbox);
-            _overviewFiltersLayout.AddView(hideBoxesLayout);
+            hideBeforeCurrentCheckbox.Click += (s, e) => { _appSettings.HideBeforeCurrentInMultiBoxView = hideBeforeCurrentCheckbox.Checked; DrawPageLayouts(); };
+            hideRow4.AddView(hideBeforeCurrentCheckbox);
+            hideFiltersCheckboxLayout.AddView(hideRow4);
+
+            _overviewFiltersLayout.AddView(hideFiltersCheckboxLayout);
 
             //Navigate Monitors
             var browseOtherMonitorsLayout = new LinearLayout(this);
@@ -1327,13 +1286,24 @@ namespace PenguinMonitor
                             || _appSettings.ShowNoBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("NO")
                             || _appSettings.ShowBoxesWithNotesInMultiboxView && mostRecentBoxData != null && !String.IsNullOrWhiteSpace(mostRecentBoxData.Notes)
                             || _appSettings.ShowInterestingBoxesInMultiBoxView && (mostRecentBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(stickyNotes))
-                            || _appSettings.ShowSingleEggBoxesInMultiboxView && (mostRecentBoxData.Eggs == 1);
+                            || _appSettings.ShowSingleEggBoxesInMultiboxView && (mostRecentBoxData.Eggs == 1)
+                            || _appSettings.ShowDoubleEggBoxesInMultiboxView && (mostRecentBoxData.Eggs == 2)
+                            || _appSettings.ShowDCMBoxesInMultiboxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("DCM");
 
                 bool hideBoxWithData = _appSettings.HideBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxName);
                 bool hideDCM = _appSettings.HideDCMInMultiBoxView && ((mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance == "DCM"));
                 bool hideBeforeCurrent = _appSettings.HideBeforeCurrentInMultiBoxView && _currentBoxIndex > _boxNamesAndIndexes[boxName];
+                bool hideNo = _appSettings.HideNoBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("NO");
+                bool hideUnlikely = _appSettings.HideUnlikelyBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("UNL");
+                bool hidePotential = _appSettings.HidePotentialBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("POT");
+                bool hideConfident = _appSettings.HideConfidentBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("CON");
+                bool hideBreeding = _appSettings.HideBreedingBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("BR");
+                bool hideNotes = _appSettings.HideBoxesWithNotesInMultiboxView && mostRecentBoxData != null && !String.IsNullOrWhiteSpace(mostRecentBoxData.Notes);
+                bool hideInteresting = _appSettings.HideInterestingBoxesInMultiBoxView && (mostRecentBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(stickyNotes));
+                bool hideSingleEgg = _appSettings.HideSingleEggBoxesInMultiboxView && mostRecentBoxData.Eggs == 1;
+                bool hideDoubleEgg = _appSettings.HideDoubleEggBoxesInMultiboxView && mostRecentBoxData.Eggs == 2;
 
-                if (showBox && !hideBoxWithData && !hideDCM && !hideBeforeCurrent)
+                if (showBox && !hideBoxWithData && !hideDCM && !hideBeforeCurrent && !hideNo && !hideUnlikely && !hidePotential && !hideConfident && !hideBreeding && !hideNotes && !hideInteresting && !hideSingleEgg && !hideDoubleEgg)
                 {
                     View? card;
                     if (currentBoxDataFound)
