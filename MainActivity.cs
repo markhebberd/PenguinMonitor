@@ -1043,6 +1043,17 @@ namespace PenguinMonitor
             filterButtonsLayout.AddView(hideFiltersToggleButton);
             _overviewFiltersLayout.AddView(filterButtonsLayout);
 
+            // Filter text representation
+            TextView filterTextView = new TextView(this)
+            {
+                Text = GetFilterTextRepresentation(),
+                TextSize = 12,
+                Gravity = GravityFlags.Center
+            };
+            filterTextView.SetTextColor(Color.Black);
+            filterTextView.SetPadding(16, 8, 16, 8);
+            _overviewFiltersLayout.AddView(filterTextView);
+
             // Show filters checkboxes layout
             var showFiltersCheckboxLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             showFiltersCheckboxLayout.Visibility = _appSettings.ShowFiltersVisible ? ViewStates.Visible : ViewStates.Gone;
@@ -1698,6 +1709,84 @@ namespace PenguinMonitor
             layout.AddView(_nextBoxButton);
 
             return layout;
+        }
+        private string GetFilterTextRepresentation()
+        {
+            List<string> showFilters = new List<string>();
+            List<string> hideFilters = new List<string>();
+
+            // Build show filters list
+            if (_appSettings.ShowAllBoxesInMultiBoxView)
+            {
+                showFilters.Add("all");
+            }
+            else
+            {
+                if (_appSettings.ShowBoxesWithDataInMultiBoxView) showFilters.Add("with data");
+                if (_appSettings.ShowNoBoxesInMultiBoxView) showFilters.Add("NO");
+                if (_appSettings.ShowUnlikleyBoxesInMultiBoxView) showFilters.Add("UNL");
+                if (_appSettings.ShowPotentialBoxesInMultiBoxView) showFilters.Add("POT");
+                if (_appSettings.ShowConfidentBoxesInMultiBoxView) showFilters.Add("CON");
+                if (_appSettings.ShowBreedingBoxesInMultiBoxView) showFilters.Add("BR");
+                if (_appSettings.showBoxesWithNotesInMultiboxView) showFilters.Add("has notes");
+                if (_appSettings.ShowInterestingBoxesInMultiBoxView) showFilters.Add("has sticky");
+                if (_appSettings.ShowSingleEggBoxesInMultiboxView) showFilters.Add("single egg");
+                if (_appSettings.ShowDoubleEggBoxesInMultiboxView) showFilters.Add("double egg");
+                if (_appSettings.ShowDCMBoxesInMultiboxView) showFilters.Add("decommissioned");
+            }
+
+            // Build hide filters list
+            if (_appSettings.HideBoxesWithDataInMultiBoxView) hideFilters.Add("with data");
+            if (_appSettings.HideNoBoxesInMultiBoxView) hideFilters.Add("NO");
+            if (_appSettings.HideUnlikelyBoxesInMultiBoxView) hideFilters.Add("UNL");
+            if (_appSettings.HidePotentialBoxesInMultiBoxView) hideFilters.Add("POT");
+            if (_appSettings.HideConfidentBoxesInMultiBoxView) hideFilters.Add("CON");
+            if (_appSettings.HideBreedingBoxesInMultiBoxView) hideFilters.Add("BR");
+            if (_appSettings.HideBoxesWithNotesInMultiboxView) hideFilters.Add("has notes");
+            if (_appSettings.HideInterestingBoxesInMultiBoxView) hideFilters.Add("has sticky");
+            if (_appSettings.HideSingleEggBoxesInMultiboxView) hideFilters.Add("single egg");
+            if (_appSettings.HideDoubleEggBoxesInMultiboxView) hideFilters.Add("double egg");
+            if (_appSettings.HideDCMInMultiBoxView) hideFilters.Add("decommissioned");
+            if (_appSettings.HideBeforeCurrentInMultiBoxView) hideFilters.Add("#<current boxes");
+
+            // Format the text
+            string result = "";
+
+            if (_appSettings.ShowAllBoxesInMultiBoxView && hideFilters.Count == 0)
+            {
+                result = "all";
+            }
+            else if (_appSettings.ShowAllBoxesInMultiBoxView)
+            {
+                result = "all minus " + string.Join(", ", hideFilters);
+            }
+            else
+            {
+                if (showFilters.Count > 0)
+                {
+                    result = string.Join(", ", showFilters.Take(showFilters.Count - 1));
+                    if (showFilters.Count > 1)
+                        result += " and " + showFilters.Last();
+                    else
+                        result = showFilters[0];
+                }
+
+                if (hideFilters.Count > 0)
+                {
+                    string hideText = string.Join(", ", hideFilters.Take(hideFilters.Count - 1));
+                    if (hideFilters.Count > 1)
+                        hideText += " and " + hideFilters.Last();
+                    else
+                        hideText = hideFilters[0];
+
+                    if (!string.IsNullOrEmpty(result))
+                        result += " - " + hideText;
+                    else
+                        result = "nothing - " + hideText;
+                }
+            }
+
+            return string.IsNullOrEmpty(result) ? "no filters" : result;
         }
         internal void DrawPageLayouts()
         {
