@@ -2094,6 +2094,19 @@ namespace PenguinMonitor
             _notesEditText[0].LayoutParameters = notesEditParams;
             _notesEditText[0].TextChanged += OnDataChanged;
             _singleBoxDataContentLayout.AddView(_notesEditText[0]);
+
+            // Add button to manage persistent notes
+            var managePersistentNotesButton = new Button(this)
+            {
+                Text = "📌 Manage Persistent Notes"
+            };
+            managePersistentNotesButton.SetTextColor(Color.White);
+            managePersistentNotesButton.SetBackgroundColor(UIFactory.PRIMARY_BLUE);
+            var manageNotesButtonParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+            manageNotesButtonParams.SetMargins(0, 0, 0, 16);
+            managePersistentNotesButton.LayoutParameters = manageNotesButtonParams;
+            managePersistentNotesButton.Click += (s, e) => ShowPersistentNotesDialog();
+            _singleBoxDataContentLayout.AddView(managePersistentNotesButton);
             _singleBoxDataOuterLayout.AddView(_singleBoxDataContentLayout);
 
             // Navigation card
@@ -2227,6 +2240,203 @@ namespace PenguinMonitor
             if (null != negativeButton)
                 alertDialog.SetButton((int)DialogButtonType.Negative, negativeButton?.text, (s, e) => negativeButton?.action());
             alertDialog?.Show();
+        }
+
+        private void ShowPersistentNotesDialog()
+        {
+            // Get current persistent notes for this box
+            var olderBoxDatas = DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, _currentBoxName);
+            string persistentNotesString = DataStorageService.getPersistentNotes(olderBoxDatas);
+            var currentNotes = new List<string>();
+            if (!string.IsNullOrWhiteSpace(persistentNotesString))
+            {
+                currentNotes = persistentNotesString.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+            }
+
+            // Create main container
+            var mainLayout = new LinearLayout(this)
+            {
+                Orientation = Orientation.Vertical
+            };
+            mainLayout.SetPadding(40, 20, 40, 20);
+
+            // Title for current notes
+            var titleText = new TextView(this)
+            {
+                Text = "Current Persistent Notes:",
+                TextSize = 14
+            };
+            titleText.SetTextColor(UIFactory.TEXT_PRIMARY);
+            titleText.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
+            var titleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+            titleParams.SetMargins(0, 0, 0, 16);
+            titleText.LayoutParameters = titleParams;
+            mainLayout.AddView(titleText);
+
+            // ScrollView for existing notes
+            var notesScrollView = new ScrollView(this);
+            var notesContainer = new LinearLayout(this)
+            {
+                Orientation = Orientation.Vertical
+            };
+            notesScrollView.AddView(notesContainer);
+            var scrollParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1.0f);
+            scrollParams.SetMargins(0, 0, 0, 16);
+            notesScrollView.LayoutParameters = scrollParams;
+
+            // Add existing notes
+            if (currentNotes.Count == 0)
+            {
+                var emptyText = new TextView(this)
+                {
+                    Text = "No persistent notes yet",
+                    TextSize = 14
+                };
+                emptyText.SetTextColor(UIFactory.TEXT_SECONDARY);
+                emptyText.SetPadding(8, 8, 8, 8);
+                notesContainer.AddView(emptyText);
+            }
+            else
+            {
+                foreach (var note in currentNotes)
+                {
+                    var noteLayout = new LinearLayout(this)
+                    {
+                        Orientation = Orientation.Horizontal
+                    };
+                    var noteLayoutParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+                    noteLayoutParams.SetMargins(0, 4, 0, 4);
+                    noteLayout.LayoutParameters = noteLayoutParams;
+
+                    var noteText = new TextView(this)
+                    {
+                        Text = note,
+                        TextSize = 14
+                    };
+                    noteText.SetTextColor(UIFactory.TEXT_PRIMARY);
+                    noteText.SetPadding(12, 12, 12, 12);
+                    noteText.SetBackgroundColor(UIFactory.LIGHTER_GRAY);
+                    var noteTextParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1.0f);
+                    noteTextParams.SetMargins(0, 0, 8, 0);
+                    noteText.LayoutParameters = noteTextParams;
+
+                    var deleteButton = new Button(this)
+                    {
+                        Text = "✕"
+                    };
+                    deleteButton.SetTextColor(Color.White);
+                    deleteButton.SetBackgroundColor(UIFactory.ERROR_RED);
+                    var deleteParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
+                    deleteButton.LayoutParameters = deleteParams;
+
+                    string noteToRemove = note;
+                    deleteButton.Click += (s, e) =>
+                    {
+                        // Remove this note by adding l-notename to the notes field
+                        string currentNotesText = _notesEditText?[0].Text ?? "";
+                        if (!currentNotesText.EndsWith(" "))
+                            currentNotesText += " ";
+                        currentNotesText += $"l-{noteToRemove} ";
+                        _notesEditText[0].Text = currentNotesText;
+
+                        SaveCurrentBoxData();
+                        Toast.MakeText(this, $"Removed persistent note: {noteToRemove}", ToastLength.Short)?.Show();
+
+                        // Close and reopen dialog to refresh
+                        ShowPersistentNotesDialog();
+                    };
+
+                    noteLayout.AddView(noteText);
+                    noteLayout.AddView(deleteButton);
+                    notesContainer.AddView(noteLayout);
+                }
+            }
+
+            mainLayout.AddView(notesScrollView);
+
+            // Add new note section
+            var addSectionLayout = new LinearLayout(this)
+            {
+                Orientation = Orientation.Vertical
+            };
+            var addSectionParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+            addSectionParams.SetMargins(0, 16, 0, 0);
+            addSectionLayout.LayoutParameters = addSectionParams;
+
+            var addLabel = new TextView(this)
+            {
+                Text = "Add New Persistent Note:",
+                TextSize = 14
+            };
+            addLabel.SetTextColor(UIFactory.TEXT_PRIMARY);
+            addLabel.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
+            var addLabelParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+            addLabelParams.SetMargins(0, 0, 0, 8);
+            addLabel.LayoutParameters = addLabelParams;
+            addSectionLayout.AddView(addLabel);
+
+            var newNoteInput = new EditText(this)
+            {
+                Hint = "Enter note text...",
+                InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextFlagCapSentences
+            };
+            newNoteInput.SetTextColor(UIFactory.TEXT_PRIMARY);
+            newNoteInput.SetHintTextColor(UIFactory.TEXT_SECONDARY);
+            newNoteInput.SetPadding(16, 16, 16, 16);
+            newNoteInput.Background = _uiFactory.CreateRoundedBackground(UIFactory.LIGHTER_GRAY, 8);
+            var inputParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+            inputParams.SetMargins(0, 0, 0, 8);
+            newNoteInput.LayoutParameters = inputParams;
+            addSectionLayout.AddView(newNoteInput);
+
+            var addButton = new Button(this)
+            {
+                Text = "Add Note"
+            };
+            addButton.SetTextColor(Color.White);
+            addButton.SetBackgroundColor(UIFactory.PRIMARY_BLUE);
+            addButton.Click += (s, e) =>
+            {
+                string newNote = newNoteInput.Text?.Trim();
+                if (string.IsNullOrWhiteSpace(newNote))
+                {
+                    Toast.MakeText(this, "Please enter a note", ToastLength.Short)?.Show();
+                    return;
+                }
+
+                // Replace spaces with underscores to make it a single token
+                newNote = newNote.Replace(" ", "_");
+
+                // Add this note by appending l=notename to the notes field
+                string currentNotesText = _notesEditText?[0].Text ?? "";
+                if (!currentNotesText.EndsWith(" "))
+                    currentNotesText += " ";
+                currentNotesText += $"l={newNote} ";
+                _notesEditText[0].Text = currentNotesText;
+
+                SaveCurrentBoxData();
+                Toast.MakeText(this, $"Added persistent note: {newNote}", ToastLength.Short)?.Show();
+
+                // Close and reopen dialog to refresh
+                ShowPersistentNotesDialog();
+            };
+            addSectionLayout.AddView(addButton);
+
+            mainLayout.AddView(addSectionLayout);
+
+            // Create and show dialog
+            var dialog = new AlertDialog.Builder(this)
+                .SetTitle($"Persistent Notes - Box {_currentBoxName}")
+                .SetView(mainLayout)
+                .SetNegativeButton("Close", (s, e) => { })
+                .Create();
+
+            dialog?.Show();
+
+            // Focus the input field and show keyboard
+            newNoteInput.RequestFocus();
+            var inputManager = (InputMethodManager?)GetSystemService(InputMethodService);
+            inputManager?.ShowSoftInput(newNoteInput, ShowFlags.Implicit);
         }
         private void OnDataChanged(object? sender, TextChangedEventArgs e)
         {
