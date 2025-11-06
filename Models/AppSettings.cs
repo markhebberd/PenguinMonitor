@@ -77,6 +77,32 @@ namespace PenguinMonitor.Models
                 }
             }
         }
+        private bool showFiltersVisible;
+        public bool ShowFiltersVisible
+        {
+            get => showFiltersVisible;
+            set
+            {
+                if (showFiltersVisible != value)
+                {
+                    showFiltersVisible = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool hideFiltersVisible;
+        public bool HideFiltersVisible
+        {
+            get => hideFiltersVisible;
+            set
+            {
+                if (hideFiltersVisible != value)
+                {
+                    hideFiltersVisible = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
         private bool showAllBoxesInMultiBoxView;
         public bool ShowAllBoxesInMultiBoxView
         {
@@ -207,6 +233,32 @@ namespace PenguinMonitor.Models
                 }
             }
         }
+        private bool showDoubleEggBoxesInMultiboxView;
+        public bool ShowDoubleEggBoxesInMultiboxView
+        {
+            get => showDoubleEggBoxesInMultiboxView;
+            set
+            {
+                if (showDoubleEggBoxesInMultiboxView != value)
+                {
+                    showDoubleEggBoxesInMultiboxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool showDCMBoxesInMultiboxView;
+        public bool ShowDCMBoxesInMultiboxView
+        {
+            get => showDCMBoxesInMultiboxView;
+            set
+            {
+                if (showDCMBoxesInMultiboxView != value)
+                {
+                    showDCMBoxesInMultiboxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
         private bool hideBoxesWithDataInMultiBoxView;  
         public bool HideBoxesWithDataInMultiBoxView
         {
@@ -229,6 +281,123 @@ namespace PenguinMonitor.Models
                 if (hideDCMInMultiBoxView != value)
                 {
                     hideDCMInMultiBoxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool hideNoBoxesInMultiBoxView;
+        public bool HideNoBoxesInMultiBoxView
+        {
+            get => hideNoBoxesInMultiBoxView;
+            set
+            {
+                if (hideNoBoxesInMultiBoxView != value)
+                {
+                    hideNoBoxesInMultiBoxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool hideUnlikelyBoxesInMultiBoxView;
+        public bool HideUnlikelyBoxesInMultiBoxView
+        {
+            get => hideUnlikelyBoxesInMultiBoxView;
+            set
+            {
+                if (hideUnlikelyBoxesInMultiBoxView != value)
+                {
+                    hideUnlikelyBoxesInMultiBoxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool hidePotentialBoxesInMultiBoxView;
+        public bool HidePotentialBoxesInMultiBoxView
+        {
+            get => hidePotentialBoxesInMultiBoxView;
+            set
+            {
+                if (hidePotentialBoxesInMultiBoxView != value)
+                {
+                    hidePotentialBoxesInMultiBoxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool hideConfidentBoxesInMultiBoxView;
+        public bool HideConfidentBoxesInMultiBoxView
+        {
+            get => hideConfidentBoxesInMultiBoxView;
+            set
+            {
+                if (hideConfidentBoxesInMultiBoxView != value)
+                {
+                    hideConfidentBoxesInMultiBoxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool hideBreedingBoxesInMultiBoxView;
+        public bool HideBreedingBoxesInMultiBoxView
+        {
+            get => hideBreedingBoxesInMultiBoxView;
+            set
+            {
+                if (hideBreedingBoxesInMultiBoxView != value)
+                {
+                    hideBreedingBoxesInMultiBoxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool hideBoxesWithNotesInMultiboxView;
+        public bool HideBoxesWithNotesInMultiboxView
+        {
+            get => hideBoxesWithNotesInMultiboxView;
+            set
+            {
+                if (hideBoxesWithNotesInMultiboxView != value)
+                {
+                    hideBoxesWithNotesInMultiboxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool hideInterestingBoxesInMultiBoxView;
+        public bool HideInterestingBoxesInMultiBoxView
+        {
+            get => hideInterestingBoxesInMultiBoxView;
+            set
+            {
+                if (hideInterestingBoxesInMultiBoxView != value)
+                {
+                    hideInterestingBoxesInMultiBoxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool hideSingleEggBoxesInMultiboxView;
+        public bool HideSingleEggBoxesInMultiboxView
+        {
+            get => hideSingleEggBoxesInMultiboxView;
+            set
+            {
+                if (hideSingleEggBoxesInMultiboxView != value)
+                {
+                    hideSingleEggBoxesInMultiboxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool hideDoubleEggBoxesInMultiboxView;
+        public bool HideDoubleEggBoxesInMultiboxView
+        {
+            get => hideDoubleEggBoxesInMultiboxView;
+            set
+            {
+                if (hideDoubleEggBoxesInMultiboxView != value)
+                {
+                    hideDoubleEggBoxesInMultiboxView = value;
                     OnAnyPropertyChanged();
                 }
             }
