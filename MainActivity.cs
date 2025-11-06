@@ -1051,7 +1051,7 @@ namespace PenguinMonitor
             TextView filterTextView = new TextView(this)
             {
                 Text = GetFilterTextRepresentation(),
-                TextSize = 14,
+                TextSize = 16,
                 Gravity = GravityFlags.Center
             };
             filterTextView.SetTypeface(null, TypefaceStyle.Bold);
@@ -1779,11 +1779,11 @@ namespace PenguinMonitor
 
             if (_appSettings.ShowAllBoxesInMultiBoxView && hideFilters.Count == 0)
             {
-                result = "all";
+                result = "All";
             }
             else if (_appSettings.ShowAllBoxesInMultiBoxView)
             {
-                result = "all minus " + string.Join(", ", hideFilters);
+                result = "All except " + string.Join(", ", hideFilters);
             }
             else
             {
@@ -1805,13 +1805,13 @@ namespace PenguinMonitor
                         hideText = hideFilters[0];
 
                     if (!string.IsNullOrEmpty(result))
-                        result += " - " + hideText;
+                        result += " except " + hideText;
                     else
-                        result = "nothing - " + hideText;
+                        result = "None except " + hideText;
                 }
             }
 
-            return string.IsNullOrEmpty(result) ? "no filters" : result;
+            return string.IsNullOrEmpty(result) ? "^ ^ Select show box filters ^ ^" : result;
         }
         internal void DrawPageLayouts()
         {
