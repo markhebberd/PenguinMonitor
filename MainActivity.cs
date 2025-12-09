@@ -1378,14 +1378,19 @@ namespace PenguinMonitor
                 olderBoxDatas.RemoveAt(0);
             }
 
-            var card = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
-            card.SetPadding(5, 5, 5, 5);
-            var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent, 1f);
+            var boxOverviewCard = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
+            boxOverviewCard.SetPadding(5, 5, 5, 5);
+
+            // Set minimum width to 1/5 of screen width (parent row is always MatchParent)
+            int minWidth = Resources.DisplayMetrics.WidthPixels / 5;
+
+            var cardParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f);
             cardParams.SetMargins(5, 5, 5, 5);
-            card.LayoutParameters = cardParams;
+            boxOverviewCard.LayoutParameters = cardParams;
+            boxOverviewCard.SetMinimumWidth(minWidth);
             bool differenceFound = false;
 
-            card.Click += (sender, e) =>
+            boxOverviewCard.Click += (sender, e) =>
             {
                 JumpToBox(boxName);
                 ScrollToTop();
@@ -1396,27 +1401,27 @@ namespace PenguinMonitor
 
             if (!currentExists)
             {
-                card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, UIFactory.WARNING_YELLOW, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
+                boxOverviewCard.Background = _uiFactory.CreateCardBackground(borderWidth: 8, UIFactory.WARNING_YELLOW, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
             }
             else if (olderBoxDatas.Count > 0
                 && thisBoxData.Eggs + thisBoxData.Chicks < olderBoxDatas.First().Eggs + olderBoxDatas.First().Chicks)
             {
                 differenceFound = true;
-                card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.DANGER_RED, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
+                boxOverviewCard.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.DANGER_RED, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
             }
             else if (thisBoxData.BreedingChance != "BR" && thisBoxData.Eggs + thisBoxData.Chicks > 0)
             {
-                card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.DANGER_RED, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
+                boxOverviewCard.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.DANGER_RED, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
             }
             else if (olderBoxDatas.Count > 0
                 && (thisBoxData.Eggs != olderBoxDatas.First().Eggs || thisBoxData.Chicks != olderBoxDatas.First().Chicks))
             {
                 differenceFound = true;
-                card.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.PRIMARY_BLUE, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
+                boxOverviewCard.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.PRIMARY_BLUE, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
             }
             else
             {
-                card.Background = _uiFactory.CreateCardBackground(borderWidth: 3, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
+                boxOverviewCard.Background = _uiFactory.CreateCardBackground(borderWidth: 3, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
             }
 
             var title = new TextView(this)
@@ -1427,10 +1432,10 @@ namespace PenguinMonitor
             };
             title.SetTypeface(Typeface.DefaultBold, TypefaceStyle.Normal);
             title.SetTextColor(Color.Black);
-            card.AddView(title);
+            boxOverviewCard.AddView(title);
 
             if (thisBoxData == null)
-                return card;
+                return boxOverviewCard;
             
             var summary = new TextView(this)
             {
@@ -1480,9 +1485,9 @@ namespace PenguinMonitor
             };
             gate_and_notes.SetTextColor(Color.DarkGray);
 
-            if(!string.IsNullOrEmpty(summary.Text)) card.AddView(summary);
-            if(!string.IsNullOrEmpty(gate_and_notes.Text)) card.AddView(gate_and_notes);
-            return card;
+            if(!string.IsNullOrEmpty(summary.Text)) boxOverviewCard.AddView(summary);
+            if(!string.IsNullOrEmpty(gate_and_notes.Text)) boxOverviewCard.AddView(gate_and_notes);
+            return boxOverviewCard;
         }
         private void ScrollToTop()
         {

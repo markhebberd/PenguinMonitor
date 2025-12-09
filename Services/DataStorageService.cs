@@ -407,29 +407,31 @@ namespace PenguinMonitor.Services
         }
         internal static string getStickyNotes(List<BoxData> olderBoxes)
         {
-            List<string> removedStickies = new List<string>();
-            string stickies = "";
+            HashSet<string> removedStickies = new HashSet<string>();
+            HashSet<string> addedStickies = new HashSet<string>();
             foreach (BoxData boxData in olderBoxes)
             {
                 foreach (string part in boxData.Notes.Split(" ", StringSplitOptions.RemoveEmptyEntries))
                 {
-                    if (part.StartsWith("l-"))
+                    if (part.StartsWith("l-") && part.Length > 2)
                     {
-                        removedStickies.Add(part);
+                        string sticky = part.Substring(2);
+                        removedStickies.Add(sticky);
+                        addedStickies.Remove(sticky);
                     }
                     else if (part.StartsWith("l=") && part.Length > 2)
                     {
                         string sticky = part.Substring(2);
                         if (!removedStickies.Contains(sticky))
-                            stickies += sticky + " ";
+                            addedStickies.Add(sticky);
                     }
                     else if (part.StartsWith("l="))
                     {
-                        return stickies.Trim();
+                        return string.Join(" ", addedStickies);
                     }
                 }
             }
-            return stickies.Trim();
+            return string.Join(" ", addedStickies);
         }
         internal static string GetBoxBreedingStatusString(string boxName, BoxData? thisBoxData, List<BoxData> olderBoxDatas)
         {
