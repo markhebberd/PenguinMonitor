@@ -1148,13 +1148,13 @@ namespace PenguinMonitor
             var filterButtonParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
             filterButtonParams.SetMargins(8, 8, 8, 8);
 
-            Button showFiltersToggleButton = _uiFactory.CreateStyledButton(!_appSettings.ShowFiltersVisible ? "Show show box filters" : "Show show box filters", UIFactory.PRIMARY_BLUE);
+            Button showFiltersToggleButton = _uiFactory.CreateStyledButton(!_appSettings.ShowFiltersVisible ? "Show show box filters" : "Hide show box filters", UIFactory.PRIMARY_BLUE);
             showFiltersToggleButton.LayoutParameters = filterButtonParams;
             showFiltersToggleButton.Click += (s, e) =>
             {
                 _appSettings.ShowFiltersVisible = !_appSettings.ShowFiltersVisible;
                 _appSettings.HideFiltersVisible = false;
-                showFiltersToggleButton.Text = !_appSettings.ShowFiltersVisible ? "Show show box filters" : "Show show box filters";
+                showFiltersToggleButton.Text = !_appSettings.ShowFiltersVisible ? "Show show box filters" : "Hide show box filters";
                 DrawPageLayouts();
             };
             filterButtonsLayout.AddView(showFiltersToggleButton);
@@ -2562,20 +2562,9 @@ namespace PenguinMonitor
                     ("Cancel", new Action(() => { }))
                 );
             }
-            else //looking at an old monitor on the server. 
+            else //looking at an old monitor on the server.
             {
-                ShowConfirmationDialog(
-                    "Delete monitoring data",
-                    "Set this monitor to be ignored on the server?",
-                    ("Yes, flag to be ignored", new Action(() =>
-                    {
-                        string question = "DeletePenguinMonitor:" + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].filename + "~~~~" + _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved.ToFileTimeUtc();
-                        string response = Backend.RequestServerResponse(question);
-                        Toast.MakeText(this, "Server response: " + response, ToastLength.Long).Show();
-                        OnBirdStatsClick(s, e);
-                    })),
-                    ("Cancel", new Action(() => { }))
-                );
+                ShowDeletionReasonDialog();
             }
         }
         private void OnSaveDataClick(object? sender, EventArgs e)
@@ -2600,6 +2589,47 @@ namespace PenguinMonitor
                 .Create();
             if (null != negativeButton)
                 alertDialog.SetButton((int)DialogButtonType.Negative, negativeButton?.text, (s, e) => negativeButton?.action());
+            alertDialog?.Show();
+        }
+
+        private void ShowDeletionReasonDialog()
+        {
+            // Create input field for deletion reason
+            var input = new EditText(this);
+            input.Hint = "Enter reason for deletion (optional)";
+            input.SetPadding(40, 20, 40, 20);
+
+            var alertDialog = new AlertDialog.Builder(this)
+                .SetTitle("Delete monitoring data")
+                .SetMessage("Set this monitor to be ignored on the server?")
+                .SetView(input)
+                .SetPositiveButton("Yes, flag to be ignored", (s, e) =>
+                {
+                    var currentMonitor = _allMonitorData[_appSettings.CurrentlyVisibleMonitor];
+                    string deletionReason = input.Text?.Trim() ?? "";
+
+                    // Save the deletion reason to the monitor
+                    if (!string.IsNullOrWhiteSpace(deletionReason))
+                    {
+                        currentMonitor.DeletionReason = deletionReason;
+                        currentMonitor.IsDeleted = true;
+                        SaveToAppDataDir();
+                    }
+
+                    // Send deletion request to server
+                    string question = "DeletePenguinMonitor:" + currentMonitor.filename + "~~~~" + currentMonitor.LastSaved.ToFileTimeUtc();
+                    if (!string.IsNullOrWhiteSpace(deletionReason))
+                    {
+                        question += "~~~~" + deletionReason;
+                    }
+                    string response = Backend.RequestServerResponse(question);
+                    Toast.MakeText(this, "Server response: " + response, ToastLength.Long)?.Show();
+                    OnBirdStatsClick(s, e);
+                })
+                .SetNegativeButton("Cancel", (s, e) => { })
+                .SetCancelable(true)
+                .Create();
+
             alertDialog?.Show();
         }
 
