@@ -2868,10 +2868,31 @@ namespace PenguinMonitor
 
             if (boxData.ToString() != boxDataString)
             {
+                DateTime newEntryTime;
                 if (_appSettings.ActiveSessionTimeStampActive)
-                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved = boxData.whenDataCollectedUtc = _appSettings.ActiveSessionLocalTimeStamp.ToUniversalTime();
+                    newEntryTime = _appSettings.ActiveSessionLocalTimeStamp.ToUniversalTime();
                 else
-                    _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved = boxData.whenDataCollectedUtc = DateTime.UtcNow;
+                    newEntryTime = DateTime.UtcNow;
+
+                // Validate that all entries are on the same local date
+                var currentMonitor = _allMonitorData[_appSettings.CurrentlyVisibleMonitor];
+                if (currentMonitor.BoxData.Count > 0)
+                {
+                    // Get the first box data entry to compare dates
+                    var firstBoxData = currentMonitor.BoxData.Values.First();
+                    var firstEntryLocalDate = firstBoxData.whenDataCollectedUtc.ToLocalTime().Date;
+                    var newEntryLocalDate = newEntryTime.ToLocalTime().Date;
+
+                    if (firstEntryLocalDate != newEntryLocalDate)
+                    {
+                        Toast.MakeText(this,
+                            $"Error: All entries must be on the same date. First entry: {firstEntryLocalDate:yyyy-MM-dd}, New entry: {newEntryLocalDate:yyyy-MM-dd}",
+                            ToastLength.Long)?.Show();
+                        return;
+                    }
+                }
+
+                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved = boxData.whenDataCollectedUtc = newEntryTime;
                 _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName] = boxData;
                 SaveToAppDataDir();
             }
