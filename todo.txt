@@ -13,8 +13,12 @@ TODO
 
 DONE
 
+37.25
+- bugfix: difference between current and previous monitor mode
+- toggle overview button text show/hide
+
 37.24
-- Removed remote breeding dates
+- Removed remote breeding dates spread sheet
 - New eggs & chicks summary text
 - Fix overwrite downloaded bird stats on application load
 - Force all entries to be on same date. 

@@ -33,7 +33,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.24";
+        private static string version = "37.25";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -1524,16 +1524,18 @@ namespace PenguinMonitor
             if (selected)
                 ;
 
-            // Check for differences with second most recent box data if comparison mode is enabled                // Get second most recent box data for comparison if mode is enabled
+            // Check for differences with second most recent box data if comparison mode is enabled          
             BoxData? secondMostRecentBoxData = null;
-            if (_appSettings.ShowDifferencesWithPreviousMonitor && olderBoxDatas.Count >= 2)
+            if (_appSettings.ShowDifferencesWithPreviousMonitor
+                && _allMonitorData.Count > _appSettings.CurrentlyVisibleMonitor + 1
+                && _allMonitorData[_appSettings.CurrentlyVisibleMonitor + 1].BoxData.ContainsKey(boxName))
             {
-                secondMostRecentBoxData = olderBoxDatas[1]; // Second element (index 1)
+                secondMostRecentBoxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor + 1].BoxData[boxName];
             }
-            bool hasDifferencesWithPrevious = false;
-            if (_appSettings.ShowDifferencesWithPreviousMonitor && secondMostRecentBoxData != null && thisBoxData != null)
+            bool showDiffFromPrevious = false;
+            if (_appSettings.ShowDifferencesWithPreviousMonitor && secondMostRecentBoxData != null)
             {
-                hasDifferencesWithPrevious =
+                showDiffFromPrevious =
                     thisBoxData.Adults != secondMostRecentBoxData.Adults ||
                     thisBoxData.Eggs != secondMostRecentBoxData.Eggs ||
                     thisBoxData.Chicks != secondMostRecentBoxData.Chicks ||
@@ -1542,7 +1544,10 @@ namespace PenguinMonitor
                     thisBoxData.Notes != secondMostRecentBoxData.Notes;
             }
 
-            if (hasDifferencesWithPrevious)
+            if (_appSettings.ShowDifferencesWithPreviousMonitor && currentExists
+                && (showDiffFromPrevious
+                || _allMonitorData.Count == _appSettings.CurrentlyVisibleMonitor + 1
+                || !_allMonitorData[_appSettings.CurrentlyVisibleMonitor + 1].BoxData.ContainsKey(boxName)))
             {
                 boxOverviewCard.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.DANGER_RED, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
             }
@@ -1778,8 +1783,13 @@ namespace PenguinMonitor
             };
             _settingsCard.AddView(_setTimeActiveSessionCheckBox);
 
-            Button toggleOverview = _uiFactory.CreateStyledButton("Toggle overview visibility", UIFactory.PRIMARY_BLUE);
-            toggleOverview.Click += (s, e) => _multiBoxViewCard.Visibility = _multiBoxViewCard.Visibility.Equals(ViewStates.Visible) ? ViewStates.Gone : ViewStates.Visible;
+            Button toggleOverview = _uiFactory.CreateStyledButton(_multiBoxViewCard?.Visibility == ViewStates.Visible ? "Hide overview" : "Show overview", UIFactory.PRIMARY_BLUE);
+            toggleOverview.Click += (s, e) =>
+            {
+                if (_multiBoxViewCard == null) return;
+                _multiBoxViewCard.Visibility = _multiBoxViewCard.Visibility.Equals(ViewStates.Visible) ? ViewStates.Gone : ViewStates.Visible;
+                toggleOverview.Text = _multiBoxViewCard.Visibility == ViewStates.Visible ? "Hide overview" : "Show overview";
+            };
             _settingsCard.AddView(toggleOverview);
 
             // Box tag delete button visibility setting
