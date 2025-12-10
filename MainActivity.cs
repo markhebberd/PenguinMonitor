@@ -33,7 +33,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.23";
+        private static string version = "37.24";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -754,7 +754,6 @@ namespace PenguinMonitor
                         await _dataStorageService.DownloadRemoteData(this, _allMonitorData);
                         _allMonitorData = _dataStorageService.LoadAllMonitorDataFromDisk(this);
                         _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
-                        _remoteBreedingDates = await _dataStorageService.loadBreedingDatesFromAppDataDir(this);
                         new Handler(Looper.MainLooper).Post(() =>
                         {
                             _isDownloadingCsvData = false;
@@ -762,7 +761,6 @@ namespace PenguinMonitor
                             child.Background = _uiFactory.CreateRoundedBackground(UIFactory.PRIMARY_BLUE, 8);
                             if (!_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
                                 _appSettings.CurrentlyVisibleMonitor = 0;
-                            SaveToAppDataDir(false);
                             DrawPageLayouts();
                             SetEnabledRecursive(child, true, 1.0f);
                         });
@@ -3215,7 +3213,6 @@ namespace PenguinMonitor
 
                 // Load remote penguin data.
                 _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
-                _remoteBreedingDates = await _dataStorageService.loadBreedingDatesFromAppDataDir(this);
                 if (_remotePenguinData != null &&  _remoteBreedingDates != null)
                 {
                     Toast.MakeText(this, $"{_remotePenguinData.Count} bird, {_remoteBreedingDates.Count} breeding dates found.", ToastLength.Short)?.Show();
