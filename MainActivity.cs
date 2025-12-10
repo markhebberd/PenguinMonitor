@@ -665,13 +665,71 @@ namespace PenguinMonitor
             var gateUpCount = _allMonitorData[selectedMonitor].BoxData.Values.Count(box => box.GateStatus == "Gate up");
             var regateCount = _allMonitorData[selectedMonitor].BoxData.Values.Count(box => box.GateStatus == "Regate");
 
+            // Count new eggs and new chicks
+            int newEggs = 0;
+            int newChicks = 0;
+
+            foreach (var boxEntry in _allMonitorData[selectedMonitor].BoxData)
+            {
+                string boxName = boxEntry.Key;
+                BoxData currentBox = boxEntry.Value;
+
+                // Get previous box data from older monitors
+                BoxData? previousBox = null;
+                for (int i = selectedMonitor + 1; i < _allMonitorData.Count; i++)
+                {
+                    if (_allMonitorData[i].BoxData.ContainsKey(boxName))
+                    {
+                        previousBox = _allMonitorData[i].BoxData[boxName];
+                        break;
+                    }
+                }
+
+                if (previousBox != null)
+                {
+                    int previousEggs = previousBox.Eggs;
+                    int previousChicks = previousBox.Chicks;
+                    int currentEggs = currentBox.Eggs;
+                    int currentChicks = currentBox.Chicks;
+
+                    // A new chick is when current chicks > previous chicks
+                    if (currentChicks > previousChicks)
+                    {
+                        int chickIncrease = currentChicks - previousChicks;
+                        newChicks += chickIncrease;
+                        // When chicks hatch, eggs should decrease by the number of new chicks
+                        // Expected egg count = previousEggs - chickIncrease (but can't go below 0)
+                        // If current eggs > expected, those are new eggs
+                        int expectedEggs = Math.Max(0, previousEggs - chickIncrease);
+                        if (currentEggs > expectedEggs)
+                        {
+                            int newEggsInBox = currentEggs - expectedEggs;
+                            newEggs += newEggsInBox;
+                        }
+                    }
+                    // No new chicks, so just check if eggs increased
+                    else if (currentEggs > previousEggs)
+                    {
+                        int newEggsInBox = currentEggs - previousEggs;
+                        newEggs += newEggsInBox;
+                    }
+                }
+            }
+
             string percentFemale = totalFemales + totalmales > 0 ? ", " + ((int)(100 * totalFemales / (totalFemales + totalmales))).ToString() + "% female" : "";
 
+            string newEggsChicksLine = "";
+            if (newEggs > 0 || newChicks > 0)
+            {
+                newEggsChicksLine = $"✨ NEW: {newEggs} eggs, {newChicks} chicks\n";
+            }
+
             string summary = $"📦 {_allMonitorData[selectedMonitor].BoxData.Count} boxes with data\n" +
-                         $"🐧 {totalScannedBirds} bird scans" + percentFemale + "\n" + 
+                         $"🐧 {totalScannedBirds} bird scans" + percentFemale + "\n" +
                          $"👥 {totalAdults} adults\n" +
                          $"🥚 {totalEggs} eggs\n" +
                          $"🐣 {totalChicks} chicks\n" +
+                         newEggsChicksLine +
                          $"🚪 Gate: {gateUpCount} up, {regateCount} regate\n\n" +
                          $"Box range: {(_allMonitorData[selectedMonitor].BoxData.Keys.Any() ? _allMonitorData[selectedMonitor].BoxData.Keys.Min() : 0)} - {(_allMonitorData[selectedMonitor].BoxData.Keys.Any() ? _allMonitorData[selectedMonitor].BoxData.Keys.Max() : 0)}";
             return summary;
