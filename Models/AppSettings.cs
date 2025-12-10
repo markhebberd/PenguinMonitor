@@ -466,5 +466,9 @@ namespace PenguinMonitor.Models
                 }
             }
         }
+
+        // Transient property - not saved to JSON
+        [JsonIgnore]
+        public bool ShowDifferencesWithPreviousMonitor { get; set; } = false;
     }
 }

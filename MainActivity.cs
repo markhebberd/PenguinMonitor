@@ -1524,7 +1524,29 @@ namespace PenguinMonitor
             if (selected)
                 ;
 
-            if (!currentExists)
+            // Check for differences with second most recent box data if comparison mode is enabled                // Get second most recent box data for comparison if mode is enabled
+            BoxData? secondMostRecentBoxData = null;
+            if (_appSettings.ShowDifferencesWithPreviousMonitor && olderBoxDatas.Count >= 2)
+            {
+                secondMostRecentBoxData = olderBoxDatas[1]; // Second element (index 1)
+            }
+            bool hasDifferencesWithPrevious = false;
+            if (_appSettings.ShowDifferencesWithPreviousMonitor && secondMostRecentBoxData != null && thisBoxData != null)
+            {
+                hasDifferencesWithPrevious =
+                    thisBoxData.Adults != secondMostRecentBoxData.Adults ||
+                    thisBoxData.Eggs != secondMostRecentBoxData.Eggs ||
+                    thisBoxData.Chicks != secondMostRecentBoxData.Chicks ||
+                    thisBoxData.GateStatus != secondMostRecentBoxData.GateStatus ||
+                    thisBoxData.BreedingChance != secondMostRecentBoxData.BreedingChance ||
+                    thisBoxData.Notes != secondMostRecentBoxData.Notes;
+            }
+
+            if (hasDifferencesWithPrevious)
+            {
+                boxOverviewCard.Background = _uiFactory.CreateCardBackground(borderWidth: 8, borderColour: UIFactory.DANGER_RED, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
+            }
+            else if (!currentExists)
             {
                 boxOverviewCard.Background = _uiFactory.CreateCardBackground(borderWidth: 8, UIFactory.WARNING_YELLOW, backgroundColor: selected ? UIFactory.WARNING_YELLOW : null);
             }
@@ -1773,6 +1795,20 @@ namespace PenguinMonitor
                 DrawPageLayouts(); // Refresh UI to show/hide delete button
             };
             _settingsCard.AddView(showBoxTagDeleteCheckBox);
+
+            // Show differences with previous monitor setting
+            var showDifferencesCheckBox = new CheckBox(this)
+            {
+                Text = "Show differences with previous monitor",
+                Checked = _appSettings.ShowDifferencesWithPreviousMonitor
+            };
+            showDifferencesCheckBox.SetTextColor(Color.Black);
+            showDifferencesCheckBox.Click += (s, e) =>
+            {
+                _appSettings.ShowDifferencesWithPreviousMonitor = showDifferencesCheckBox.Checked;
+                DrawPageLayouts(); // Refresh UI to show differences
+            };
+            _settingsCard.AddView(showDifferencesCheckBox);
 
             LinearLayout enterBoxSetsLayout = new LinearLayout(this) ;
             enterBoxSetsLayout.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
