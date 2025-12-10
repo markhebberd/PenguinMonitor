@@ -1,22 +1,27 @@
 TODO
 
-- create multibox view card different from draw multibox view card. 
-- Add text field to include a reason when you delete a monitor
-- Mode/setting to show difference between current and previous monitor to help deleting
-- Force all entries to be on same date. 
 - if expected eggs/chicks incorrect by more than 3 days +- uncertainty box should be red
-- Data summary should show count of new eggs and new chicks. 
-- Show box history
 - Penguin database query, clicking on a scan entry should 
 	- show all known data about the bird 
 	- prompt to enter optional information connected with the scan result, i.e. Sex, weight, etc.
 	- Scanned entries should be bigger and easier to click
-- enter bird ID and get everything that is known about the bird, same for box, maybe that is later db stuff though?
 - The app should be able to sort by next relevant date. IE show the next chicks that need chipping
 - penguin reporting under specific name to seperate britta from alternate locations (i.e. wellington?)
 - note from britta "nest status ABN - a definite point in time when nest has been declared abandoned and failed, this would be perfect as a prediction status, so those nests can be Specifically filtered for"
+- Performance tweak: create multibox view card different from draw multibox view card. 
+
 
 DONE
+
+37.24
+- Removed remote breeding dates
+- New eggs & chicks summary text
+- Fix overwrite downloaded bird stats on application load
+- Force all entries to be on same date. 
+- Add text field to include a reason when you delete a monitor
+- "Show show box filters" should update to "Hide show box filters" when show box filters are shown.
+- Filter Decommissioned > DCM 
+- Mode/setting to show difference between current and previous monitor to help deleting
 
 37.23
 - Swipeable historical box data
