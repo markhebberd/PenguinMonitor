@@ -33,7 +33,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.21";
+        private static string version = "37.23";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -87,7 +87,7 @@ namespace PenguinMonitor
         private List<Spinner?> _gateStatusSpinner;
         private List<EditText?> _notesEditText;
 
-        private UIFactory.selectedPage selectedPage;
+        public UIFactory.selectedPage selectedPage;
         private readonly (string Text, UIFactory.selectedPage Page)[] _menuItems = new[]
         {
             ("⚙️ Settings",      UIFactory.selectedPage.Settings),
@@ -97,6 +97,8 @@ namespace PenguinMonitor
 
         // Add gesture detection components
         private GestureDetector? _gestureDetector;
+        private float _lastTouchDownY = 0;
+        private bool _isAnimating = false;
 
         // Services
         public UIFactory? _uiFactory;
@@ -105,6 +107,7 @@ namespace PenguinMonitor
         // Data storage
         private int _currentBoxIndex = 1;
         private string _currentBoxName = "";
+        private int _currentHistoricalDataIndex = 0; // 0 = current, 1+ = older data
         private Dictionary<string, int> _boxNamesAndIndexes;
         Dictionary<int, MonitorDetails> _allMonitorData = new Dictionary<int, MonitorDetails>();
         private AppSettings _appSettings;
@@ -257,6 +260,39 @@ namespace PenguinMonitor
         }
         public void OnSwipePrevious()
         {
+            // If viewing single box data, navigate to newer historical data
+            if (selectedPage == UIFactory.selectedPage.BoxDataSingle)
+            {
+                if (_isAnimating) return; // Prevent swipe spam
+
+                if (_currentHistoricalDataIndex > 0)
+                {
+                    // Try to find newer data with this box
+                    int newIndex = _currentHistoricalDataIndex - 1;
+                    while (newIndex > 0)
+                    {
+                        int displayMonitorIndex = _appSettings.CurrentlyVisibleMonitor + newIndex;
+                        if (_allMonitorData.ContainsKey(displayMonitorIndex) &&
+                            _allMonitorData[displayMonitorIndex].BoxData.ContainsKey(_currentBoxName))
+                        {
+                            _currentHistoricalDataIndex = newIndex;
+                            AnimateHistoricalDataTransition(false); // Swiping to newer
+                            return;
+                        }
+                        newIndex--;
+                    }
+                    // Always allow going to index 0 (today/current) even if no data exists
+                    _currentHistoricalDataIndex = 0;
+                    AnimateHistoricalDataTransition(false); // Swiping to current/today
+                }
+                else
+                {
+                    Toast.MakeText(this, "Already viewing current data", ToastLength.Short)?.Show();
+                }
+                return;
+            }
+
+            // Otherwise, navigate to previous box
             if (!_isBoxLocked)
             {
                 Toast.MakeText(this, "Please lock the current box before navigating", ToastLength.Short)?.Show();
@@ -273,6 +309,38 @@ namespace PenguinMonitor
         }
         public void OnSwipeNext()
         {
+            // If viewing single box data, navigate to older historical data
+            if (selectedPage == UIFactory.selectedPage.BoxDataSingle)
+            {
+                if (_isAnimating) return; // Prevent swipe spam
+
+                int maxHistoricalIndex = _allMonitorData.Count - 1;
+                if (_currentHistoricalDataIndex < maxHistoricalIndex)
+                {
+                    // Try to find older data with this box
+                    int newIndex = _currentHistoricalDataIndex + 1;
+                    while (newIndex <= maxHistoricalIndex)
+                    {
+                        int displayMonitorIndex = _appSettings.CurrentlyVisibleMonitor + newIndex;
+                        if (_allMonitorData.ContainsKey(displayMonitorIndex) &&
+                            _allMonitorData[displayMonitorIndex].BoxData.ContainsKey(_currentBoxName))
+                        {
+                            _currentHistoricalDataIndex = newIndex;
+                            AnimateHistoricalDataTransition(true); // Swiping to older
+                            return;
+                        }
+                        newIndex++;
+                    }
+                    Toast.MakeText(this, "No older data available for this box", ToastLength.Short)?.Show();
+                }
+                else
+                {
+                    Toast.MakeText(this, "No older data available", ToastLength.Short)?.Show();
+                }
+                return;
+            }
+
+            // Otherwise, navigate to next box
             if (!_isBoxLocked)
             {
                 Toast.MakeText(this, "Please lock the current box before navigating", ToastLength.Short)?.Show();
@@ -1500,6 +1568,57 @@ namespace PenguinMonitor
                 animator.Start();
             });
         }
+        private void AnimateHistoricalDataTransition(bool isSwipingToOlder)
+        {
+            if (_singleBoxDataContentLayout == null || _isAnimating) return;
+
+            _isAnimating = true;
+
+            // Slide distance
+            int slideDistance = _singleBoxDataContentLayout.Width;
+            // Swipe LEFT (to older): current exits RIGHT, new enters from LEFT
+            // Swipe RIGHT (to newer): current exits LEFT, new enters from RIGHT
+            int slideOutX = isSwipingToOlder ? slideDistance : -slideDistance;
+            int slideInX = isSwipingToOlder ? -slideDistance : slideDistance;
+
+            // Haptic feedback
+            _vibrator?.Vibrate(50);
+
+            // Phase 1: Slide out current content
+            var slideOut = ObjectAnimator.OfFloat(_singleBoxDataContentLayout, "translationX", 0, slideOutX);
+            slideOut?.SetDuration(200);
+            slideOut?.SetInterpolator(new AccelerateInterpolator());
+
+            if (slideOut != null)
+            {
+                slideOut.AnimationEnd += (s, e) =>
+                {
+                    // Phase 2: Update content (happens off-screen)
+                    DrawPageLayouts();
+
+                    // Phase 3: Slide in new content
+                    if (_singleBoxDataContentLayout != null)
+                    {
+                        _singleBoxDataContentLayout.TranslationX = slideInX;
+                        var slideIn = ObjectAnimator.OfFloat(_singleBoxDataContentLayout, "translationX", slideInX, 0);
+                        slideIn?.SetDuration(250);
+                        slideIn?.SetInterpolator(new DecelerateInterpolator());
+
+                        if (slideIn != null)
+                        {
+                            slideIn.AnimationEnd += (s2, e2) =>
+                            {
+                                _isAnimating = false;
+                            };
+
+                            slideIn.Start();
+                        }
+                    }
+                };
+
+                slideOut.Start();
+            }
+        }
         private void createSettingsCard()
         {
             _settingsCard = _uiFactory.CreateCard(borderWidth: 8);
@@ -1693,6 +1812,11 @@ namespace PenguinMonitor
 
         private void OnScrollViewTouch(object? sender, View.TouchEventArgs e)
         {
+            if (e.Event?.Action == MotionEventActions.Down)
+            {
+                _lastTouchDownY = e.Event.GetY();
+            }
+
             if (_gestureDetector != null && e.Event != null)
             {
                 _gestureDetector.OnTouchEvent(e.Event);
@@ -1715,6 +1839,18 @@ namespace PenguinMonitor
                 layout.AddView(button);
             }
             return layout;
+        }
+        public bool IsTouchInContentArea(float touchY)
+        {
+            if (_singleBoxDataContentLayout == null) return false;
+
+            int[] contentLocation = new int[2];
+            _singleBoxDataContentLayout.GetLocationOnScreen(contentLocation);
+
+            int contentTop = contentLocation[1] - (_rootScrollView?.ScrollY ?? 0);
+            int contentBottom = contentTop + _singleBoxDataContentLayout.Height;
+
+            return touchY >= contentTop && touchY <= contentBottom;
         }
         private LinearLayout CreateNavigationLayout()
         {
@@ -1864,7 +2000,14 @@ namespace PenguinMonitor
                     }
 
                     if (_dataCardTitleText != null)
+                    {
                         _dataCardTitleText.Text = $"Box {_currentBoxName}";
+                        // Show in red if viewing historical data
+                        if (_currentHistoricalDataIndex > 0)
+                            _dataCardTitleText.SetTextColor(UIFactory.DANGER_RED);
+                        else
+                            _dataCardTitleText.SetTextColor(Color.Black);
+                    }
 
                     // Update box tag delete button visibility
                     if (_deleteBoxTagButton != null)
@@ -1873,13 +2016,17 @@ namespace PenguinMonitor
                         _deleteBoxTagButton.Visibility = (_appSettings.ShowBoxTagDeleteButton && boxHasTag) ? ViewStates.Visible : ViewStates.Gone;
                     }
 
-                    _boxSavedTimeTextView.Text = _allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName) ?
-                        _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName].whenDataCollectedUtc.ToLocalTime().ToString("d MMM yyyy\nHH:mm") : "";
-                    _boxSavedTimeTextView.SetTextColor(Color.Black);
+                    // Calculate the monitor index based on historical navigation
+                    int displayMonitorIndex = _appSettings.CurrentlyVisibleMonitor + _currentHistoricalDataIndex;
+
+                    _boxSavedTimeTextView.Text = _allMonitorData.ContainsKey(displayMonitorIndex) && _allMonitorData[displayMonitorIndex].BoxData.ContainsKey(_currentBoxName) ?
+                        _allMonitorData[displayMonitorIndex].BoxData[_currentBoxName].whenDataCollectedUtc.ToLocalTime().ToString("d MMM yyyy\nHH:mm") : "";
+                    // Show date in red if viewing historical data
+                    _boxSavedTimeTextView.SetTextColor(_currentHistoricalDataIndex > 0 ? UIFactory.DANGER_RED : Color.Black);
                     _boxSavedTimeTextView.Gravity = GravityFlags.Right;
 
                     _interestingBoxTextView.Visibility = ViewStates.Gone;
-                    string stickyNotes = DataStorageService.getStickyNotes(DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, _currentBoxName));
+                    string stickyNotes = DataStorageService.getStickyNotes(DataStorageService.getOlderBoxDatas(_allMonitorData, displayMonitorIndex, _currentBoxName));
                     if (!string.IsNullOrWhiteSpace(stickyNotes))
                     {
                         _interestingBoxTextView.Text = "💡 Note: " + stickyNotes;
@@ -1896,9 +2043,9 @@ namespace PenguinMonitor
                         if (editText != null) editText[0].TextChanged -= OnDataChanged;
                     }
 
-                    if (_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName))
+                    if (_allMonitorData.ContainsKey(displayMonitorIndex) && _allMonitorData[displayMonitorIndex].BoxData.ContainsKey(_currentBoxName))
                     {
-                        var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName];
+                        var boxData = _allMonitorData[displayMonitorIndex].BoxData[_currentBoxName];
                         if (_adultsEditText != null) _adultsEditText[0].Text = boxData.Adults.ToString();
                         if (_eggsEditText != null) _eggsEditText[0].Text = boxData.Eggs.ToString();
                         if (_chicksEditText != null) _chicksEditText[0].Text = boxData.Chicks.ToString();
@@ -1917,7 +2064,7 @@ namespace PenguinMonitor
                         buildScannedIdsLayout(new List<ScanRecord>());
 
                         SetSpinnerStatus(_breedingChanceSpinner[0], "");
-                        var olderBoxDatas = DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, _currentBoxName);
+                        var olderBoxDatas = DataStorageService.getOlderBoxDatas(_allMonitorData, displayMonitorIndex, _currentBoxName);
                         int iterator = -1;
                         while (iterator++ < olderBoxDatas.Count-1)
                             if (!string.IsNullOrEmpty(olderBoxDatas[iterator].BreedingChance))
@@ -1949,7 +2096,9 @@ namespace PenguinMonitor
                     for (int i = 1; i < _singleBoxDataOuterLayout.ChildCount; i++)
                     {
                         var child = _singleBoxDataOuterLayout.GetChildAt(i);
-                        SetEnabledRecursive(child, !_isBoxLocked, _isBoxLocked ? 0.8f : 1.0f);
+                        // Disable editing when viewing historical data OR when box is locked
+                        bool shouldDisable = _isBoxLocked || _currentHistoricalDataIndex > 0;
+                        SetEnabledRecursive(child, !shouldDisable, shouldDisable ? 0.8f : 1.0f);
                     }
 
                     // Enable/Disable navigation and data buttons when available
@@ -2024,6 +2173,13 @@ namespace PenguinMonitor
                 }
                 else
                 {
+                    // Don't save when viewing historical data
+                    if (_currentHistoricalDataIndex > 0)
+                    {
+                        DrawPageLayouts();
+                        return;
+                    }
+
                     if (!_allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName) && dataCardHasZeroData())
                     {
                         ShowEmptyBoxDialog(() =>
@@ -2183,6 +2339,9 @@ namespace PenguinMonitor
             _gateStatusSpinner.Add(_uiFactory.CreateSpinner(new string[] { "", "Gate up", "Regate" }));
             _gateStatusSpinner[0].ItemSelected += (s, e) =>
             {
+                // Only save if viewing current data (not historical)
+                if (_currentHistoricalDataIndex > 0) return;
+
                 string status = _gateStatusSpinner[0].SelectedItem.ToString();
                 if (status.Equals("Gate up") || status.Equals("Regate"))
                 {
@@ -3508,6 +3667,7 @@ namespace PenguinMonitor
             }
             _currentBoxIndex = _boxNamesAndIndexes[targetBox];
             _currentBoxName = targetBox;
+            _currentHistoricalDataIndex = 0; // Reset to current data when changing boxes
             _singleBoxDataContentLayout.Visibility = ViewStates.Visible;
             DrawPageLayouts();
         }

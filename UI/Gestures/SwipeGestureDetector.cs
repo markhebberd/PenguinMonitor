@@ -1,16 +1,20 @@
 using Android.Views;
+using PenguinMonitor.UI.Factories;
 
 namespace PenguinMonitor.UI.Gestures
 {
     public class SwipeGestureDetector : GestureDetector.SimpleOnGestureListener
     {
         private readonly MainActivity _activity;
-        private const int SWIPE_THRESHOLD = 100;
+        private readonly int _swipeThreshold;
         private const int SWIPE_VELOCITY_THRESHOLD = 100;
 
         public SwipeGestureDetector(MainActivity activity)
         {
             _activity = activity;
+            // Set threshold to 1/4 of screen width for more intentional swipes
+            var screenWidth = activity.Resources?.DisplayMetrics?.WidthPixels ?? 1080;
+            _swipeThreshold = screenWidth / 4;
         }
 
         public override bool OnFling(MotionEvent? e1, MotionEvent e2, float velocityX, float velocityY)
@@ -24,19 +28,28 @@ namespace PenguinMonitor.UI.Gestures
             if (System.Math.Abs(diffX) > System.Math.Abs(diffY))
             {
                 // Check if swipe distance and velocity are sufficient
-                if (System.Math.Abs(diffX) > SWIPE_THRESHOLD && System.Math.Abs(velocityX) > SWIPE_VELOCITY_THRESHOLD)
+                if (System.Math.Abs(diffX) > _swipeThreshold && System.Math.Abs(velocityX) > SWIPE_VELOCITY_THRESHOLD)
                 {
-                    if (diffX > 0)
+                    // ONLY allow swipes on single box page in content area
+                    bool isOnSingleBoxPage = _activity.selectedPage == UIFactory.selectedPage.BoxDataSingle;
+                    bool isInContentArea = _activity.IsTouchInContentArea(e1.GetY());
+
+                    if (isOnSingleBoxPage && isInContentArea)
                     {
-                        // Swipe right ? Previous box
-                        _activity.OnSwipePrevious();
+                        // Historical data navigation: LEFT = older (from left), RIGHT = newer (from right)
+                        // Reading left-to-right timeline: older is on the left
+                        if (diffX > 0)
+                        {
+                            // Swipe right → older data (slides from left)
+                            _activity.OnSwipeNext();
+                        }
+                        else
+                        {
+                            // Swipe left → newer data (slides from right)
+                            _activity.OnSwipePrevious();
+                        }
+                        return true;
                     }
-                    else
-                    {
-                        // Swipe left ? Next box
-                        _activity.OnSwipeNext();
-                    }
-                    return true;
                 }
             }
             return false;

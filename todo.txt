@@ -10,17 +10,38 @@ TODO
 - Penguin database query, clicking on a scan entry should 
 	- show all known data about the bird 
 	- prompt to enter optional information connected with the scan result, i.e. Sex, weight, etc.
-	- Have move/delete contained. 
 	- Scanned entries should be bigger and easier to click
 - enter bird ID and get everything that is known about the bird, same for box, maybe that is later db stuff though?
 - The app should be able to sort by next relevant date. IE show the next chicks that need chipping
 - penguin reporting under specific name to seperate britta from alternate locations (i.e. wellington?)
-
+- note from britta "nest status ABN - a definite point in time when nest has been declared abandoned and failed, this would be perfect as a prediction status, so those nests can be Specifically filtered for"
 
 DONE
 
+37.23
+- Swipeable historical box data
+
+37.22
+- Fix duplicate sticky notes using HashSet
+- Minimum box overview width set to 1/5 screen width
+
+37.21
+- Show/Hide filter tweaks
+- Show/Hide filter buttons replacing filter section titles
+- Double egg and Decommissioned filter options added
+- Filter text representation below Show/Hide buttons
+- Update 'Has sticky' to 'Has sticky notes' in labels
+
+37.20
+- Sticky notes management dialog (renamed from persistent notes)
+- Fix box tag scan incorrectly unlocking current box
+
+37.19
+- Box tag system for RFID-based box identification
+- Box tags (LA9000250*) for quick box unlock and navigation
+
 37.18
-- button to apply box set string. 
+- button to apply box set string.
 - remember which BoxSet was open. 
 
 37.17
