@@ -33,7 +33,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.25";
+        private static string version = "37.27";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -86,6 +86,7 @@ namespace PenguinMonitor
         private List<Spinner?> _breedingChanceSpinner;
         private List<Spinner?> _gateStatusSpinner;
         private List<EditText?> _notesEditText;
+        private AlertDialog? _currentStickyNotesDialog;
 
         public UIFactory.selectedPage selectedPage;
         private readonly (string Text, UIFactory.selectedPage Page)[] _menuItems = new[]
@@ -941,7 +942,7 @@ namespace PenguinMonitor
                                     var expandedRange = ExpandAlphanumericRange(start, end);
                                     foreach (string boxName in expandedRange)
                                     {
-                                        _boxNamesAndIndexes[boxName] = currentIndex++;
+                                        _boxNamesAndIndexes[boxName.ToUpper()] = currentIndex++;
                                     }
                                 }
                             }
@@ -949,7 +950,7 @@ namespace PenguinMonitor
                         else
                         {
                             // Single box name/number
-                            _boxNamesAndIndexes[trimmedPart] = currentIndex++;
+                            _boxNamesAndIndexes[trimmedPart.ToUpper()] = currentIndex++;
                         }
                     }
                 }
@@ -2780,7 +2781,8 @@ namespace PenguinMonitor
                         SaveCurrentBoxData();
                         Toast.MakeText(this, $"Removed sticky note: {noteToRemove}", ToastLength.Short)?.Show();
 
-                        // Close and reopen dialog to refresh
+                        // Dismiss current dialog and reopen to refresh
+                        _currentStickyNotesDialog?.Dismiss();
                         ShowStickyNotesDialog();
                     };
 
@@ -2855,7 +2857,8 @@ namespace PenguinMonitor
                 SaveCurrentBoxData();
                 Toast.MakeText(this, $"Added sticky note: {newNote}", ToastLength.Short)?.Show();
 
-                // Close and reopen dialog to refresh
+                // Dismiss current dialog and reopen to refresh
+                _currentStickyNotesDialog?.Dismiss();
                 ShowStickyNotesDialog();
             };
             addSectionLayout.AddView(addButton);
@@ -2863,13 +2866,17 @@ namespace PenguinMonitor
             mainLayout.AddView(addSectionLayout);
 
             // Create and show dialog
-            var dialog = new AlertDialog.Builder(this)
+            AlertDialog? dialog = null;
+            dialog = new AlertDialog.Builder(this)
                 .SetTitle($"Sticky Notes - Box {_currentBoxName}")
                 .SetView(mainLayout)
                 .SetNegativeButton("Close", (s, e) => { })
                 .Create();
 
             dialog?.Show();
+
+            // Store reference for dismissing before refresh
+            _currentStickyNotesDialog = dialog;
 
             // Focus the input field and show keyboard
             newNoteInput.RequestFocus();
@@ -2950,24 +2957,6 @@ namespace PenguinMonitor
                     newEntryTime = _appSettings.ActiveSessionLocalTimeStamp.ToUniversalTime();
                 else
                     newEntryTime = DateTime.UtcNow;
-
-                // Validate that all entries are on the same local date
-                var currentMonitor = _allMonitorData[_appSettings.CurrentlyVisibleMonitor];
-                if (currentMonitor.BoxData.Count > 0)
-                {
-                    // Get the first box data entry to compare dates
-                    var firstBoxData = currentMonitor.BoxData.Values.First();
-                    var firstEntryLocalDate = firstBoxData.whenDataCollectedUtc.ToLocalTime().Date;
-                    var newEntryLocalDate = newEntryTime.ToLocalTime().Date;
-
-                    if (firstEntryLocalDate != newEntryLocalDate)
-                    {
-                        Toast.MakeText(this,
-                            $"Error: All entries must be on the same date. First entry: {firstEntryLocalDate:yyyy-MM-dd}, New entry: {newEntryLocalDate:yyyy-MM-dd}",
-                            ToastLength.Long)?.Show();
-                        return;
-                    }
-                }
 
                 _allMonitorData[_appSettings.CurrentlyVisibleMonitor].LastSaved = boxData.whenDataCollectedUtc = newEntryTime;
                 _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName] = boxData;
