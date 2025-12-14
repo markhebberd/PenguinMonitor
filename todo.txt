@@ -13,6 +13,9 @@ TODO
 
 DONE
 
+37.28
+- Boxtags on the server. Untested. 
+
 37.27
 - Removed the requirement that entries need to be on the same date
 

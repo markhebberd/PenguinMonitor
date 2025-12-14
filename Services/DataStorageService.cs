@@ -195,18 +195,45 @@ namespace PenguinMonitor.Services
                 return null;
             }
         }
-        internal async Task DownloadRemoteData(Android.Content.Context? context, Dictionary<int, MonitorDetails> allMonitorData)
+        /// <summary>
+        /// Result of DownloadRemoteData including box tag sync info
+        /// </summary>
+        public class DownloadResult
         {
+            public Dictionary<string, BoxTag>? BoxTags { get; set; }
+            public BoxTagService.SyncResult? TagSyncResult { get; set; }
+        }
+
+        internal async Task<DownloadResult> DownloadRemoteData(Android.Content.Context? context, Dictionary<int, MonitorDetails> allMonitorData, Dictionary<string, BoxTag>? boxTags = null)
+        {
+            var downloadResult = new DownloadResult();
             try
             {
                 Task<HttpResponseMessage> responseBirdsTask =
                      _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(ALL_PENGS_URL));
                 Task saveMonitorDataToDiskTask = SaveAllMonitorDataToDisk(context, allMonitorData, reportHome:false, downloadRemoteMonitorData: true);
 
+                // Box tag sync task (runs in parallel if configured)
+                Task<BoxTagService.SyncResult?> tagSyncTask;
+                if (boxTags != null && BoxTagService.IsApiConfigured && context?.FilesDir?.AbsolutePath != null)
+                {
+                    tagSyncTask = BoxTagService.SyncWithApiAsync(boxTags, context.FilesDir.AbsolutePath)!;
+                }
+                else
+                {
+                    tagSyncTask = Task.FromResult<BoxTagService.SyncResult?>(null);
+                }
+
                 // Await them in parallel
-                await Task.WhenAll(responseBirdsTask, saveMonitorDataToDiskTask);
+                await Task.WhenAll(responseBirdsTask, saveMonitorDataToDiskTask, tagSyncTask);
                 // Retrieve results
                 HttpResponseMessage responseBirds = await responseBirdsTask;
+                var tagSyncResult = await tagSyncTask;
+                downloadResult.TagSyncResult = tagSyncResult;
+                if (tagSyncResult != null)
+                {
+                    downloadResult.BoxTags = tagSyncResult.Tags;
+                }
 
                 var csvContentBirds = await responseBirds.Content.ReadAsStringAsync();
                 var parsedDataBirds = _csvDataService.ParseBirdCsvData(csvContentBirds);
@@ -236,7 +263,7 @@ namespace PenguinMonitor.Services
                                 }
                             }
 
-                            
+
 
                             var penguinData = new PenguinData
                             {
@@ -257,9 +284,31 @@ namespace PenguinMonitor.Services
                 foreach (MonitorDetails monitorDetails in allMonitorData.Values)
                     boxDataCount += monitorDetails.BoxData.Count;
 
+                // Build toast message with box tag sync info
+                string tagSyncInfo = "";
+                if (tagSyncResult != null)
+                {
+                    if (tagSyncResult.Error != null)
+                    {
+                        tagSyncInfo = ", box tags sync failed";
+                    }
+                    else
+                    {
+                        int total = tagSyncResult.Tags.Count;
+                        if (tagSyncResult.Uploaded > 0 && tagSyncResult.Downloaded > 0)
+                            tagSyncInfo = $", {total} box tags ({tagSyncResult.Uploaded} up, {tagSyncResult.Downloaded} down)";
+                        else if (tagSyncResult.Uploaded > 0)
+                            tagSyncInfo = $", {total} box tags ({tagSyncResult.Uploaded} uploaded)";
+                        else if (tagSyncResult.Downloaded > 0)
+                            tagSyncInfo = $", {total} box tags ({tagSyncResult.Downloaded} downloaded)";
+                        else
+                            tagSyncInfo = $", {total} box tags synced";
+                    }
+                }
+
                 new Handler(Looper.MainLooper).Post(() =>
                 {
-                    Toast.MakeText(context, $"Got {boxDataCount} box monitor, {remotePenguinData.Count} remote bird infos", ToastLength.Long)?.Show();
+                    Toast.MakeText(context, $"Got {boxDataCount} box monitor, {remotePenguinData.Count} remote bird infos{tagSyncInfo}", ToastLength.Long)?.Show();
                 });
             }
             catch (Exception ex)
@@ -269,6 +318,7 @@ namespace PenguinMonitor.Services
                       Toast.MakeText(context, $"❌ Download failed: {ex.Message}", ToastLength.Long)?.Show();
                   });
             }
+            return downloadResult;
         }
         public static void saveApplicationSettings(AppSettings appSettings)
         {

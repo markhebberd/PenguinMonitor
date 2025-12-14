@@ -148,17 +148,33 @@ namespace PenguinMonitor.Services
         public static bool IsApiConfigured => _apiService != null;
 
         /// <summary>
+        /// Result of a box tag sync operation
+        /// </summary>
+        public class SyncResult
+        {
+            public Dictionary<string, BoxTag> Tags { get; set; } = new();
+            public int Uploaded { get; set; }
+            public int Downloaded { get; set; }
+            public int Failed { get; set; }
+            public bool ApiAvailable { get; set; }
+            public string? Error { get; set; }
+        }
+
+        /// <summary>
         /// Sync box tags with remote API
         /// Downloads remote tags and merges with local (remote wins for conflicts)
         /// </summary>
-        public static async Task<Dictionary<string, BoxTag>> SyncWithApiAsync(
+        public static async Task<SyncResult> SyncWithApiAsync(
             Dictionary<string, BoxTag> localTags,
             string filesDir)
         {
+            var result = new SyncResult { Tags = localTags };
+
             if (_apiService == null)
             {
                 System.Diagnostics.Debug.WriteLine("BoxTagService.SyncWithApiAsync: API not configured");
-                return localTags;
+                result.Error = "API not configured";
+                return result;
             }
 
             try
@@ -167,12 +183,24 @@ namespace PenguinMonitor.Services
                 if (!await _apiService.IsApiAvailableAsync())
                 {
                     System.Diagnostics.Debug.WriteLine("BoxTagService.SyncWithApiAsync: API not available");
-                    return localTags;
+                    result.Error = "API not available";
+                    return result;
                 }
+
+                result.ApiAvailable = true;
 
                 // Get remote tags
                 var remoteTags = await _apiService.GetAllBoxTagsAsync();
                 System.Diagnostics.Debug.WriteLine($"BoxTagService.SyncWithApiAsync: Got {remoteTags.Count} remote tags");
+
+                // Count new tags downloaded from remote
+                foreach (var kvp in remoteTags)
+                {
+                    if (!localTags.ContainsKey(kvp.Key))
+                    {
+                        result.Downloaded++;
+                    }
+                }
 
                 // Upload any local tags that don't exist remotely or are newer
                 foreach (var kvp in localTags)
@@ -184,10 +212,12 @@ namespace PenguinMonitor.Services
                         {
                             await _apiService.SaveBoxTagAsync(kvp.Value);
                             remoteTags[kvp.Key] = kvp.Value;
+                            result.Uploaded++;
                             System.Diagnostics.Debug.WriteLine($"BoxTagService.SyncWithApiAsync: Uploaded {kvp.Key}");
                         }
                         catch (Exception ex)
                         {
+                            result.Failed++;
                             System.Diagnostics.Debug.WriteLine($"BoxTagService.SyncWithApiAsync: Failed to upload {kvp.Key}: {ex.Message}");
                         }
                     }
@@ -196,13 +226,15 @@ namespace PenguinMonitor.Services
                 // Save merged result locally
                 SaveBoxTags(remoteTags, filesDir);
 
-                System.Diagnostics.Debug.WriteLine($"BoxTagService.SyncWithApiAsync: Sync complete, {remoteTags.Count} total tags");
-                return remoteTags;
+                result.Tags = remoteTags;
+                System.Diagnostics.Debug.WriteLine($"BoxTagService.SyncWithApiAsync: Sync complete, {remoteTags.Count} total tags, {result.Uploaded} uploaded, {result.Downloaded} downloaded");
+                return result;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"BoxTagService.SyncWithApiAsync failed: {ex.Message}");
-                return localTags;
+                result.Error = ex.Message;
+                return result;
             }
         }
 

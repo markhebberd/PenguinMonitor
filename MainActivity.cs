@@ -752,14 +752,16 @@ namespace PenguinMonitor
                     child.Background = _uiFactory.CreateRoundedBackground(UIFactory.WARNING_YELLOW, 8);
                     _ = Task.Run(async () =>
                     {
-                        await _dataStorageService.DownloadRemoteData(this, _allMonitorData);
+                        // DownloadRemoteData handles bird data, monitor data, AND box tag sync in parallel
+                        var result = await _dataStorageService.DownloadRemoteData(this, _allMonitorData, _boxTags);
+
+                        // Process results
                         _allMonitorData = _dataStorageService.LoadAllMonitorDataFromDisk(this);
                         _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
 
-                        // Sync box tags with remote API
-                        if (BoxTagService.IsApiConfigured && FilesDir?.AbsolutePath != null)
+                        if (result.BoxTags != null)
                         {
-                            _boxTags = await BoxTagService.SyncWithApiAsync(_boxTags, FilesDir.AbsolutePath);
+                            _boxTags = result.BoxTags;
                         }
 
                         new Handler(Looper.MainLooper).Post(() =>
@@ -3593,10 +3595,24 @@ namespace PenguinMonitor
         {
             try
             {
-                _boxTags = await BoxTagService.SyncWithApiAsync(_boxTags, internalPath);
+                var result = await BoxTagService.SyncWithApiAsync(_boxTags, internalPath);
+                _boxTags = result.Tags;
                 RunOnUiThread(() =>
                 {
-                    Toast.MakeText(this, $"📡 Box tags synced ({_boxTags.Count} tags)", ToastLength.Short)?.Show();
+                    if (result.Error != null)
+                    {
+                        Toast.MakeText(this, $"📡 Box tags: {result.Error}", ToastLength.Short)?.Show();
+                    }
+                    else
+                    {
+                        var parts = new List<string>();
+                        if (result.Uploaded > 0) parts.Add($"⬆️{result.Uploaded}");
+                        if (result.Downloaded > 0) parts.Add($"⬇️{result.Downloaded}");
+                        if (result.Failed > 0) parts.Add($"❌{result.Failed}");
+
+                        var syncInfo = parts.Count > 0 ? string.Join(" ", parts) : "✓";
+                        Toast.MakeText(this, $"📡 Box tags: {syncInfo} ({_boxTags.Count} total)", ToastLength.Short)?.Show();
+                    }
                 });
             }
             catch (Exception ex)

@@ -67,7 +67,7 @@ function handleGet($pdo) {
 
         echo json_encode([
             'success' => true,
-            'data' => $data,
+            'data' => (object)$data,  // Force object encoding even when empty
             'count' => count($data)
         ]);
     }
