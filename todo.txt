@@ -13,6 +13,13 @@ TODO
 
 DONE
 
+37.30
+- Filter box tag sync to valid box sets only
+
+37.29
+- Box tags sync in DownloadRemoteData (parallel with other downloads)
+- Readable box tag sync results in toast
+
 37.28
 - Boxtags on the server. Untested. 
 

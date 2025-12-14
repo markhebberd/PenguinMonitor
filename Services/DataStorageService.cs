@@ -204,28 +204,49 @@ namespace PenguinMonitor.Services
             public BoxTagService.SyncResult? TagSyncResult { get; set; }
         }
 
-        internal async Task<DownloadResult> DownloadRemoteData(Android.Content.Context? context, Dictionary<int, MonitorDetails> allMonitorData, Dictionary<string, BoxTag>? boxTags = null)
+        internal async Task<DownloadResult> DownloadRemoteData(Android.Content.Context? context, Dictionary<int, MonitorDetails> allMonitorData, Dictionary<string, BoxTag>? boxTags = null, ICollection<string>? validBoxIds = null)
         {
             var downloadResult = new DownloadResult();
             try
             {
-                Task<HttpResponseMessage> responseBirdsTask =
-                     _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(ALL_PENGS_URL));
-                Task saveMonitorDataToDiskTask = SaveAllMonitorDataToDisk(context, allMonitorData, reportHome:false, downloadRemoteMonitorData: true);
+                var overallStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-                // Box tag sync task (runs in parallel if configured)
+                // Wrap each task with timing
+                // Note: SaveAllMonitorDataToDisk uses synchronous Backend calls, so wrap in Task.Run for true parallelism
+                var birdsStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                Task<HttpResponseMessage> responseBirdsTask = _httpClient.GetAsync(_csvDataService.ConvertToGoogleSheetsCsvUrl(ALL_PENGS_URL))
+                    .ContinueWith(t => { birdsStopwatch.Stop(); return t.Result; });
+
+                var monitorStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                Task saveMonitorDataToDiskTask = Task.Run(async () => {
+                    await SaveAllMonitorDataToDisk(context, allMonitorData, reportHome:false, downloadRemoteMonitorData: true);
+                    monitorStopwatch.Stop();
+                });
+
+                // Box tag sync task
+                var tagSyncStopwatch = System.Diagnostics.Stopwatch.StartNew();
                 Task<BoxTagService.SyncResult?> tagSyncTask;
                 if (boxTags != null && BoxTagService.IsApiConfigured && context?.FilesDir?.AbsolutePath != null)
                 {
-                    tagSyncTask = BoxTagService.SyncWithApiAsync(boxTags, context.FilesDir.AbsolutePath)!;
+                    tagSyncTask = BoxTagService.SyncWithApiAsync(boxTags, context.FilesDir.AbsolutePath, validBoxIds)
+                        .ContinueWith(t => { tagSyncStopwatch.Stop(); return (BoxTagService.SyncResult?)t.Result; });
                 }
                 else
                 {
+                    tagSyncStopwatch.Stop();
                     tagSyncTask = Task.FromResult<BoxTagService.SyncResult?>(null);
                 }
 
                 // Await them in parallel
                 await Task.WhenAll(responseBirdsTask, saveMonitorDataToDiskTask, tagSyncTask);
+                overallStopwatch.Stop();
+
+                // Log timing info
+                System.Diagnostics.Debug.WriteLine($"responseBirdsTask: {birdsStopwatch.ElapsedMilliseconds}ms");
+                System.Diagnostics.Debug.WriteLine($"saveMonitorDataToDiskTask: {monitorStopwatch.ElapsedMilliseconds}ms");
+                System.Diagnostics.Debug.WriteLine($"tagSyncTask: {tagSyncStopwatch.ElapsedMilliseconds}ms");
+                System.Diagnostics.Debug.WriteLine($"DownloadRemoteData total: {overallStopwatch.ElapsedMilliseconds}ms");
+
                 // Retrieve results
                 HttpResponseMessage responseBirds = await responseBirdsTask;
                 var tagSyncResult = await tagSyncTask;

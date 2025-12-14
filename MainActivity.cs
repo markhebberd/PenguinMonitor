@@ -753,7 +753,7 @@ namespace PenguinMonitor
                     _ = Task.Run(async () =>
                     {
                         // DownloadRemoteData handles bird data, monitor data, AND box tag sync in parallel
-                        var result = await _dataStorageService.DownloadRemoteData(this, _allMonitorData, _boxTags);
+                        var result = await _dataStorageService.DownloadRemoteData(this, _allMonitorData, _boxTags, _boxNamesAndIndexes?.Keys);
 
                         // Process results
                         _allMonitorData = _dataStorageService.LoadAllMonitorDataFromDisk(this);
@@ -3493,12 +3493,6 @@ namespace PenguinMonitor
                 // Load box tags from local storage
                 _boxTags = BoxTagService.LoadBoxTags(internalPath);
 
-                // Sync with remote API if configured (runs in background)
-                if (BoxTagService.IsApiConfigured)
-                {
-                    _ = SyncBoxTagsInBackgroundAsync(internalPath);
-                }
-
                 // Load remote penguin data.
                 _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
                 if (_remotePenguinData != null &&  _remoteBreedingDates != null)
@@ -3588,36 +3582,6 @@ namespace PenguinMonitor
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to clear auto-save file: {ex.Message}");
-            }
-        }
-
-        private async Task SyncBoxTagsInBackgroundAsync(string internalPath)
-        {
-            try
-            {
-                var result = await BoxTagService.SyncWithApiAsync(_boxTags, internalPath);
-                _boxTags = result.Tags;
-                RunOnUiThread(() =>
-                {
-                    if (result.Error != null)
-                    {
-                        Toast.MakeText(this, $"📡 Box tags: {result.Error}", ToastLength.Short)?.Show();
-                    }
-                    else
-                    {
-                        var parts = new List<string>();
-                        if (result.Uploaded > 0) parts.Add($"⬆️{result.Uploaded}");
-                        if (result.Downloaded > 0) parts.Add($"⬇️{result.Downloaded}");
-                        if (result.Failed > 0) parts.Add($"❌{result.Failed}");
-
-                        var syncInfo = parts.Count > 0 ? string.Join(" ", parts) : "✓";
-                        Toast.MakeText(this, $"📡 Box tags: {syncInfo} ({_boxTags.Count} total)", ToastLength.Short)?.Show();
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Box tags sync failed: {ex.Message}");
             }
         }
 

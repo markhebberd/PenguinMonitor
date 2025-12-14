@@ -35,11 +35,15 @@ namespace PenguinMonitor.Services
         {
             try
             {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 var response = await _httpClient.GetAsync(_apiUrl);
+                var httpTime = sw.ElapsedMilliseconds;
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync();
+                var readTime = sw.ElapsedMilliseconds;
                 var result = JsonConvert.DeserializeObject<ApiResponse<Dictionary<string, BoxTag>>>(json);
+                System.Diagnostics.Debug.WriteLine($"BoxTagApiService.GetAllBoxTagsAsync: HTTP={httpTime}ms, Read={readTime - httpTime}ms, Total={sw.ElapsedMilliseconds}ms");
 
                 if (result?.Success == true && result.Data != null)
                 {
