@@ -33,7 +33,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.27";
+        private static string version = "37.28";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -755,6 +755,13 @@ namespace PenguinMonitor
                         await _dataStorageService.DownloadRemoteData(this, _allMonitorData);
                         _allMonitorData = _dataStorageService.LoadAllMonitorDataFromDisk(this);
                         _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
+
+                        // Sync box tags with remote API
+                        if (BoxTagService.IsApiConfigured && FilesDir?.AbsolutePath != null)
+                        {
+                            _boxTags = await BoxTagService.SyncWithApiAsync(_boxTags, FilesDir.AbsolutePath);
+                        }
+
                         new Handler(Looper.MainLooper).Post(() =>
                         {
                             _isDownloadingCsvData = false;
@@ -1465,10 +1472,19 @@ namespace PenguinMonitor
                 bool hideSingleEgg = _appSettings.HideSingleEggBoxesInMultiboxView && mostRecentBoxData.Eggs == 1;
                 bool hideDoubleEgg = _appSettings.HideDoubleEggBoxesInMultiboxView && mostRecentBoxData.Eggs == 2;
 
-                if (showBox && !hideBoxWithData && !hideDCM && !hideBeforeCurrent && !hideNo && !hideUnlikely && !hidePotential && !hideConfident && !hideBreeding && !hideNotes && !hideInteresting && !hideSingleEgg && !hideDoubleEgg)
+                // In Edit Box Tags mode, show all boxes regardless of filters
+                bool shouldShow = _appSettings.EditBoxTagsMode ||
+                    (showBox && !hideBoxWithData && !hideDCM && !hideBeforeCurrent && !hideNo && !hideUnlikely && !hidePotential && !hideConfident && !hideBreeding && !hideNotes && !hideInteresting && !hideSingleEgg && !hideDoubleEgg);
+
+                if (shouldShow)
                 {
                     View? card;
-                    if (currentBoxDataFound)
+                    if (_appSettings.EditBoxTagsMode)
+                    {
+                        // Use box tag editing card
+                        card = CreateBoxTagEditCard(boxName);
+                    }
+                    else if (currentBoxDataFound)
                         card = CreateBoxSummaryCard(boxName, currentBoxData, _boxNamesAndIndexes[boxName] == _currentBoxIndex, olderBoxDatas, nrfPercentageString);
                     else
                         card = CreateBoxSummaryCard(boxName, null, _boxNamesAndIndexes[boxName] == _currentBoxIndex, olderBoxDatas, nrfPercentageString);
@@ -1642,6 +1658,158 @@ namespace PenguinMonitor
             if(!string.IsNullOrEmpty(gate_and_notes.Text)) boxOverviewCard.AddView(gate_and_notes);
             return boxOverviewCard;
         }
+
+        /// <summary>
+        /// Creates a box card for the Edit Box Tags mode
+        /// Green = has tag, Yellow = no tag
+        /// </summary>
+        private View CreateBoxTagEditCard(string boxName)
+        {
+            bool hasTag = _boxTags.ContainsKey(boxName);
+
+            var boxCard = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
+            boxCard.SetPadding(8, 8, 8, 8);
+
+            int minWidth = Resources.DisplayMetrics.WidthPixels / 5;
+            var cardParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f);
+            cardParams.SetMargins(5, 5, 5, 5);
+            boxCard.LayoutParameters = cardParams;
+            boxCard.SetMinimumWidth(minWidth);
+
+            // Set background color based on tag status
+            if (hasTag)
+            {
+                boxCard.Background = _uiFactory.CreateCardBackground(borderWidth: 3, backgroundColor: UIFactory.SUCCESS_GREEN);
+            }
+            else
+            {
+                boxCard.Background = _uiFactory.CreateCardBackground(borderWidth: 3, backgroundColor: UIFactory.WARNING_YELLOW);
+            }
+
+            // Box name title
+            var title = new TextView(this)
+            {
+                Text = $"Box {boxName}",
+                Gravity = GravityFlags.Center,
+                TextSize = 18
+            };
+            title.SetTypeface(Typeface.DefaultBold, TypefaceStyle.Normal);
+            title.SetTextColor(Color.Black);
+            boxCard.AddView(title);
+
+            // Show tag info if exists
+            if (hasTag)
+            {
+                var tagNumber = _boxTags[boxName].TagNumber;
+                var displayTag = tagNumber.Length > 8 ? tagNumber.Substring(tagNumber.Length - 8) : tagNumber;
+                var tagInfo = new TextView(this)
+                {
+                    Text = displayTag,
+                    Gravity = GravityFlags.Center,
+                    TextSize = 12
+                };
+                tagInfo.SetTextColor(Color.DarkGray);
+                boxCard.AddView(tagInfo);
+            }
+            else
+            {
+                var noTag = new TextView(this)
+                {
+                    Text = "No tag",
+                    Gravity = GravityFlags.Center,
+                    TextSize = 12
+                };
+                noTag.SetTextColor(Color.DarkGray);
+                boxCard.AddView(noTag);
+            }
+
+            // Click handler
+            boxCard.Click += (sender, e) =>
+            {
+                if (hasTag)
+                {
+                    // Show confirmation dialog to clear the tag
+                    ShowClearBoxTagDialog(boxName);
+                }
+                else
+                {
+                    // Show data entry dialog to add a tag
+                    ShowAddBoxTagDialog(boxName);
+                }
+            };
+
+            return boxCard;
+        }
+
+        /// <summary>
+        /// Shows a confirmation dialog to clear a box tag
+        /// </summary>
+        private void ShowClearBoxTagDialog(string boxName)
+        {
+            var tagNumber = _boxTags.ContainsKey(boxName) ? _boxTags[boxName].TagNumber : "Unknown";
+            var builder = new AlertDialog.Builder(this);
+            builder.SetTitle($"Box {boxName} Tag");
+            builder.SetMessage($"Tag: {tagNumber}\n\nWould you like to clear this tag?");
+            builder.SetPositiveButton("Yes", (sender, args) =>
+            {
+                var internalPath = this.FilesDir?.AbsolutePath;
+                if (!string.IsNullOrEmpty(internalPath))
+                {
+                    _ = BoxTagService.RemoveBoxTagAsync(_boxTags, boxName, internalPath);
+                    Toast.MakeText(this, $"Box tag cleared for Box {boxName}", ToastLength.Short)?.Show();
+                    DrawPageLayouts();
+                }
+            });
+            builder.SetNegativeButton("Cancel", (sender, args) => { });
+            builder.Show();
+        }
+
+        /// <summary>
+        /// Shows a dialog to add a box tag
+        /// </summary>
+        private void ShowAddBoxTagDialog(string boxName)
+        {
+            var builder = new AlertDialog.Builder(this);
+            builder.SetTitle($"Add Box Tag for Box {boxName}");
+
+            // Create input field
+            var input = new EditText(this)
+            {
+                Hint = "Enter tag number (e.g., LA9000250001)",
+                InputType = Android.Text.InputTypes.ClassText
+            };
+            input.SetPadding(40, 20, 40, 20);
+            builder.SetView(input);
+
+            builder.SetPositiveButton("Save", (sender, args) =>
+            {
+                string tagNumber = input.Text?.Trim() ?? "";
+                if (string.IsNullOrWhiteSpace(tagNumber))
+                {
+                    Toast.MakeText(this, "Tag number cannot be empty", ToastLength.Short)?.Show();
+                    return;
+                }
+
+                var internalPath = this.FilesDir?.AbsolutePath;
+                if (!string.IsNullOrEmpty(internalPath))
+                {
+                    _ = BoxTagService.AssignBoxTagAsync(
+                        _boxTags,
+                        boxName,
+                        tagNumber,
+                        _currentLocation?.Latitude ?? 0,
+                        _currentLocation?.Longitude ?? 0,
+                        _currentLocation?.Accuracy ?? -1,
+                        internalPath
+                    );
+                    Toast.MakeText(this, $"Box tag saved for Box {boxName}", ToastLength.Short)?.Show();
+                    DrawPageLayouts();
+                }
+            });
+            builder.SetNegativeButton("Cancel", (sender, args) => { });
+            builder.Show();
+        }
+
         private void ScrollToTop()
         {
             if (_rootScrollView == null) return;
@@ -1820,6 +1988,25 @@ namespace PenguinMonitor
                 DrawPageLayouts(); // Refresh UI to show differences
             };
             _settingsCard.AddView(showDifferencesCheckBox);
+
+            // Edit Box Tags mode toggle button
+            Button editBoxTagsButton = _uiFactory.CreateStyledButton(
+                _appSettings.EditBoxTagsMode ? "Exit Box Tags Mode" : "Edit Box Tags",
+                _appSettings.EditBoxTagsMode ? UIFactory.DANGER_RED : UIFactory.PRIMARY_BLUE);
+            editBoxTagsButton.Click += (s, e) =>
+            {
+                _appSettings.EditBoxTagsMode = !_appSettings.EditBoxTagsMode;
+                editBoxTagsButton.Text = _appSettings.EditBoxTagsMode ? "Exit Box Tags Mode" : "Edit Box Tags";
+                editBoxTagsButton.Background = _uiFactory.CreateRoundedBackground(
+                    _appSettings.EditBoxTagsMode ? UIFactory.DANGER_RED : UIFactory.PRIMARY_BLUE, 8);
+                // Show overview if entering edit mode
+                if (_appSettings.EditBoxTagsMode && _multiBoxViewCard != null)
+                {
+                    _multiBoxViewCard.Visibility = ViewStates.Visible;
+                }
+                DrawPageLayouts();
+            };
+            _settingsCard.AddView(editBoxTagsButton);
 
             LinearLayout enterBoxSetsLayout = new LinearLayout(this) ;
             enterBoxSetsLayout.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
@@ -2356,7 +2543,7 @@ namespace PenguinMonitor
                 var internalPath = this.FilesDir?.AbsolutePath;
                 if (!string.IsNullOrEmpty(internalPath))
                 {
-                    BoxTagService.RemoveBoxTag(_boxTags, _currentBoxName, internalPath);
+                    _ = BoxTagService.RemoveBoxTagAsync(_boxTags, _currentBoxName, internalPath);
                     Toast.MakeText(this, $"Box tag removed from Box {_currentBoxName}", ToastLength.Short)?.Show();
                     DrawPageLayouts(); // Refresh to hide the button
                 }
@@ -3295,8 +3482,20 @@ namespace PenguinMonitor
                 _appSettings = DataStorageService.loadAppSettingsFromDir(internalPath);
                 _appSettings.PropertyChanged += (s, e) => DataStorageService.saveApplicationSettings(_appSettings);
 
-                // Load box tags
+                // Initialize BoxTags API if configured
+                if (_appSettings.IsBoxTagsApiConfigured)
+                {
+                    BoxTagService.InitializeApi(_appSettings.BoxTagsApiUrl, _appSettings.BoxTagsApiKey);
+                }
+
+                // Load box tags from local storage
                 _boxTags = BoxTagService.LoadBoxTags(internalPath);
+
+                // Sync with remote API if configured (runs in background)
+                if (BoxTagService.IsApiConfigured)
+                {
+                    _ = SyncBoxTagsInBackgroundAsync(internalPath);
+                }
 
                 // Load remote penguin data.
                 _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
@@ -3390,6 +3589,22 @@ namespace PenguinMonitor
             }
         }
 
+        private async Task SyncBoxTagsInBackgroundAsync(string internalPath)
+        {
+            try
+            {
+                _boxTags = await BoxTagService.SyncWithApiAsync(_boxTags, internalPath);
+                RunOnUiThread(() =>
+                {
+                    Toast.MakeText(this, $"📡 Box tags synced ({_boxTags.Count} tags)", ToastLength.Short)?.Show();
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Box tags sync failed: {ex.Message}");
+            }
+        }
+
         private void HandleBoxTagScan(string cleanTagId)
         {
             RunOnUiThread(() =>
@@ -3412,7 +3627,7 @@ namespace PenguinMonitor
                     var internalPath = this.FilesDir?.AbsolutePath;
                     if (!string.IsNullOrEmpty(internalPath))
                     {
-                        BoxTagService.AssignBoxTag(
+                        _ = BoxTagService.AssignBoxTagAsync(
                             _boxTags,
                             _currentBoxName,
                             cleanTagId,

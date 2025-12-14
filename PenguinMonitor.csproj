@@ -15,6 +15,10 @@
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 
+    <!-- BoxTags API defaults (can be overridden in secrets.props) -->
+    <BoxTagsApiUrl Condition="'$(BoxTagsApiUrl)' == ''"></BoxTagsApiUrl>
+    <BoxTagsApiKey Condition="'$(BoxTagsApiKey)' == ''"></BoxTagsApiKey>
+
 	<AndroidPackageFormat>apk</AndroidPackageFormat>
 	<PublishSingleFile>false</PublishSingleFile>
 	<UseAppHost>false</UseAppHost>
@@ -42,4 +46,25 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
+
+  <!-- Generate Secrets.g.cs with API configuration -->
+  <Target Name="GenerateSecrets" BeforeTargets="BeforeCompile;CoreCompile" Inputs="$(MSBuildProjectFile);secrets.props" Outputs="$(IntermediateOutputPath)Secrets.g.cs">
+    <PropertyGroup>
+      <SecretsContent>
+// Auto-generated - do not edit
+namespace PenguinMonitor
+{
+    internal static class Secrets
+    {
+        public const string BoxTagsApiUrl = "$(BoxTagsApiUrl)"%3B
+        public const string BoxTagsApiKey = "$(BoxTagsApiKey)"%3B
+    }
+}
+      </SecretsContent>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(IntermediateOutputPath)Secrets.g.cs" Lines="$(SecretsContent)" Overwrite="true" />
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)Secrets.g.cs" />
+    </ItemGroup>
+  </Target>
 </Project>

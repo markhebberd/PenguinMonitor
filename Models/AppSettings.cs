@@ -470,5 +470,46 @@ namespace PenguinMonitor.Models
         // Transient property - not saved to JSON
         [JsonIgnore]
         public bool ShowDifferencesWithPreviousMonitor { get; set; } = false;
+
+        // Transient property - Edit Box Tags mode (not saved)
+        [JsonIgnore]
+        public bool EditBoxTagsMode { get; set; } = false;
+
+        // BoxTags API configuration - defaults from secrets.props (not in source control)
+        private string boxTagsApiUrl = Secrets.BoxTagsApiUrl;
+        public string BoxTagsApiUrl
+        {
+            get => boxTagsApiUrl;
+            set
+            {
+                if (boxTagsApiUrl != value)
+                {
+                    boxTagsApiUrl = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+
+        private string boxTagsApiKey = Secrets.BoxTagsApiKey;
+        public string BoxTagsApiKey
+        {
+            get => boxTagsApiKey;
+            set
+            {
+                if (boxTagsApiKey != value)
+                {
+                    boxTagsApiKey = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Check if BoxTags API is configured
+        /// </summary>
+        [JsonIgnore]
+        public bool IsBoxTagsApiConfigured =>
+            !string.IsNullOrWhiteSpace(BoxTagsApiUrl) &&
+            !string.IsNullOrWhiteSpace(BoxTagsApiKey);
     }
 }
