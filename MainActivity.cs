@@ -33,7 +33,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.28";
+        private static string version = "37.31";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -773,6 +773,11 @@ namespace PenguinMonitor
                                 _appSettings.CurrentlyVisibleMonitor = 0;
                             DrawPageLayouts();
                             SetEnabledRecursive(child, true, 1.0f);
+
+                            if (!string.IsNullOrEmpty(result.BoxTagError))
+                            {
+                                Toast.MakeText(this, "Box tags failed to sync: " + result.BoxTagError, ToastLength.Long)?.Show();
+                            }
                         });
                     });
                 }
@@ -1215,7 +1220,7 @@ namespace PenguinMonitor
 
             CheckBox showBoxesWithDataInMultiboxView = new CheckBox(this) { Text = "With data", Checked = _appSettings.ShowBoxesWithDataInMultiBoxView };
             showBoxesWithDataInMultiboxView.SetTextColor(Color.Black);
-            showBoxesWithDataInMultiboxView.Click += (s, e) => { _appSettings.ShowBoxesWithDataInMultiBoxView = showBoxesWithDataInMultiboxView.Checked; if (_appSettings.ShowBoxesWithDataInMultiBoxView) _appSettings.HideBoxesWithDataInMultiBoxView = false; DrawPageLayouts(); };
+            showBoxesWithDataInMultiboxView.Click += (s, e) => { _appSettings.ShowBoxesWithDataInMultiBoxView = showBoxesWithDataInMultiboxView.Checked; if (_appSettings.ShowBoxesWithDataInMultiBoxView) { _appSettings.ShowAllBoxesInMultiBoxView = false; _appSettings.HideBoxesWithDataInMultiBoxView = false; } DrawPageLayouts(); };
             showRow1.AddView(showBoxesWithDataInMultiboxView);
 
             CheckBox showNoBoxesInMultiboxView = new CheckBox(this) { Text = "NO", Checked = _appSettings.ShowNoBoxesInMultiBoxView };
@@ -2230,7 +2235,7 @@ namespace PenguinMonitor
                         result = showFilters[0];
                 }
 
-                if (hideFilters.Count > 0)
+                if (hideFilters.Count > 0 && !string.IsNullOrEmpty(result))
                 {
                     string hideText = string.Join(", ", hideFilters.Take(hideFilters.Count - 1));
                     if (hideFilters.Count > 1)
@@ -2238,14 +2243,17 @@ namespace PenguinMonitor
                     else
                         hideText = hideFilters[0];
 
-                    if (!string.IsNullOrEmpty(result))
-                        result += " except " + hideText;
-                    else
-                        result = "None except " + hideText;
+                    result += " except " + hideText;
                 }
             }
 
-            return string.IsNullOrEmpty(result) ? "^ ^ Select show box filters ^ ^" : result;
+            if (string.IsNullOrEmpty(result))
+                return "^ ^ Select show box filters.";
+
+            // Capitalize first character only
+            return result.Length > 0 && char.IsLower(result[0])
+                ? char.ToUpper(result[0]) + result.Substring(1)
+                : result;
         }
         internal void DrawPageLayouts()
         {

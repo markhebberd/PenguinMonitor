@@ -1,2 +1,2 @@
 @echo off
-dotnet publish -c Release -f net9.0-android /p:AndroidPackageFormat=apk /p:PublishDir=bin\publish\
+dotnet publish -c Release -f net9.0-android -r android-arm64 /p:AndroidPackageFormat=apk /p:PublishDir=bin\publish\

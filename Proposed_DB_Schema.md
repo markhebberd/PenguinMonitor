@@ -32,13 +32,22 @@ Design and implement a complete MySQL database schema for PenguinMonitor to stor
 | region_id | INT | NOT NULL, FOREIGN KEY → regions(region_id) |
 | colony_name | VARCHAR(100) | NOT NULL |
 | box_sets_string | TEXT | AllBoxSetsString format: {1-150,AA-AC},{N1-N6} |
-| view_passphrase_hash | VARCHAR(255) | NULL (bcrypt hash, allows read-only access to colony data) |
-| edit_passphrase_hash | VARCHAR(255) | NULL (bcrypt hash, allows full edit access to colony data) |
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | updated_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP |
 | | | UNIQUE KEY (region_id, colony_name) |
 
-### 4. Observation Locations Table
+### 4. Colony Permissions Table
+| Column | Type | Constraints |
+|--------|------|-------------|
+| permission_id | INT | PRIMARY KEY AUTO_INCREMENT |
+| colony_id | INT | NOT NULL, FOREIGN KEY → colonies(colony_id) |
+| observer_id | INT | NOT NULL, FOREIGN KEY → observers(observer_id) |
+| role | VARCHAR(20) | NOT NULL (admin, edit, view) |
+| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+| | | UNIQUE KEY (colony_id, observer_id) |
+| | | INDEX (observer_id) |
+
+### 5. Observation Locations Table
 | Column | Type | Constraints |
 |--------|------|-------------|
 | location_id | INT | PRIMARY KEY AUTO_INCREMENT |
@@ -57,7 +66,7 @@ Design and implement a complete MySQL database schema for PenguinMonitor to stor
 | | | UNIQUE KEY (colony_id, rfid_tag_number) |
 | | | INDEX (location_type) |
 
-### 5. Observations Table (Box Visits)
+### 6. Observations Table (Box Visits)
 | Column | Type | Constraints |
 |--------|------|-------------|
 | observation_id | INT | PRIMARY KEY AUTO_INCREMENT |
@@ -81,7 +90,7 @@ Design and implement a complete MySQL database schema for PenguinMonitor to stor
 | | | INDEX (observer_id) |
 | | | INDEX (is_deleted) |
 
-### 6. Penguins Table (Master Penguin List)
+### 7. Penguins Table (Master Penguin List)
 | Column | Type | Constraints |
 |--------|------|-------------|
 | penguin_id | INT | PRIMARY KEY AUTO_INCREMENT |
@@ -94,7 +103,7 @@ Design and implement a complete MySQL database schema for PenguinMonitor to stor
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | updated_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP |
 
-### 7. Penguin Scans Table (Links Penguins to Observations)
+### 8. Penguin Scans Table (Links Penguins to Observations)
 | Column | Type | Constraints |
 |--------|------|-------------|
 | scan_id | INT | PRIMARY KEY AUTO_INCREMENT |
@@ -108,7 +117,7 @@ Design and implement a complete MySQL database schema for PenguinMonitor to stor
 | | | INDEX (observation_id) |
 | | | INDEX (penguin_id) |
 
-### 8. Penguin Observations Table
+### 9. Penguin Observations Table
 | Column | Type | Constraints |
 |--------|------|-------------|
 | stats_id | INT | PRIMARY KEY AUTO_INCREMENT |
@@ -131,7 +140,7 @@ Design and implement a complete MySQL database schema for PenguinMonitor to stor
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | | | INDEX (penguin_id, observation_date) |
 
-### 9. Audit Log Table (Track All Changes)
+### 10. Audit Log Table (Track All Changes)
 | Column | Type | Constraints |
 |--------|------|-------------|
 | audit_id | INT | PRIMARY KEY AUTO_INCREMENT |

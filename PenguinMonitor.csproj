@@ -48,23 +48,22 @@
   </ItemGroup>
 
   <!-- Generate Secrets.g.cs with API configuration -->
-  <Target Name="GenerateSecrets" BeforeTargets="BeforeCompile;CoreCompile" Inputs="$(MSBuildProjectFile);secrets.props" Outputs="$(IntermediateOutputPath)Secrets.g.cs">
+  <Target Name="GenerateSecrets" BeforeTargets="CoreCompile">
     <PropertyGroup>
-      <SecretsContent>
+      <_SecretsFile>$(IntermediateOutputPath)Secrets.g.cs</_SecretsFile>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_SecretsFile)" Overwrite="true" Lines="
 // Auto-generated - do not edit
 namespace PenguinMonitor
 {
     internal static class Secrets
     {
-        public const string BoxTagsApiUrl = "$(BoxTagsApiUrl)"%3B
-        public const string BoxTagsApiKey = "$(BoxTagsApiKey)"%3B
+        public const string BoxTagsApiUrl = &quot;$(BoxTagsApiUrl)&quot;%3B
+        public const string BoxTagsApiKey = &quot;$(BoxTagsApiKey)&quot;%3B
     }
-}
-      </SecretsContent>
-    </PropertyGroup>
-    <WriteLinesToFile File="$(IntermediateOutputPath)Secrets.g.cs" Lines="$(SecretsContent)" Overwrite="true" />
+}" />
     <ItemGroup>
-      <Compile Include="$(IntermediateOutputPath)Secrets.g.cs" />
+      <Compile Include="$(_SecretsFile)" />
     </ItemGroup>
   </Target>
 </Project>

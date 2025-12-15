@@ -202,6 +202,7 @@ namespace PenguinMonitor.Services
         {
             public Dictionary<string, BoxTag>? BoxTags { get; set; }
             public BoxTagService.SyncResult? TagSyncResult { get; set; }
+            public string? BoxTagError { get; set; }
         }
 
         internal async Task<DownloadResult> DownloadRemoteData(Android.Content.Context? context, Dictionary<int, MonitorDetails> allMonitorData, Dictionary<string, BoxTag>? boxTags = null, ICollection<string>? validBoxIds = null)
@@ -254,6 +255,7 @@ namespace PenguinMonitor.Services
                 if (tagSyncResult != null)
                 {
                     downloadResult.BoxTags = tagSyncResult.Tags;
+                    downloadResult.BoxTagError = tagSyncResult.Error;
                 }
 
                 var csvContentBirds = await responseBirds.Content.ReadAsStringAsync();
@@ -317,13 +319,13 @@ namespace PenguinMonitor.Services
                     {
                         int total = tagSyncResult.Tags.Count;
                         if (tagSyncResult.Uploaded > 0 && tagSyncResult.Downloaded > 0)
-                            tagSyncInfo = $", {total} box tags ({tagSyncResult.Uploaded} up, {tagSyncResult.Downloaded} down)";
+                            tagSyncInfo = $", boxTags: {tagSyncResult.Uploaded} up, {tagSyncResult.Downloaded} down.";
                         else if (tagSyncResult.Uploaded > 0)
-                            tagSyncInfo = $", {total} box tags ({tagSyncResult.Uploaded} uploaded)";
+                            tagSyncInfo = $", boxTags: {tagSyncResult.Uploaded} uploaded.";
                         else if (tagSyncResult.Downloaded > 0)
-                            tagSyncInfo = $", {total} box tags ({tagSyncResult.Downloaded} downloaded)";
+                            tagSyncInfo = $", boxTags: {tagSyncResult.Downloaded} downloaded.";
                         else
-                            tagSyncInfo = $", {total} box tags synced";
+                            tagSyncInfo = $", {total} box tags synced.";
                     }
                 }
 

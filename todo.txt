@@ -13,6 +13,10 @@ TODO
 
 DONE
 
+
+37.31
+- Update box filter checkboxes and visible boxes string
+
 37.30
 - Filter box tag sync to valid box sets only
 
