@@ -22,9 +22,12 @@ define('API_KEY', 'notARealPassword');
 define('ALLOWED_ORIGIN', '*');  // In production, set to your specific domain
 
 /**
- * Get database connection
+ * Get database connection with retry logic for shared hosting
+ *
+ * @param int $attemptsRemaining Number of retry attempts remaining
+ * @return PDO Database connection
  */
-function getDbConnection() {
+function getDbConnection($attemptsRemaining = 4) {
     try {
         $pdo = new PDO(
             "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
@@ -33,11 +36,30 @@ function getDbConnection() {
             [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false
+                PDO::ATTR_EMULATE_PREPARES => false,
+                // Shared hosting optimizations
+                PDO::ATTR_PERSISTENT => false,  // Avoid stale connections on shared hosting
+                PDO::ATTR_TIMEOUT => 5,          // Connection timeout (5 seconds)
+                PDO::MYSQL_ATTR_INIT_COMMAND => "SET SESSION wait_timeout=30"  // Keep session alive
             ]
         );
         return $pdo;
     } catch (PDOException $e) {
+        // Retry if MySQL connection timed out (common on cheap shared hosting)
+        if ($attemptsRemaining > 0 && (
+            strpos($e->getMessage(), 'gone away') !== false ||
+            strpos($e->getMessage(), 'timeout') !== false ||
+            strpos($e->getMessage(), 'Lost connection') !== false
+        )) {
+            $attemptNumber = 5 - $attemptsRemaining;
+            error_log("Database connection attempt {$attemptNumber} failed, retrying... ({$attemptsRemaining} attempts remaining)");
+            usleep(500000);  // Wait 500ms before retry
+            return getDbConnection($attemptsRemaining - 1);
+        }
+
+        // Log the actual error for debugging (visible in PHP error logs)
+        error_log("Database connection failed after all retries: " . $e->getMessage());
+
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Database connection failed']);
         exit;
