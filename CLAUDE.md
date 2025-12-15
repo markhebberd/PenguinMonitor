@@ -14,7 +14,7 @@ Wait for the user to say "build" or explicitly request a build.
 
 ## Project Overview
 
-**PenguinMonitor** is a .NET MAUI Android app used by conservation teams to monitor penguin breeding at nest box colonies in New Zealand.
+**PenguinMonitor** is a .NET for Android app (net9.0-android) used by conservation teams to monitor penguin breeding at nest box colonies in New Zealand.
 
 **What it does:**
 - Field researchers visit nest boxes and record: adults present, eggs, chicks, breeding status, gate status, notes
@@ -23,17 +23,14 @@ Wait for the user to say "build" or explicitly request a build.
 - Shows colony overview with filters (by breeding status, egg count, etc.)
 
 **Architecture:**
-- 3 tabs: Settings, Box Data, Overview
-- MVVM pattern: Pages (XAML) + ViewModels
+- Native Android Activity-based UI (not MAUI)
+- `MainActivity.cs` - Main entry point, contains most UI logic
 - `DataManager` singleton holds all state
 - `DataStorageService` handles file I/O and server communication
 - `Backend` class (in SmtpAuthenticator namespace) handles encrypted server requests
 - `BluetoothManager` handles HR5 EID reader connection
 
 **Key files:**
-- `AppShell.xaml` - Tab navigation
-- `Pages/SettingsPage.xaml` - Config (box set, Bluetooth, GPS)
-- `Pages/BoxDataPage.xaml` - Main data entry screen
-- `Pages/OverviewPage.xaml` - Colony summary grid
+- `MainActivity.cs` - Main activity with all UI screens
 - `Services/DataManager.cs` - Central state management
 - `Services/DataStorageService.cs` - Persistence and sync
