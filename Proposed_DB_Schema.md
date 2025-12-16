@@ -32,8 +32,6 @@ Design and implement a complete MySQL database schema for PenguinMonitor to stor
 | region_id | INT | NOT NULL, FOREIGN KEY → regions(region_id) |
 | colony_name | VARCHAR(100) | NOT NULL |
 | box_sets_string | TEXT | AllBoxSetsString format: {1-150,AA-AC},{N1-N6} |
-| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
-| updated_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP |
 | | | UNIQUE KEY (region_id, colony_name) |
 
 ### 4. Colony Permissions Table
