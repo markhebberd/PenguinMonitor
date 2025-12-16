@@ -259,6 +259,19 @@ namespace PenguinMonitor.Models
                 }
             }
         }
+        private bool showABNBoxesInMultiboxView;
+        public bool ShowABNBoxesInMultiboxView
+        {
+            get => showABNBoxesInMultiboxView;
+            set
+            {
+                if (showABNBoxesInMultiboxView != value)
+                {
+                    showABNBoxesInMultiboxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
         private bool hideBoxesWithDataInMultiBoxView;  
         public bool HideBoxesWithDataInMultiBoxView
         {
@@ -281,6 +294,19 @@ namespace PenguinMonitor.Models
                 if (hideDCMInMultiBoxView != value)
                 {
                     hideDCMInMultiBoxView = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool hideABNInMultiBoxView;
+        public bool HideABNInMultiBoxView
+        {
+            get => hideABNInMultiBoxView;
+            set
+            {
+                if (hideABNInMultiBoxView != value)
+                {
+                    hideABNInMultiBoxView = value;
                     OnAnyPropertyChanged();
                 }
             }

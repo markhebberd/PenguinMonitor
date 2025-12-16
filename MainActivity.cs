@@ -33,7 +33,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.31";
+        private static string version = "37.32";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -1227,19 +1227,19 @@ namespace PenguinMonitor
             showNoBoxesInMultiboxView.SetTextColor(Color.Black);
             showNoBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowNoBoxesInMultiBoxView = showNoBoxesInMultiboxView.Checked; if (_appSettings.ShowNoBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
             showRow1.AddView(showNoBoxesInMultiboxView);
-            showFiltersCheckboxLayout.AddView(showRow1);
 
-            var showRow2 = new LinearLayout(this);
             CheckBox showUnlikelyBoxesInMultiboxView = new CheckBox(this) { Text = "UNL", Checked = _appSettings.ShowUnlikleyBoxesInMultiBoxView };
             showUnlikelyBoxesInMultiboxView.SetTextColor(Color.Black);
             showUnlikelyBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowUnlikleyBoxesInMultiBoxView = showUnlikelyBoxesInMultiboxView.Checked; if (_appSettings.ShowUnlikleyBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
-            showRow2.AddView(showUnlikelyBoxesInMultiboxView);
+            showRow1.AddView(showUnlikelyBoxesInMultiboxView);
 
             CheckBox showPotentialBoxesInMultiboxView = new CheckBox(this) { Text = "POT", Checked = _appSettings.ShowPotentialBoxesInMultiBoxView };
             showPotentialBoxesInMultiboxView.SetTextColor(Color.Black);
             showPotentialBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowPotentialBoxesInMultiBoxView = showPotentialBoxesInMultiboxView.Checked; if (_appSettings.ShowPotentialBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
-            showRow2.AddView(showPotentialBoxesInMultiboxView);
+            showRow1.AddView(showPotentialBoxesInMultiboxView);
+            showFiltersCheckboxLayout.AddView(showRow1);
 
+            var showRow2 = new LinearLayout(this);
             CheckBox showConfidentBoxesInMultiboxView = new CheckBox(this) { Text = "CON", Checked = _appSettings.ShowConfidentBoxesInMultiBoxView };
             showConfidentBoxesInMultiboxView.SetTextColor(Color.Black);
             showConfidentBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowConfidentBoxesInMultiBoxView = showConfidentBoxesInMultiboxView.Checked; if (_appSettings.ShowConfidentBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
@@ -1249,6 +1249,11 @@ namespace PenguinMonitor
             showBreedingBoxesInMultiboxView.SetTextColor(Color.Black);
             showBreedingBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowBreedingBoxesInMultiBoxView = showBreedingBoxesInMultiboxView.Checked; if (_appSettings.ShowBreedingBoxesInMultiBoxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
             showRow2.AddView(showBreedingBoxesInMultiboxView);
+
+            CheckBox showABNBoxesInMultiboxView = new CheckBox(this) { Text = "ABN", Checked = _appSettings.ShowABNBoxesInMultiboxView };
+            showABNBoxesInMultiboxView.SetTextColor(Color.Black);
+            showABNBoxesInMultiboxView.Click += (s, e) => { _appSettings.ShowABNBoxesInMultiboxView = showABNBoxesInMultiboxView.Checked; if (_appSettings.ShowABNBoxesInMultiboxView) _appSettings.ShowAllBoxesInMultiBoxView = false; DrawPageLayouts(); };
+            showRow2.AddView(showABNBoxesInMultiboxView);
 
             CheckBox showDCMBoxesInMultiboxView = new CheckBox(this) { Text = "DCM", Checked = _appSettings.ShowDCMBoxesInMultiboxView };
             showDCMBoxesInMultiboxView.SetTextColor(Color.Black);
@@ -1312,14 +1317,14 @@ namespace PenguinMonitor
             hideUnlikelyBoxesInMultiBoxView.SetTextColor(Color.Black);
             hideUnlikelyBoxesInMultiBoxView.Click += (s, e) => { _appSettings.HideUnlikelyBoxesInMultiBoxView = hideUnlikelyBoxesInMultiBoxView.Checked; DrawPageLayouts(); };
             hideRow1.AddView(hideUnlikelyBoxesInMultiBoxView);
-            hideFiltersCheckboxLayout.AddView(hideRow1);
 
-            var hideRow2 = new LinearLayout(this);
             CheckBox hidePotentialBoxesInMultiBoxView = new CheckBox(this) { Text = "POT", Checked = _appSettings.HidePotentialBoxesInMultiBoxView };
             hidePotentialBoxesInMultiBoxView.SetTextColor(Color.Black);
             hidePotentialBoxesInMultiBoxView.Click += (s, e) => { _appSettings.HidePotentialBoxesInMultiBoxView = hidePotentialBoxesInMultiBoxView.Checked; DrawPageLayouts(); };
-            hideRow2.AddView(hidePotentialBoxesInMultiBoxView);
+            hideRow1.AddView(hidePotentialBoxesInMultiBoxView);
+            hideFiltersCheckboxLayout.AddView(hideRow1);
 
+            var hideRow2 = new LinearLayout(this);
             CheckBox hideConfidentBoxesInMultiBoxView = new CheckBox(this) { Text = "CON", Checked = _appSettings.HideConfidentBoxesInMultiBoxView };
             hideConfidentBoxesInMultiBoxView.SetTextColor(Color.Black);
             hideConfidentBoxesInMultiBoxView.Click += (s, e) => { _appSettings.HideConfidentBoxesInMultiBoxView = hideConfidentBoxesInMultiBoxView.Checked; DrawPageLayouts(); };
@@ -1329,6 +1334,11 @@ namespace PenguinMonitor
             hideBreedingBoxesInMultiBoxView.SetTextColor(Color.Black);
             hideBreedingBoxesInMultiBoxView.Click += (s, e) => { _appSettings.HideBreedingBoxesInMultiBoxView = hideBreedingBoxesInMultiBoxView.Checked; DrawPageLayouts(); };
             hideRow2.AddView(hideBreedingBoxesInMultiBoxView);
+
+            CheckBox hideABNInMultiboxView = new CheckBox(this) { Text = "ABN", Checked = _appSettings.HideABNInMultiBoxView };
+            hideABNInMultiboxView.SetTextColor(Color.Black);
+            hideABNInMultiboxView.Click += (s, e) => { _appSettings.HideABNInMultiBoxView = hideABNInMultiboxView.Checked; DrawPageLayouts(); };
+            hideRow2.AddView(hideABNInMultiboxView);
 
             CheckBox hideDCMInMultiboxView = new CheckBox(this) { Text = "DCM", Checked = _appSettings.HideDCMInMultiBoxView };
             hideDCMInMultiboxView.SetTextColor(Color.Black);
@@ -1347,22 +1357,22 @@ namespace PenguinMonitor
             hideSpecialBoxesInMultiBoxView.Click += (s, e) => { _appSettings.HideInterestingBoxesInMultiBoxView = hideSpecialBoxesInMultiBoxView.Checked; DrawPageLayouts(); };
             hideRow3.AddView(hideSpecialBoxesInMultiBoxView);
 
-            CheckBox hideSingleEggBoxesInMultiboxView = new CheckBox(this) { Text = "Single egg", Checked = _appSettings.HideSingleEggBoxesInMultiboxView };
-            hideSingleEggBoxesInMultiboxView.SetTextColor(Color.Black);
-            hideSingleEggBoxesInMultiboxView.Click += (s, e) => { _appSettings.HideSingleEggBoxesInMultiboxView = hideSingleEggBoxesInMultiboxView.Checked; DrawPageLayouts(); };
-            hideRow3.AddView(hideSingleEggBoxesInMultiboxView);
+            CheckBox hideBeforeCurrentCheckbox = new CheckBox(this) { Text = "< current", Checked = _appSettings.HideBeforeCurrentInMultiBoxView };
+            hideBeforeCurrentCheckbox.SetTextColor(Color.Black);
+            hideBeforeCurrentCheckbox.Click += (s, e) => { _appSettings.HideBeforeCurrentInMultiBoxView = hideBeforeCurrentCheckbox.Checked; DrawPageLayouts(); };
+            hideRow3.AddView(hideBeforeCurrentCheckbox);
             hideFiltersCheckboxLayout.AddView(hideRow3);
 
             var hideRow4 = new LinearLayout(this);
+            CheckBox hideSingleEggBoxesInMultiboxView = new CheckBox(this) { Text = "Single egg", Checked = _appSettings.HideSingleEggBoxesInMultiboxView };
+            hideSingleEggBoxesInMultiboxView.SetTextColor(Color.Black);
+            hideSingleEggBoxesInMultiboxView.Click += (s, e) => { _appSettings.HideSingleEggBoxesInMultiboxView = hideSingleEggBoxesInMultiboxView.Checked; DrawPageLayouts(); };
+            hideRow4.AddView(hideSingleEggBoxesInMultiboxView);
+
             CheckBox hideDoubleEggBoxesInMultiboxView = new CheckBox(this) { Text = "Double egg", Checked = _appSettings.HideDoubleEggBoxesInMultiboxView };
             hideDoubleEggBoxesInMultiboxView.SetTextColor(Color.Black);
             hideDoubleEggBoxesInMultiboxView.Click += (s, e) => { _appSettings.HideDoubleEggBoxesInMultiboxView = hideDoubleEggBoxesInMultiboxView.Checked; DrawPageLayouts(); };
             hideRow4.AddView(hideDoubleEggBoxesInMultiboxView);
-
-            CheckBox hideBeforeCurrentCheckbox = new CheckBox(this) { Text = "< current", Checked = _appSettings.HideBeforeCurrentInMultiBoxView };
-            hideBeforeCurrentCheckbox.SetTextColor(Color.Black);
-            hideBeforeCurrentCheckbox.Click += (s, e) => { _appSettings.HideBeforeCurrentInMultiBoxView = hideBeforeCurrentCheckbox.Checked; DrawPageLayouts(); };
-            hideRow4.AddView(hideBeforeCurrentCheckbox);
             hideFiltersCheckboxLayout.AddView(hideRow4);
 
             _overviewFiltersLayout.AddView(hideFiltersCheckboxLayout);
@@ -1464,10 +1474,12 @@ namespace PenguinMonitor
                             || _appSettings.ShowInterestingBoxesInMultiBoxView && (mostRecentBoxData.Eggs > 0 && !nrfPercentageString.StartsWith("0") || !string.IsNullOrWhiteSpace(stickyNotes))
                             || _appSettings.ShowSingleEggBoxesInMultiboxView && (mostRecentBoxData.Eggs == 1)
                             || _appSettings.ShowDoubleEggBoxesInMultiboxView && (mostRecentBoxData.Eggs == 2)
-                            || _appSettings.ShowDCMBoxesInMultiboxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("DCM");
+                            || _appSettings.ShowDCMBoxesInMultiboxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("DCM")
+                            || _appSettings.ShowABNBoxesInMultiboxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("ABN");
 
                 bool hideBoxWithData = _appSettings.HideBoxesWithDataInMultiBoxView && _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(boxName);
                 bool hideDCM = _appSettings.HideDCMInMultiBoxView && ((mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance == "DCM"));
+                bool hideABN = _appSettings.HideABNInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("ABN");
                 bool hideBeforeCurrent = _appSettings.HideBeforeCurrentInMultiBoxView && _currentBoxIndex > _boxNamesAndIndexes[boxName];
                 bool hideNo = _appSettings.HideNoBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("NO");
                 bool hideUnlikely = _appSettings.HideUnlikelyBoxesInMultiBoxView && mostRecentBoxData.BreedingChance != null && mostRecentBoxData.BreedingChance.Equals("UNL");
@@ -1481,7 +1493,7 @@ namespace PenguinMonitor
 
                 // In Edit Box Tags mode, show all boxes regardless of filters
                 bool shouldShow = _appSettings.EditBoxTagsMode ||
-                    (showBox && !hideBoxWithData && !hideDCM && !hideBeforeCurrent && !hideNo && !hideUnlikely && !hidePotential && !hideConfident && !hideBreeding && !hideNotes && !hideInteresting && !hideSingleEgg && !hideDoubleEgg);
+                    (showBox && !hideBoxWithData && !hideDCM && !hideABN && !hideBeforeCurrent && !hideNo && !hideUnlikely && !hidePotential && !hideConfident && !hideBreeding && !hideNotes && !hideInteresting && !hideSingleEgg && !hideDoubleEgg);
 
                 if (shouldShow)
                 {
@@ -2193,6 +2205,7 @@ namespace PenguinMonitor
                 if (_appSettings.ShowConfidentBoxesInMultiBoxView) showFilters.Add("CON");
                 if (_appSettings.ShowBreedingBoxesInMultiBoxView) showFilters.Add("BR");
                 if (_appSettings.ShowDCMBoxesInMultiboxView) showFilters.Add("DCM");
+                if (_appSettings.ShowABNBoxesInMultiboxView) showFilters.Add("ABN");
                 if (_appSettings.showBoxesWithNotesInMultiboxView) showFilters.Add("has notes");
                 if (_appSettings.ShowInterestingBoxesInMultiBoxView) showFilters.Add("has sticky notes");
                 if (_appSettings.ShowSingleEggBoxesInMultiboxView) showFilters.Add("single egg");
@@ -2207,6 +2220,7 @@ namespace PenguinMonitor
             if (_appSettings.HideConfidentBoxesInMultiBoxView) hideFilters.Add("CON");
             if (_appSettings.HideBreedingBoxesInMultiBoxView) hideFilters.Add("BR");
             if (_appSettings.HideDCMInMultiBoxView) hideFilters.Add("DCM");
+            if (_appSettings.HideABNInMultiBoxView) hideFilters.Add("ABN");
             if (_appSettings.HideBoxesWithNotesInMultiboxView) hideFilters.Add("has notes");
             if (_appSettings.HideInterestingBoxesInMultiBoxView) hideFilters.Add("has sticky notes");
             if (_appSettings.HideSingleEggBoxesInMultiboxView) hideFilters.Add("single egg");
@@ -2619,7 +2633,7 @@ namespace PenguinMonitor
             spinnerParams.SetMargins(4, 0, 4, 0);
             _breedingChanceSpinner[0].LayoutParameters = spinnerParams;
             _breedingChanceSpinner[0].SetGravity(GravityFlags.Center);
-            List<string> items = new List<string> { "", "NO", "UNL", "POT", "CON", "BR", "DCM" };
+            List<string> items = new List<string> { "", "NO", "UNL", "POT", "CON", "BR", "ABN", "DCM" };
             ArrayAdapter<string> adapter = new(this, Android.Resource.Layout.SimpleSpinnerItem, items);
             adapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
             _breedingChanceSpinner[0].Adapter = adapter;

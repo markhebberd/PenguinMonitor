@@ -7,12 +7,14 @@ TODO
 	- Scanned entries should be bigger and easier to click
 - The app should be able to sort by next relevant date. IE show the next chicks that need chipping
 - penguin reporting under specific name to seperate britta from alternate locations (i.e. wellington?)
-- note from britta "nest status ABN - a definite point in time when nest has been declared abandoned and failed, this would be perfect as a prediction status, so those nests can be Specifically filtered for"
 - Performance tweak: create multibox view card different from draw multibox view card.
-- on going discussion about how to retire an egg - egg removed action? 
+- on going discussion about how to retire an egg - egg removed action?
 
 DONE
 
+37.32
+- ABN breeding status for abandoned nests, displays "Abandoned" in breeding status string
+- Rearranged show/hide filter checkboxes (NO, UNL, POT on same row; ABN before DCM)
 
 37.31
 - Update box filter checkboxes and visible boxes string

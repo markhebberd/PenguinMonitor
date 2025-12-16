@@ -499,6 +499,9 @@ namespace PenguinMonitor.Services
             }
             if (boxName == "49")
                 ;
+            // Check if current box is abandoned
+            if (thisBoxData?.BreedingChance == "ABN")
+                return "Abandoned";
             if (thisBoxData == null || thisBoxData.Eggs + thisBoxData.Chicks == 0 || olderBoxDatas == null || olderBoxDatas.Count==0)
                 return "";
             string breedingStatusString = "";
@@ -506,8 +509,14 @@ namespace PenguinMonitor.Services
             DateTime whenOffspringNotFound = DateTime.MinValue;
             foreach (BoxData olderBoxData in olderBoxDatas.Skip(skip))
             {
+                // If we hit an ABN when going back in time (while eggs/chicks still present), the nest was abandoned
+                if (olderBoxData.BreedingChance == "ABN" && olderBoxData.Eggs + olderBoxData.Chicks > 0)
+                    return "Abandoned";
                 if (olderBoxData.Eggs + olderBoxData.Chicks == 0)
                 {
+                    // Also check if ABN was set on the record when eggs/chicks went to 0
+                    if (olderBoxData.BreedingChance == "ABN")
+                        return "Abandoned";
                     if (thisBoxData.Eggs > 1) //in case of multiple eggs, assume first one was laid 2 days before found
                         whenOffspringFound = whenOffspringFound.AddDays(-2);
                     whenOffspringNotFound = olderBoxData.whenDataCollectedUtc.ToLocalTime().Date;
