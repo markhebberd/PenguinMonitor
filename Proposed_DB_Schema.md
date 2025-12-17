@@ -23,19 +23,16 @@ MySQL database schema for penguin colony monitoring. Supports multiple regions a
               ▼                                    │ 1:N
         ┌─────────┐       ┌──────────┐             │
         │ regions │──1:N──│ colonies │             ▼
-        └─────────┘       └────┬─────┘      ┌───────────────┐
-                               │            │ penguin_scans │──FK──┐
-                               │ 1:N        └───────────────┘      │
-                               ▼                                   │
-              ┌───────────────────────┐                            ▼
-              │ observation_locations │                     ┌──────────┐
-              └───────────────────────┘                     │ penguins │
-                                                            └────┬─────┘
-                                                                 │ 1:N
-                                                                 ▼
-                                                   ┌────────────────────────┐
-                                                   │ penguin_biometric_data │
-                                                   └────────────────────────┘
+        └─────────┘       └────┬─────┘    ┌───────────────┐   ┌────────────────────────┐
+                               │          │ penguin_scans │   │ penguin_biometric_data │
+                               │ 1:N      └───────┬───────┘   └────────────┬───────────┘
+                               ▼                  │                        │
+              ┌───────────────────────┐           │      FK                │
+              │ observation_locations │           └───────────┬────────────┘
+              └───────────────────────┘                       ▼
+                                                       ┌──────────┐
+                                                       │ penguins │
+                                                       └──────────┘
 ```
 
 **Key relationships:**
