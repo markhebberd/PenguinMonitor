@@ -17,7 +17,7 @@ MySQL database schema for penguin colony monitoring. Supports multiple regions a
               │                  │                  │
               ▼                  ▼                  ▼
     ┌───────────────────┐  ┌─────────┐       ┌───────────┐
-    │ colony_permissions │  │ audit_log│       │observations│
+    │ colony_permissions│  │audit_log│       │observations│
     └─────────┬─────────┘  └─────────┘       └─────┬─────┘
               │                                    │
               ▼                                    │
@@ -28,7 +28,7 @@ MySQL database schema for penguin colony monitoring. Supports multiple regions a
                                │ 1:N              │
                                ▼                  │
                     ┌─────────────────────┐       │
-                    │ observation_locations│◄──────┘
+                    │observation_locations│◄──────┘
                     └─────────────────────┘       │
                                                   │
                                                   │ 1:N
@@ -39,7 +39,7 @@ MySQL database schema for penguin colony monitoring. Supports multiple regions a
          │ 1:N
          ▼
 ┌──────────────────────┐
-│ penguin_biometric_data│
+│penguin_biometric_data│
 └──────────────────────┘
 ```
 
