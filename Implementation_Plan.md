@@ -34,8 +34,8 @@ Batch upload auto-creates `observation_locations` and `penguin_scans` as needed.
 |----------|--------|-------------|
 | `/api/penguins.php` | GET | Download penguin master list |
 | `/api/penguins.php` | POST | Create/update penguin records |
-| `/api/penguin_observations.php` | POST | Upload penguin health/measurements |
-| `/api/penguin_observations.php?penguin_id=X` | GET | Get penguin observation history |
+| `/api/penguin_biometrics.php` | POST | Upload penguin biometrics |
+| `/api/penguin_biometrics.php?penguin_id=X` | GET | Get penguin biometric history |
 
 ### Location Management
 | Endpoint | Method | Description |
@@ -77,7 +77,7 @@ Batch upload auto-creates `observation_locations` and `penguin_scans` as needed.
 3. `colonies.php` — colony list and details
 4. `observations.php` — batch upload and download
 5. `penguins.php` — penguin master list
-6. `penguin_observations.php` — health/measurement data
+6. `penguin_biometrics.php` — biometric data
 7. Update `boxtags.php` for colony_id filtering
 
 ### Phase 3: C# Client
@@ -104,7 +104,7 @@ Batch upload auto-creates `observation_locations` and `penguin_scans` as needed.
 - `ServerApi/colonies.php`
 - `ServerApi/observations.php`
 - `ServerApi/penguins.php`
-- `ServerApi/penguin_observations.php`
+- `ServerApi/penguin_biometrics.php`
 - `ServerApi/database_schema.sql`
 
 ### Client (C#)

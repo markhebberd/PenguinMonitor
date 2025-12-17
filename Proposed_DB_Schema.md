@@ -38,9 +38,9 @@ MySQL database schema for penguin colony monitoring. Supports multiple regions a
          │
          │ 1:N
          ▼
-┌─────────────────────┐
-│ penguin_observations │
-└─────────────────────┘
+┌──────────────────────┐
+│ penguin_biometric_data│
+└──────────────────────┘
 ```
 
 **Key relationships:**
@@ -48,8 +48,8 @@ MySQL database schema for penguin colony monitoring. Supports multiple regions a
 - Colony → Observation Location (1:N) — boxes, beaches, burrows within a colony
 - Observation Location → Observation (1:N) — visit history per location
 - Observation → Penguin Scan (1:N) — penguins scanned during a visit
-- Penguin → Penguin Scan (1:N) — where a penguin has been seen
-- Penguin → Penguin Observation (1:N) — health/measurement history
+- Penguin → Penguin Scan (1:N)
+- Penguin → Penguin Biometric Data (1:N)
 
 ---
 
@@ -151,10 +151,10 @@ MySQL database schema for penguin colony monitoring. Supports multiple regions a
 | accuracy | FLOAT | |
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 
-### penguin_observations
+### penguin_biometric_data
 | Column | Type | Constraints |
 |--------|------|-------------|
-| stats_id | INT | PK, AUTO_INCREMENT |
+| biometric_id | INT | PK, AUTO_INCREMENT |
 | penguin_id | INT | NOT NULL, FK → penguins |
 | observation_id | INT | FK → observations ON DELETE SET NULL |
 | observation_date | DATE | NOT NULL |
@@ -207,7 +207,7 @@ MySQL database schema for penguin colony monitoring. Supports multiple regions a
 | observations | is_deleted | Exclude soft-deleted records |
 | penguin_scans | observation_id | Scans for an observation |
 | penguin_scans | penguin_id | Observation history for a penguin |
-| penguin_observations | (penguin_id, observation_date) | Health history for a penguin |
+| penguin_biometric_data | (penguin_id, observation_date) | Biometric history for a penguin |
 | audit_log | (table_name, record_id) | Change history for a record |
 | audit_log | observer_id | Changes by an observer |
 | audit_log | change_timestamp | Recent changes |
