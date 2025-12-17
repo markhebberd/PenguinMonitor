@@ -9,45 +9,36 @@ MySQL database schema for penguin colony monitoring. Supports multiple regions a
 ## Entity Relationships
 
 ```
-                          ┌─────────────┐
-                          │  observers  │
-                          └──────┬──────┘
-                                 │
-              ┌──────────────────┼──────────────────┐
-              │                  │                  │
-              ▼                  ▼                  ▼
-    ┌───────────────────┐  ┌─────────┐       ┌───────────┐
-    │ colony_permissions│  │audit_log│       │observations│
-    └─────────┬─────────┘  └─────────┘       └─────┬─────┘
+                          ┌───────────┐
+                          │ observers │
+                          └─────┬─────┘
+                                │
+             ┌──────────────────┼──────────────────┐
+             │                  │                  │
+             ▼                  ▼                  ▼
+   ┌────────────────────┐ ┌───────────┐    ┌──────────────┐
+   │ colony_permissions │ │ audit_log │    │ observations │
+   └──────────┬─────────┘ └───────────┘    └───────┬──────┘
               │                                    │
-              ▼                                    │
-         ┌─────────┐      ┌──────────┐            │
-         │ regions │──1:N─│ colonies │            │
-         └─────────┘      └────┬─────┘            │
-                               │                  │
-                               │ 1:N              │
-                               ▼                  │
-                    ┌─────────────────────┐       │
-                    │observation_locations│◄──────┘
-                    └─────────────────────┘       │
-                                                  │
-                                                  │ 1:N
-    ┌──────────┐       ┌───────────────┐          │
-    │ penguins │──1:N──│ penguin_scans │◄─────────┘
-    └────┬─────┘       └───────────────┘
-         │
-         │ 1:N
-         ▼
-┌──────────────────────┐
-│penguin_biometric_data│
-└──────────────────────┘
+              ▼                                    │ 1:N
+        ┌─────────┐       ┌──────────┐             │
+        │ regions │──1:N──│ colonies │             ▼
+        └─────────┘       └────┬─────┘    ┌───────────────┐   ┌────────────────────────┐
+                               │          │ penguin_scans │   │ penguin_biometric_data │
+                               │ 1:N      └───────┬───────┘   └────────────┬───────────┘
+                               ▼                  │                        │
+              ┌───────────────────────┐           └───────────┬────────────┘
+              │ observation_locations │                       ▼
+              └───────────────────────┘                ┌──────────┐
+                                                       │ penguins │
+                                                       └──────────┘
 ```
 
 **Key relationships:**
-- Region → Colony (1:N) — e.g., Nelson region contains Tarakohe colony
-- Colony → Observation Location (1:N) — boxes, beaches, burrows within a colony
-- Observation Location → Observation (1:N) — visit history per location
-- Observation → Penguin Scan (1:N) — penguins scanned during a visit
+- Region → Colony (1:N)
+- Colony → Observation Location (1:N)
+- Observation Location → Observation (1:N)
+- Observation → Penguin Scan (1:N)
 - Penguin → Penguin Biometric Data (1:N)
 
 ---
