@@ -27,10 +27,9 @@ MySQL database schema for penguin colony monitoring. Supports multiple regions a
                                │          │ penguin_scans │   │ penguin_biometric_data │
                                │ 1:N      └───────┬───────┘   └────────────┬───────────┘
                                ▼                  │                        │
-              ┌───────────────────────┐           │      FK                │
-              │ observation_locations │           └───────────┬────────────┘
-              └───────────────────────┘                       ▼
-                                                       ┌──────────┐
+              ┌───────────────────────┐           └───────────┬────────────┘
+              │ observation_locations │                       ▼
+              └───────────────────────┘                ┌──────────┐
                                                        │ penguins │
                                                        └──────────┘
 ```
