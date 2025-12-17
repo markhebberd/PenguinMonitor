@@ -48,7 +48,6 @@ MySQL database schema for penguin colony monitoring. Supports multiple regions a
 - Colony → Observation Location (1:N) — boxes, beaches, burrows within a colony
 - Observation Location → Observation (1:N) — visit history per location
 - Observation → Penguin Scan (1:N) — penguins scanned during a visit
-- Penguin → Penguin Scan (1:N)
 - Penguin → Penguin Biometric Data (1:N)
 
 ---
