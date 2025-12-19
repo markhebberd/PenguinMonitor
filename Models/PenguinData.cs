@@ -14,5 +14,6 @@ namespace PenguinMonitor.Models
         public DateTime ChipDate { get; set; }
         public string Sex { get; set; } = "";
         public string VidForScanner { get; set; } = "";
+        public string ChipAs { get; set; } = "";
     }
 }

@@ -294,7 +294,8 @@ namespace PenguinMonitor.Services
                                 LastKnownLifeStage = lifeStage,
                                 Sex = row.Sex ?? "",
                                 VidForScanner = row.VidForScanner ?? "",
-                                ChipDate = DateTime.TryParse(row.ChipDate, out DateTime chipDateFound) ? chipDateFound : DateTime.MinValue
+                                ChipDate = DateTime.TryParse(row.ChipDate, out DateTime chipDateFound) ? chipDateFound : DateTime.MinValue,
+                                ChipAs = (row.ChipAs ?? "").Trim()
                             };
                             remotePenguinData[eightDigitId] = penguinData;
                         }

@@ -12,6 +12,10 @@ TODO
 
 DONE
 
+37.33
+- returner icon for all birds
+- detect returner before chick. 
+
 37.32
 - ABN breeding status for abandoned nests, displays "Abandoned" in breeding status string
 - Rearranged show/hide filter checkboxes (NO, UNL, POT on same row; ABN before DCM)

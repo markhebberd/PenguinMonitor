@@ -33,7 +33,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.32";
+        private static string version = "37.33";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -772,6 +772,15 @@ namespace PenguinMonitor
                             if (!_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor))
                                 _appSettings.CurrentlyVisibleMonitor = 0;
                             DrawPageLayouts();
+
+                            // Rebuild scanned IDs layout now that penguin data is loaded
+                            if (_allMonitorData.ContainsKey(_appSettings.CurrentlyVisibleMonitor) &&
+                                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.ContainsKey(_currentBoxName))
+                            {
+                                var boxData = _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData[_currentBoxName];
+                                buildScannedIdsLayout(boxData.ScannedIds);
+                            }
+
                             SetEnabledRecursive(child, true, 1.0f);
 
                             if (!string.IsNullOrEmpty(result.BoxTagError))
@@ -3271,26 +3280,39 @@ namespace PenguinMonitor
             
             if (null != _remotePenguinData && _remotePenguinData.TryGetValue(scan.BirdId, out var penguinData))
             {
-                // Penguin found in remote data - prioritize life stage over sex
-                if (penguinData.LastKnownLifeStage == LifeStage.Chick)
+                // Penguin found in remote data - check for returning birds
+                // Check if ChipAs contains "chick" (case insensitive)
+                bool isReturning = penguinData.LastKnownLifeStage == LifeStage.Returnee ||
+                                   (!string.IsNullOrEmpty(penguinData.ChipAs) &&
+                                    penguinData.ChipAs.IndexOf("chick", StringComparison.OrdinalIgnoreCase) >= 0);
+
+                // Check if it's a recent chick (< 3 months old)
+                bool isRecentChick = penguinData.LastKnownLifeStage == LifeStage.Chick &&
+                                     !(penguinData.ChipDate > DateTime.Today.AddYears(-20) &&
+                                       DateTime.Today > penguinData.ChipDate.AddMonths(3));
+
+                if (isRecentChick)
                 {
+                    // Still a chick
                     backgroundColor = UIFactory.CHICK_BACKGROUND;
-                    additionalInfo = " 🐣";
+                    additionalInfo = isReturning ? " 🐣🔄" : " 🐣";
                 }
+                // Adult - check sex
                 else if (penguinData.Sex.Equals("F", StringComparison.OrdinalIgnoreCase))
                 {
                     backgroundColor = UIFactory.FEMALE_BACKGROUND;
-                    additionalInfo = " ♀";
+                    additionalInfo = isReturning ? " 🐧♀🔄" : " 🐧♀";
                 }
                 else if (penguinData.Sex.Equals("M", StringComparison.OrdinalIgnoreCase))
                 {
                     backgroundColor = UIFactory.MALE_BACKGROUND;
-                    additionalInfo = " ♂";
+                    additionalInfo = isReturning ? " 🐧♂🔄" : " 🐧♂";
                 }
                 else
                 {
-                    // Unknown sex, use alternating colors
+                    // Unknown sex - gray background
                     backgroundColor = index % 2 == 0 ? UIFactory.SCAN_ROW_EVEN : UIFactory.SCAN_ROW_ODD;
+                    additionalInfo = isReturning ? " 🐧🔄" : " 🐧";
                 }
             }
             else
@@ -3714,15 +3736,35 @@ namespace PenguinMonitor
                 RunOnUiThread(() =>
                 {
                     // Enhanced toast message with life stage info
-                    string toastMessage = $"🐧 Bird {shortId} added to Box {_currentBoxIndex}";
+                    bool isReturning = false;
+                    if (_remotePenguinData != null && _remotePenguinData.TryGetValue(shortId, out var penguinCheck))
+                    {
+                        // Check if ChipAs contains "chick" (case insensitive)
+                        isReturning = penguinCheck.LastKnownLifeStage == LifeStage.Returnee ||
+                                      (!string.IsNullOrEmpty(penguinCheck.ChipAs) &&
+                                       penguinCheck.ChipAs.IndexOf("chick", StringComparison.OrdinalIgnoreCase) >= 0);
+                    }
+                    string birdIcon = isReturning ? "🔄🐧" : "🐧";
+                    string toastMessage = $"{birdIcon} Bird {shortId} added to Box {_currentBoxIndex}";
                     if (_remotePenguinData != null && _remotePenguinData.TryGetValue(shortId, out var penguin))
                     {
-                        if (penguin.LastKnownLifeStage == LifeStage.Adult || 
+                        if (penguin.LastKnownLifeStage == LifeStage.Adult ||
                             penguin.LastKnownLifeStage == LifeStage.Returnee)
                         {
                             _adultsEditText[0].Text = (int.Parse(_adultsEditText[0].Text ?? "0") + 1).ToString();
                             SaveCurrentBoxData();
-                            if (!penguin.Sex.Equals("f", StringComparison.OrdinalIgnoreCase) && !penguin.Sex.Equals("m", StringComparison.OrdinalIgnoreCase))
+
+                            // Check for returning bird FIRST (chipped as chick)
+                            // Check if ChipAs contains "chick" (case insensitive)
+                            bool isReturningBird = penguin.LastKnownLifeStage == LifeStage.Returnee ||
+                                                   (!string.IsNullOrEmpty(penguin.ChipAs) &&
+                                                    penguin.ChipAs.IndexOf("chick", StringComparison.OrdinalIgnoreCase) >= 0);
+                            if (isReturningBird)
+                            {
+                                triggerAlertAsync();
+                                toastMessage += $" RETURNING BIRD";
+                            }
+                            else if (!penguin.Sex.Equals("f", StringComparison.OrdinalIgnoreCase) && !penguin.Sex.Equals("m", StringComparison.OrdinalIgnoreCase))
                             {
                                 triggerAlertAsync();
                                 toastMessage += $" unsexed";
