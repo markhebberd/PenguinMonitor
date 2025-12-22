@@ -493,6 +493,73 @@ namespace PenguinMonitor.Models
             }
         }
 
+        // Breeding dates timeline settings
+        private bool showBreedingDatesTimeline;
+        public bool ShowBreedingDatesTimeline
+        {
+            get => showBreedingDatesTimeline;
+            set
+            {
+                if (showBreedingDatesTimeline != value)
+                {
+                    showBreedingDatesTimeline = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool showHatchingDatesInTimeline = true;
+        public bool ShowHatchingDatesInTimeline
+        {
+            get => showHatchingDatesInTimeline;
+            set
+            {
+                if (showHatchingDatesInTimeline != value)
+                {
+                    showHatchingDatesInTimeline = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool showPGDatesInTimeline = true;
+        public bool ShowPGDatesInTimeline
+        {
+            get => showPGDatesInTimeline;
+            set
+            {
+                if (showPGDatesInTimeline != value)
+                {
+                    showPGDatesInTimeline = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool showChippingDatesInTimeline = true;
+        public bool ShowChippingDatesInTimeline
+        {
+            get => showChippingDatesInTimeline;
+            set
+            {
+                if (showChippingDatesInTimeline != value)
+                {
+                    showChippingDatesInTimeline = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+        private bool showFledgingDatesInTimeline = true;
+        public bool ShowFledgingDatesInTimeline
+        {
+            get => showFledgingDatesInTimeline;
+            set
+            {
+                if (showFledgingDatesInTimeline != value)
+                {
+                    showFledgingDatesInTimeline = value;
+                    OnAnyPropertyChanged();
+                }
+            }
+        }
+
         // Transient property - not saved to JSON
         [JsonIgnore]
         public bool ShowDifferencesWithPreviousMonitor { get; set; } = false;

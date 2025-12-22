@@ -5,12 +5,18 @@ TODO
 	- show all known data about the bird 
 	- prompt to enter optional information connected with the scan result, i.e. Sex, weight, etc.
 	- Scanned entries should be bigger and easier to click
-- The app should be able to sort by next relevant date. IE show the next chicks that need chipping
 - penguin reporting under specific name to seperate britta from alternate locations (i.e. wellington?)
 - Performance tweak: create multibox view card different from draw multibox view card.
-- on going discussion about how to retire an egg - egg removed action?
+- lock without saving -> discard wording. save/edit
+- if a new breeding session was STARTED with a CHICK (unusual, as one would normally sight eggs first, but possible to imagine in a very low monitor environment), then the system would need to back-calculate likely egg laying dates, as the chicks had already hatched. This made me think of something that I will explain sometime about your automatic calculations/guesses. I think I can explain well when we get the next opportunity.
+
 
 DONE
+
+37.34
+- handling scans when in box history and in monitor history, scanning a box/bird takes you to latest. (untested)
+- View for list of interesting datas: Hatching, PG, Chip start, Fledging.
+- Jump to box case invariant. 
 
 37.33
 - returner icon for all birds

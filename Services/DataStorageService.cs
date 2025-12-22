@@ -549,6 +549,63 @@ namespace PenguinMonitor.Services
                 return "Fledge" + getDateString(estFledge);
             return "Fail detecting laid date?";
         }
+
+        /// <summary>
+        /// Gets estimated breeding dates for a box based on local data.
+        /// Returns null if dates cannot be calculated.
+        /// </summary>
+        internal static (DateTime? hatch, DateTime? pg, DateTime? chipStart, DateTime? fledge)? GetEstimatedBreedingDates(string boxName, BoxData? thisBoxData, List<BoxData> olderBoxDatas)
+        {
+            if(olderBoxDatas.Count == 0)
+                return null;
+            int skip = 0;
+            if (thisBoxData == null)
+            {
+                if (olderBoxDatas.Count == 1)
+                    return null;
+                thisBoxData = olderBoxDatas[0];
+                skip = 1;
+            }
+            if (thisBoxData?.BreedingChance == "ABN")
+                return null;
+            if (thisBoxData == null || thisBoxData.Eggs + thisBoxData.Chicks == 0 || olderBoxDatas == null || olderBoxDatas.Count == 0)
+                return null;
+
+            // Track whether we ever saw eggs in the history (needed to calculate hatch date)
+            bool sawEggsInHistory = thisBoxData.Eggs > 0;
+
+            DateTime whenOffspringFound = thisBoxData.whenDataCollectedUtc.ToLocalTime().Date;
+            foreach (BoxData olderBoxData in olderBoxDatas.Skip(skip))
+            {
+                if (olderBoxData.Eggs > 0)
+                    sawEggsInHistory = true;
+
+                if (olderBoxData.BreedingChance == "ABN" && olderBoxData.Eggs + olderBoxData.Chicks > 0)
+                    return null;
+                if (olderBoxData.Eggs + olderBoxData.Chicks == 0)
+                {
+                    if (olderBoxData.BreedingChance == "ABN")
+                        return null;
+                    if (thisBoxData.Eggs > 1)
+                        whenOffspringFound = whenOffspringFound.AddDays(-2);
+                    DateTime whenOffspringNotFound = olderBoxData.whenDataCollectedUtc.ToLocalTime().Date;
+                    TimeSpan uncertainty = (whenOffspringFound - whenOffspringNotFound) / 2;
+                    DateTime probableLaidDate = whenOffspringNotFound.AddDays(Math.Ceiling(uncertainty.TotalDays));
+                    int daysSinceLaid = (int)(DateTime.UtcNow.ToLocalTime().Date - probableLaidDate).TotalDays;
+
+                    // Only show hatch date if we saw eggs in history (otherwise we don't know when egg was laid)
+                    // Also don't show if chicks already present (hatching already occurred)
+                    DateTime? estHatch = (sawEggsInHistory && thisBoxData.Chicks == 0) ? DateTime.Today.AddDays(38 - daysSinceLaid) : null;
+                    DateTime estPG = DateTime.Today.AddDays(52 - daysSinceLaid);
+                    DateTime chipStart = DateTime.Today.AddDays(80 - daysSinceLaid);
+                    DateTime estFledge = DateTime.Today.AddDays(87 - daysSinceLaid);
+
+                    return (estHatch, estPG, chipStart, estFledge);
+                }
+                whenOffspringFound = olderBoxData.whenDataCollectedUtc;
+            }
+            return null;
+        }
         private static string getDateString(DateTime expectedDate)
         {
             DateTime today = DateTime.Today;

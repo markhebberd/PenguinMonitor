@@ -33,7 +33,7 @@ namespace PenguinMonitor
     public class MainActivity : Activity, ILocationListener
     {
         //Lazy versioning.
-        private static string version = "37.33";
+        private static string version = "37.34";
         // Bluetooth manager
         private BluetoothManager? _bluetoothManager;
 
@@ -125,6 +125,7 @@ namespace PenguinMonitor
 
         //multibox View
         private LinearLayout? _multiBoxViewCard;
+        private LinearLayout? _breedingDatesCard;
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
@@ -362,6 +363,14 @@ namespace PenguinMonitor
                 ;// new Handler(Looper.MainLooper).Post(() => Toast.MakeText(this, "EID length " + eidData.Length + ", '" + eidData + "'", ToastLength.Long)?.Show());
 
             var cleanEid = new String(eidData.Where(char.IsLetterOrDigit).ToArray());
+
+            // If viewing historical data, switch to today's monitor first
+            if (_currentHistoricalDataIndex > 0 || _appSettings.CurrentlyVisibleMonitor != 0)
+            {
+                _currentHistoricalDataIndex = 0;
+                _appSettings.CurrentlyVisibleMonitor = 0;
+                _appSettings.ActiveSessionTimeStampActive = false;
+            }
 
             // Don't auto-unlock for box tag scans - let HandleBoxTagScan manage the lock state
             bool isBoxTag = BoxTagService.IsBoxTag(cleanEid);
@@ -901,8 +910,13 @@ namespace PenguinMonitor
             _multiBoxViewCard = _uiFactory.CreateCard();
             _multiBoxViewCard.Visibility = ViewStates.Visible;
 
+            //Create Breeding dates card
+            _breedingDatesCard = _uiFactory.CreateCard();
+            _breedingDatesCard.Visibility = ViewStates.Visible;
+
             parentLinearLayout.AddView(_singleBoxDataOuterLayout);
             parentLinearLayout.AddView(_multiBoxViewCard);
+            parentLinearLayout.AddView(_breedingDatesCard);
 
             _rootScrollView.AddView(parentLinearLayout);
             SetContentView(_rootScrollView);
@@ -1526,6 +1540,12 @@ namespace PenguinMonitor
                 _multiBoxViewCard.AddView(empty);
             }
         }
+        private void createBreedingDatesCard()
+        {
+            _breedingDatesCard.RemoveAllViews();
+            var breedingDatesContent = createBreedingDatesTimelineSection();
+            _breedingDatesCard.AddView(breedingDatesContent);
+        }
         private DateTime getLocalDateTime(MonitorDetails monitorDetails)
         {
             foreach (var boxData in monitorDetails.BoxData.Values)
@@ -1685,6 +1705,139 @@ namespace PenguinMonitor
             if(!string.IsNullOrEmpty(summary.Text)) boxOverviewCard.AddView(summary);
             if(!string.IsNullOrEmpty(gate_and_notes.Text)) boxOverviewCard.AddView(gate_and_notes);
             return boxOverviewCard;
+        }
+
+        /// <summary>
+        /// Creates the breeding dates timeline section showing upcoming milestones grouped by date
+        /// </summary>
+        private LinearLayout createBreedingDatesTimelineSection()
+        {
+            var container = _uiFactory.CreateCard(Android.Widget.Orientation.Vertical);
+
+            // Header with title
+            var headerRow = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
+            var title = new TextView(this)
+            {
+                Text = "Next breeding dates",
+                TextSize = 24,
+                Gravity = GravityFlags.Left
+            };
+            title.SetTextColor(Color.Black);
+            title.SetTypeface(Typeface.DefaultBold, TypefaceStyle.Normal);
+            headerRow.AddView(title);
+            container.AddView(headerRow);
+
+            // Filter checkboxes row
+            var filtersRow = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
+            filtersRow.SetPadding(0, 8, 0, 8);
+
+            CheckBox hatchingCheckbox = new CheckBox(this) { Text = "Hatching", Checked = _appSettings.ShowHatchingDatesInTimeline };
+            hatchingCheckbox.SetTextColor(Color.Black);
+            hatchingCheckbox.Click += (s, e) => { _appSettings.ShowHatchingDatesInTimeline = hatchingCheckbox.Checked; DrawPageLayouts(); };
+            filtersRow.AddView(hatchingCheckbox);
+
+            CheckBox pgCheckbox = new CheckBox(this) { Text = "PG", Checked = _appSettings.ShowPGDatesInTimeline };
+            pgCheckbox.SetTextColor(Color.Black);
+            pgCheckbox.Click += (s, e) => { _appSettings.ShowPGDatesInTimeline = pgCheckbox.Checked; DrawPageLayouts(); };
+            filtersRow.AddView(pgCheckbox);
+
+            CheckBox chippingCheckbox = new CheckBox(this) { Text = "Chipping", Checked = _appSettings.ShowChippingDatesInTimeline };
+            chippingCheckbox.SetTextColor(Color.Black);
+            chippingCheckbox.Click += (s, e) => { _appSettings.ShowChippingDatesInTimeline = chippingCheckbox.Checked; DrawPageLayouts(); };
+            filtersRow.AddView(chippingCheckbox);
+
+            CheckBox fledgingCheckbox = new CheckBox(this) { Text = "Fledging", Checked = _appSettings.ShowFledgingDatesInTimeline };
+            fledgingCheckbox.SetTextColor(Color.Black);
+            fledgingCheckbox.Click += (s, e) => { _appSettings.ShowFledgingDatesInTimeline = fledgingCheckbox.Checked; DrawPageLayouts(); };
+            filtersRow.AddView(fledgingCheckbox);
+
+            container.AddView(filtersRow);
+
+            // Collect all breeding dates from local calculations
+            var milestones = new List<(DateTime date, string boxName, string milestone)>();
+
+            foreach (string boxName in _boxNamesAndIndexes.Keys)
+            {
+                var olderBoxDatas = DataStorageService.getOlderBoxDatas(_allMonitorData, _appSettings.CurrentlyVisibleMonitor, boxName);
+                BoxData? currentBoxData = null;
+                _allMonitorData[_appSettings.CurrentlyVisibleMonitor].BoxData.TryGetValue(boxName, out currentBoxData);
+
+                var estimatedDates = DataStorageService.GetEstimatedBreedingDates(boxName, currentBoxData, olderBoxDatas);
+                if (estimatedDates != null)
+                {
+                    var dates = estimatedDates.Value;
+                    if (_appSettings.ShowHatchingDatesInTimeline && dates.hatch.HasValue)
+                        milestones.Add((dates.hatch.Value, boxName, "Hatches"));
+                    if (_appSettings.ShowPGDatesInTimeline && dates.pg.HasValue)
+                        milestones.Add((dates.pg.Value, boxName, "PG"));
+                    if (_appSettings.ShowChippingDatesInTimeline && dates.chipStart.HasValue)
+                        milestones.Add((dates.chipStart.Value, boxName, "Chipping starts"));
+                    if (_appSettings.ShowFledgingDatesInTimeline && dates.fledge.HasValue)
+                        milestones.Add((dates.fledge.Value, boxName, "Fledges"));
+                }
+            }
+
+            // Filter to only future dates (including today), then sort
+            var today = DateTime.Today;
+            var sortedMilestones = milestones
+                .Where(m => m.date >= today)
+                .OrderBy(m => m.date)
+                .ToList();
+
+            // Group by date and render
+            var groupedByDate = sortedMilestones.GroupBy(m => m.date.Date);
+
+            foreach (var dateGroup in groupedByDate)
+            {
+                var dateHeader = new TextView(this)
+                {
+                    Text = dateGroup.Key.ToString("d MMM"),
+                    TextSize = 18,
+                    Gravity = GravityFlags.Left
+                };
+                dateHeader.SetTypeface(Typeface.DefaultBold, TypefaceStyle.Normal);
+                dateHeader.SetPadding(0, 16, 0, 4);
+                dateHeader.SetTextColor(Color.Black);
+
+                container.AddView(dateHeader);
+
+                foreach (var milestone in dateGroup.OrderBy(m => m.boxName))
+                {
+                    var entryRow = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
+                    entryRow.SetPadding(24, 2, 0, 2);
+
+                    var entryText = new TextView(this)
+                    {
+                        Text = $"Box {milestone.boxName}: {milestone.milestone}",
+                        TextSize = 16
+                    };
+                    entryText.SetTextColor(Color.Black);
+
+                    // Make clickable to jump to box
+                    entryRow.Click += (s, e) =>
+                    {
+                        JumpToBox(milestone.boxName);
+                        ScrollToTop();
+                    };
+
+                    entryRow.AddView(entryText);
+                    container.AddView(entryRow);
+                }
+            }
+
+            if (milestones.Count == 0)
+            {
+                var noDataText = new TextView(this)
+                {
+                    Text = "No breeding dates available. Dates are calculated from boxes with eggs/chicks.",
+                    TextSize = 14
+                };
+                noDataText.SetTextColor(UIFactory.TEXT_SECONDARY);
+                noDataText.SetPadding(0, 16, 0, 8);
+                container.AddView(noDataText);
+            }
+
+            return container;
         }
 
         /// <summary>
@@ -1979,15 +2132,6 @@ namespace PenguinMonitor
                 }
             };
             _settingsCard.AddView(_setTimeActiveSessionCheckBox);
-
-            Button toggleOverview = _uiFactory.CreateStyledButton(_multiBoxViewCard?.Visibility == ViewStates.Visible ? "Hide overview" : "Show overview", UIFactory.PRIMARY_BLUE);
-            toggleOverview.Click += (s, e) =>
-            {
-                if (_multiBoxViewCard == null) return;
-                _multiBoxViewCard.Visibility = _multiBoxViewCard.Visibility.Equals(ViewStates.Visible) ? ViewStates.Gone : ViewStates.Visible;
-                toggleOverview.Text = _multiBoxViewCard.Visibility == ViewStates.Visible ? "Hide overview" : "Show overview";
-            };
-            _settingsCard.AddView(toggleOverview);
 
             // Box tag delete button visibility setting
             var showBoxTagDeleteCheckBox = new CheckBox(this)
@@ -2438,6 +2582,7 @@ namespace PenguinMonitor
                         button.Alpha = button.Enabled ? 2.0f : 0.5f; // Grey out when unlocked
                     }
                     createMultiBoxViewCard();
+                    createBreedingDatesCard();
                 });
         }
         private bool dataCardHasZeroData()
@@ -4019,9 +4164,10 @@ namespace PenguinMonitor
                 .SetView(input)
                 .SetPositiveButton("Go", (s, e) =>
                 {
-                    if (_boxNamesAndIndexes.ContainsKey(input.Text) )
+                    var matchingKey = _boxNamesAndIndexes.Keys.FirstOrDefault(k => string.Equals(k, input.Text, StringComparison.OrdinalIgnoreCase));
+                    if (matchingKey != null)
                     {
-                        JumpToBox(input.Text); 
+                        JumpToBox(matchingKey);
                     }
                     else
                     {
