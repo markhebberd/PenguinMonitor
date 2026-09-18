@@ -889,7 +889,6 @@ namespace PenguinMonitor.Services
                 ObservedSex = S("observed_sex"),
                 // Wildwatch's column is is_moulting — not the condition_* family the other flags use.
                 ConditionMoulting = B("is_moulting"),
-                ConditionTicks = B("condition_ticks"),
                 ConditionDead = B("condition_dead"),
                 DispositionPassive = B("disposition_passive"),
                 DispositionAggressive = B("disposition_aggressive"),
@@ -1086,9 +1085,8 @@ namespace PenguinMonitor.Services
                     // Send 0/1, not a JSON bool: PDO binds a PHP `false` as '' and the tinyint
                     // column rejects it, which used to sink the whole biometric (sex guess and all).
                     fields["is_moulting"] = bio.ConditionMoulting ? 1 : 0;
-                    // Ticks and the dispositions are checkboxes on the form too, so like moulting they
+                    // The dispositions are checkboxes on the form too, so like moulting they
                     // always go up — unticking one has to clear it on the server.
-                    fields["condition_ticks"] = bio.ConditionTicks ? 1 : 0;
                     fields["disposition_passive"] = bio.DispositionPassive ? 1 : 0;
                     fields["disposition_aggressive"] = bio.DispositionAggressive ? 1 : 0;
                     if (!string.IsNullOrEmpty(bio.Notes)) fields["notes"] = bio.Notes;

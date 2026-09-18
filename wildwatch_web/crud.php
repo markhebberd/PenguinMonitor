@@ -680,7 +680,7 @@ function handleGet($pdo, $table, $pk, $id) {
  */
 function stripRetiredColumns($table, $input) {
     $retired = [
-        'penguin_biometric_data' => ['condition_underweight', 'condition_dog_attacked', 'condition_attacked', 'condition_dead'],
+        'penguin_biometric_data' => ['condition_underweight', 'condition_dog_attacked', 'condition_attacked', 'condition_dead', 'condition_healthy', 'condition_ticks'],
         'penguins' => ['life_stage', 'is_dead'], // is_dead is a generated column (derived from death_date)
         'penguin_chips' => ['chip_by'], // retired: chip_by is derived from chipper_id in the snapshot
     ];
@@ -783,9 +783,9 @@ function handleCreate($pdo, $table, $pk, $observer) {
             $has = false;
             foreach (['weight','flipper_length','body_length','beak_length','observed_sex','sex','notes'] as $k)
                 if (isset($input[$k]) && trim((string)$input[$k]) !== '') $has = true;
-            foreach (['is_moulting','condition_ticks','condition_healthy','disposition_aggressive','disposition_passive'] as $k)
+            foreach (['is_moulting','disposition_aggressive','disposition_passive'] as $k)
                 if (!empty($input[$k])) $has = true;
-            if (!$has) { $pdo->rollBack(); http_response_code(400); echo json_encode(['error'=>'Empty biometric — nothing to save']); return; }
+            if (!$has) { $pdo->rollBack(); http_response_code(400); echo json_encode(['error'=>'Empty traits record — nothing to save']); return; }
         }
         $newId = wwAuditedInsert($pdo, $table, $input, $observer['observer_id'], $reason);
         // Natural-key tables (penguins, penguin_chips) have no auto-increment id to return.

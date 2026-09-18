@@ -40,7 +40,7 @@ const SNAP_COLS_CHIP_P = 'pc.pit_id, pc.peng_num, pc.chip_date, pc.is_active, pc
 // box_tags store straight off these rows rather than calling boxtags.php, so a tag, a moved fix or a
 // cleared tag reaches the phone on the one feed. boxtags.php still takes the writes.
 const SNAP_COLS_LOC  = 'location_id, location_name, persistent_notes, watched, pit_id, latitude, longitude, accuracy, scan_time_utc';
-const SNAP_COLS_BIO  = 'biometric_id, peng_num, observation_id, observation_date, sex, observed_sex, weight, flipper_length, body_length, beak_length, condition_healthy, condition_ticks, is_moulting, disposition_aggressive, disposition_passive, notes, is_deleted';
+const SNAP_COLS_BIO  = 'biometric_id, peng_num, observation_id, observation_date, sex, observed_sex, weight, flipper_length, body_length, beak_length, is_moulting, disposition_aggressive, disposition_passive, notes, is_deleted';
 
 // Human-verified breeding truth (single table). Reviewer names come from the observer joins
 // (oa/oc) so the client shows "accepted by <name>" without an observers table. chicks is a JSON

@@ -234,8 +234,6 @@ CREATE TABLE IF NOT EXISTS penguin_biometric_data (
     flipper_length decimal(5,2) DEFAULT NULL,
     body_length decimal(5,2) DEFAULT NULL,
     beak_length decimal(5,2) DEFAULT NULL,
-    condition_ticks tinyint(1) DEFAULT NULL,
-    condition_healthy tinyint(1) DEFAULT NULL,
     notes text DEFAULT NULL,
     is_deleted tinyint(1) DEFAULT 0,
     deleted_at timestamp NULL DEFAULT NULL,

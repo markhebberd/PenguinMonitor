@@ -647,7 +647,7 @@ const HASH_COLS: Record<string, { pk: string; cols: string[] }> = {
   observations: { pk: 'observation_id', cols: ['observation_id','location_id','observation_time_utc','adults','eggs','chicks','breeding_status','gate_status','notes','no_scan','fledged_unchipped','failed_eggs','dead_chicks','is_deleted','observer_id'] },
   scans:        { pk: 'scan_id',        cols: ['scan_id','observation_id','pit_id'] },
   locations:    { pk: 'location_id',    cols: ['location_id','location_name','persistent_notes','watched','pit_id','scan_time_utc'] },
-  biometrics:   { pk: 'biometric_id',   cols: ['biometric_id','peng_num','observation_id','observation_date','sex','observed_sex','condition_healthy','condition_ticks','is_moulting','disposition_aggressive','disposition_passive','notes','is_deleted'] },
+  biometrics:   { pk: 'biometric_id',   cols: ['biometric_id','peng_num','observation_id','observation_date','sex','observed_sex','is_moulting','disposition_aggressive','disposition_passive','notes','is_deleted'] },
 };
 const MEM_TABLE: Record<string, (m: any) => any[]> = {
   penguins: m => m.penguins, chips: m => m.chips, observations: m => m.observations,

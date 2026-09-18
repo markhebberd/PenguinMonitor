@@ -72,7 +72,6 @@ namespace PenguinMonitor.Models
             public string? flipper_length { get; set; }
             public string? observed_sex { get; set; }
             public int? is_moulting { get; set; }
-            public int? condition_ticks { get; set; }
             public int? disposition_passive { get; set; }
             public int? disposition_aggressive { get; set; }
             public string? notes { get; set; }

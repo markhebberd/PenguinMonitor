@@ -96,7 +96,7 @@ export default function AlgorithmDoc({ seasonStartMonth, seasonStartDay }: { sea
         <li><b>Observations</b> — one box, one day: adults, eggs, chicks, breeding status, notes.</li>
         <li><b>Scans</b> — the microchipped birds read inside an observation.</li>
         <li><b>Chipping records</b> — a bird given its chip at this box on a date.</li>
-        <li><b>Penguin records</b> — confirmed sex where known, and the biometric observed-sex calls a monitor made when handling the bird.</li>
+        <li><b>Penguin records</b> — confirmed sex where known, and the observed-sex calls a monitor recorded in the bird’s traits when handling it.</li>
       </ul>
 
       <h3>3. Seasons</h3>

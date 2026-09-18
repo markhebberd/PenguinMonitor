@@ -29,7 +29,7 @@ const WW_HASH_COLS = [
     'observations' => ['pk' => 'observation_id','cols' => ['observation_id','location_id','observation_time_utc','adults','eggs','chicks','breeding_status','gate_status','notes','no_scan','fledged_unchipped','failed_eggs','dead_chicks','is_deleted','observer_id']],
     'scans'        => ['pk' => 'scan_id',       'cols' => ['scan_id','observation_id','pit_id']],
     'locations'    => ['pk' => 'location_id',   'cols' => ['location_id','location_name','persistent_notes','watched','pit_id','scan_time_utc']],
-    'biometrics'   => ['pk' => 'biometric_id',  'cols' => ['biometric_id','peng_num','observation_id','observation_date','sex','observed_sex','condition_healthy','condition_ticks','is_moulting','disposition_aggressive','disposition_passive','notes','is_deleted']],
+    'biometrics'   => ['pk' => 'biometric_id',  'cols' => ['biometric_id','peng_num','observation_id','observation_date','sex','observed_sex','is_moulting','disposition_aggressive','disposition_passive','notes','is_deleted']],
 ];
 
 /** Canonical hash of one table's rows (assoc arrays), matching the client's serialisation. */
@@ -79,7 +79,7 @@ function wwComputeSnapshotHashes(PDO $pdo, int $colonyId): array {
     $do('locations', "SELECT location_id, location_name, persistent_notes, watched, pit_id, scan_time_utc
         FROM observation_locations WHERE colony_id = ?", [$colonyId]);
 
-    $do('biometrics', "SELECT biometric_id, peng_num, observation_id, observation_date, sex, observed_sex, condition_healthy, condition_ticks, is_moulting, disposition_aggressive, disposition_passive, notes, is_deleted FROM penguin_biometric_data", []);
+    $do('biometrics', "SELECT biometric_id, peng_num, observation_id, observation_date, sex, observed_sex, is_moulting, disposition_aggressive, disposition_passive, notes, is_deleted FROM penguin_biometric_data", []);
 
     return $out;
 }

@@ -2529,7 +2529,7 @@ function BiometricsEditor({ pengNum, biometrics, deleted, token, canEdit, editin
   const [adding, setAdding] = useState(false);
   // Every biometric field the DB carries, so nothing is hidden.
   const MEASURES: [string, string, string][] = [['weight', 'Weight', 'g'], ['flipper_length', 'Flipper', 'mm'], ['body_length', 'Body', 'mm'], ['beak_length', 'Beak', 'mm']];
-  const FLAGS: [string, string][] = [['is_moulting', 'Moulting'], ['condition_ticks', 'Ticks'], ['condition_healthy', 'Healthy'], ['disposition_aggressive', 'Aggressive'], ['disposition_passive', 'Passive']];
+  const FLAGS: [string, string][] = [['is_moulting', 'Moulting'], ['disposition_aggressive', 'Aggressive'], ['disposition_passive', 'Passive']];
   const emptyForm: any = { observation_date: toNzDateStr(new Date().toISOString()), observed_sex: '', sex: '', notes: '' };
   MEASURES.forEach(([k]) => emptyForm[k] = '');
   FLAGS.forEach(([k]) => emptyForm[k] = false);
@@ -2544,7 +2544,7 @@ function BiometricsEditor({ pengNum, biometrics, deleted, token, canEdit, editin
     if (token) return updateRecord(token, 'penguin_biometric_data', id, { [field]: val === '' ? null : val });
   };
   const toggle = async (b: any, field: string, val: boolean) => { if (token) await updateRecord(token, 'penguin_biometric_data', b.biometric_id, { [field]: val ? 1 : 0 }); };
-  const remove = async (b: any) => { if (token && confirm('Remove this biometric record?')) await deleteRecord(token, 'penguin_biometric_data', b.biometric_id); };
+  const remove = async (b: any) => { if (token && confirm('Remove this trait record?')) await deleteRecord(token, 'penguin_biometric_data', b.biometric_id); };
   const restore = async (b: any) => { if (token) await updateRecord(token, 'penguin_biometric_data', b.biometric_id, { is_deleted: 0 }); };
   const submitAdd = async () => {
     if (!token || busy) return;
@@ -2623,11 +2623,11 @@ function BiometricsEditor({ pengNum, biometrics, deleted, token, canEdit, editin
   };
 
   return (<>
-    <tr><td className="muted">Biometrics</td><td className="clickable" onClick={() => setShowBio(!showBio)}>{summary || <span className="muted">-</span>} <span className="muted small">{biometrics.length} records {showBio ? '▲' : '▼'}</span></td></tr>
+    <tr><td className="muted">Traits</td><td className="clickable" onClick={() => setShowBio(!showBio)}>{summary || <span className="muted">-</span>} <span className="muted small">{biometrics.length} records {showBio ? '▲' : '▼'}</span></td></tr>
     {showBio && <>
-      {editing && !adding && <tr><td></td><td><button className="edit-btn" onClick={() => setAdding(true)}>+ Add biometric</button></td></tr>}
+      {editing && !adding && <tr><td></td><td><button className="edit-btn" onClick={() => setAdding(true)}>+ Add traits</button></td></tr>}
       {editing && adding && editCard('bio-new', form, setF,
-        <span className="bio-card-title">New biometric</span>,
+        <span className="bio-card-title">New traits</span>,
         <div className="bio-card-foot"><button className="edit-btn done-btn" disabled={busy} onClick={submitAdd}>{busy ? 'Saving…' : 'Save'}</button> <button className="edit-btn" onClick={() => { setAdding(false); setForm(emptyForm); }}>Cancel</button></div>)}
       {biometrics.map((b, i) => record(b, i, false))}
       {deleted.length > 0 && <tr><td></td><td className="clickable muted small" onClick={() => setShowRemoved(!showRemoved)}>{deleted.length} removed {showRemoved ? '▲' : '▼'}</td></tr>}
@@ -5352,10 +5352,10 @@ function NestcheckJsonImport({ token, colonyId }: { token: string; colonyId: num
           peng_num: fullPengNum(b.peng_num), observation_date: b.observation_date,
           weight: b.weight ?? null, flipper_length: b.flipper_length ?? null,
           observed_sex: b.observed_sex || null, notes: b.notes || null,
-          is_moulting: b.is_moulting ? 1 : 0, condition_ticks: b.condition_ticks ? 1 : 0,
+          is_moulting: b.is_moulting ? 1 : 0,
         });
         bios++;
-      } catch (e: any) { failed.push(`biometric ${displayPengNum(fullPengNum(b.peng_num))}: ${e?.message || e}`); }
+      } catch (e: any) { failed.push(`traits ${displayPengNum(fullPengNum(b.peng_num))}: ${e?.message || e}`); }
     }
     count(bios, 'bird detail');
 
@@ -6176,7 +6176,7 @@ function UnsexedByGuessesReport() {
   return (
     <div className="report-card">
       <h3>Unsexed penguins by sex guesses</h3>
-      <p className="muted">Birds with no assigned sex, ordered by number of biometric sex guesses ({rows.length})</p>
+      <p className="muted">Birds with no assigned sex, ordered by number of sex guesses in their traits ({rows.length})</p>
       {rows.length === 0 ? <p className="muted">No data available</p> : (
         <table className="guess-rank-table count-cols">
           <thead><tr><th>Penguin</th><th>Guesses</th><th>{'♂'}</th><th>{'♀'}</th></tr></thead>
@@ -8673,7 +8673,7 @@ function AddPenguinDialog({ token, chipBox, colonyPrefix, defaultChipperId, allP
               {getUsers().map(u => <option key={u.id} value={u.id}>{u.name}{u.active ? '' : ' (inactive)'}</option>)}
             </select></div>
         </div>
-        <div className="app-bio-header">Biometric Data (optional)</div>
+        <div className="app-bio-header">Traits (optional)</div>
         <div className="app-row">
           <div className="app-field"><label>Weight (g)</label>
             <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 1250" /></div>
@@ -9066,7 +9066,7 @@ function ChangeDateGroup({ date, entries, token, onReverted }: { date: string; e
               <div className="muted" style={{fontSize:11, marginTop:2}}>
                 {fields.observations} observation{fields.observations !== 1 ? 's' : ''}
                 {fields.scans ? `, ${fields.scans} scan${fields.scans !== 1 ? 's' : ''}` : ''}
-                {fields.biometrics ? `, ${fields.biometrics} biometric${fields.biometrics !== 1 ? 's' : ''}` : ''}
+                {fields.biometrics ? `, ${fields.biometrics} trait record${fields.biometrics !== 1 ? 's' : ''}` : ''}
                 {fields.colony ? ` · ${fields.colony}` : ''}
               </div>
             )}
@@ -10399,7 +10399,7 @@ function AdminPanel({ token, observationDates, checkTarget, allPenguins, fmColon
         {impResult && (
           <div style={{ border: '1px solid #b7e0b7', background: '#f2fbf2', borderRadius: 6, padding: 12, fontSize: 13 }}>
             <strong>✓ Imported into {impResult.colony_name}.</strong>{' '}
-            {impResult.imported} observation(s), {impResult.scans} scan(s){impResult.biometrics ? `, ${impResult.biometrics} biometric(s)` : ''} written.
+            {impResult.imported} observation(s), {impResult.scans} scan(s){impResult.biometrics ? `, ${impResult.biometrics} trait record(s)` : ''} written.
             {impResult.skipped_duplicates > 0 && <> {impResult.skipped_duplicates} duplicate row(s) skipped.</>}
             {impResult.imported_conflicts > 0 && <> <span style={{ color: '#d35400' }}>{impResult.imported_conflicts} conflicting row(s) imported as second observations.</span></>}
             {impResult.skipped_conflicts > 0 && <> {impResult.skipped_conflicts} conflicting row(s) skipped.</>}
@@ -10423,7 +10423,7 @@ function AdminPanel({ token, observationDates, checkTarget, allPenguins, fmColon
             ['Errors (skip)', t.error_rows, t.error_rows ? '#c0392b' : undefined],
             ['Boxes', t.boxes], ['Not in sheet', t.boxes_missing, t.boxes_missing ? '#8a6d3b' : undefined], ['Decom→DCM', t.decom],
             ['Adults', t.adults], ['Eggs', t.eggs], ['Chicks', t.chicks], ['No-scan', t.no_scan],
-            ['Biometrics', t.biometrics, t.biometrics ? '#1a7a1a' : undefined],
+            ['Traits', t.biometrics, t.biometrics ? '#1a7a1a' : undefined],
             ['No-scans created', t.noscan_confirm, t.noscan_confirm ? '#8a6d3b' : undefined],
             ['Scans matched', t.scans_matched, '#1a7a1a'],
             ['Chips unresolved', t.scans_unmatched, t.scans_unmatched ? '#c0392b' : undefined],
@@ -11521,9 +11521,9 @@ function RenumberPenguin({ token }: { token: string }) {
       const d = await r.json();
       if (d.success) {
         if (action === 'rename_penguin') {
-          setResult(`Renamed ${displayPengNum(d.from)} → ${displayPengNum(d.to)} (${d.chips} chip${d.chips === 1 ? '' : 's'}, ${d.biometrics} biometric record${d.biometrics === 1 ? '' : 's'} carried; scans follow the chips).`);
+          setResult(`Renamed ${displayPengNum(d.from)} → ${displayPengNum(d.to)} (${d.chips} chip${d.chips === 1 ? '' : 's'}, ${d.biometrics} trait record${d.biometrics === 1 ? '' : 's'} carried; scans follow the chips).`);
         } else {
-          setResult(`Swapped ${displayPengNum(d.a)} ↔ ${displayPengNum(d.b)}. Each bird keeps its chips, scans, biometrics and history under its new number.`);
+          setResult(`Swapped ${displayPengNum(d.a)} ↔ ${displayPengNum(d.b)}. Each bird keeps its chips, scans, traits and history under its new number.`);
         }
         setFrom(''); setTo('');
       } else {
@@ -11539,9 +11539,9 @@ function RenumberPenguin({ token }: { token: string }) {
   const a = fullPengNum(from), b = fullPengNum(to);
   const da = displayPengNum(a), db = displayPengNum(b);
   const rename = () => post('rename_penguin', { from: a, to: b },
-    `Rename penguin #${da} to #${db}?\n\nThe bird keeps its chips, scans, biometrics and audit history — only the number changes. #${db} must be vacant.`);
+    `Rename penguin #${da} to #${db}?\n\nThe bird keeps its chips, scans, traits and audit history — only the number changes. #${db} must be vacant.`);
   const swap = () => post('swap_penguins', { a, b },
-    `Swap the numbers of penguins #${da} and #${db}?\n\nEach bird keeps its own chips, scans, biometrics and audit history — the two numbers simply trade places.`);
+    `Swap the numbers of penguins #${da} and #${db}?\n\nEach bird keeps its own chips, scans, traits and audit history — the two numbers simply trade places.`);
 
   const box = { padding: '4px 8px', fontSize: 13, border: '1px solid #ccc', borderRadius: 4, width: 100 };
   return (
@@ -11549,7 +11549,7 @@ function RenumberPenguin({ token }: { token: string }) {
       <h3>Renumber penguin</h3>
       <p className="muted" style={{fontSize:12, margin:'0 0 8px'}}>
         Rename gives the first penguin the second number (which must be free). Swap trades the two penguins' numbers.
-        Chips, scans, biometrics and audit history follow each bird. A bare number means the colony you are viewing.
+        Chips, scans, traits and audit history follow each bird. A bare number means the colony you are viewing.
       </p>
       <div style={{display:'flex', gap:8, alignItems:'center', marginBottom:8}}>
         <input type="text" value={from} onChange={e => setFrom(e.target.value)} placeholder="Penguin #" style={box} />
@@ -11587,7 +11587,7 @@ function RemovePenguin({ token }: { token: string }) {
     const num = preview.penguin.peng_num;
     const scanTotal = preview.scan_count + (preview.scans_soft_deleted || 0);
     const bioTotal = preview.biometrics.length + (preview.bio_soft_deleted || 0);
-    if (!confirm(`Permanently delete penguin #${displayPengNum(num)}?\n\nHard-deletes:\n- ${scanTotal} scan(s)\n- ${bioTotal} biometric record(s)\n- ${preview.chips.length} chip record(s)\n- the penguin itself\n\nEach deleted row is copied to the audit log first.`)) return;
+    if (!confirm(`Permanently delete penguin #${displayPengNum(num)}?\n\nHard-deletes:\n- ${scanTotal} scan(s)\n- ${bioTotal} trait record(s)\n- ${preview.chips.length} chip record(s)\n- the penguin itself\n\nEach deleted row is copied to the audit log first.`)) return;
     setLoading(true);
     const r = await fetch('/api/admin.php?action=delete_penguin', {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -11663,7 +11663,7 @@ function RemovePenguin({ token }: { token: string }) {
           {preview.scans.length > 20 && <p className="muted" style={{fontSize:11}}>...and {preview.scans.length - 20} more</p>}
 
           {preview.biometrics.length > 0 && (
-            <h4 style={{margin:'8px 0 4px', fontSize:13}}>Biometrics ({preview.biometrics.length})</h4>
+            <h4 style={{margin:'8px 0 4px', fontSize:13}}>Traits ({preview.biometrics.length})</h4>
           )}
 
           <h4 style={{margin:'12px 0 4px', fontSize:13}}>What deleting will do</h4>
@@ -11713,7 +11713,7 @@ function RemovePenguin({ token }: { token: string }) {
               Deleting {displayPengNum(compaction.gap_peng)} left a gap in this colony's numbering. The {plan.length} penguin{plan.length === 1 ? '' : 's'} below
               {' '}can each be shifted <b>down by one</b> to close it. Only penguins first chipped in the last 7 days are eligible, so
               {' '}the shift stops at the first established or unchipped bird. This renames each penguin's number — its chips, scans and
-              {' '}biometrics move with it — and every change is recorded in the audit log. It cannot be undone from here.
+              {' '}traits move with it — and every change is recorded in the audit log. It cannot be undone from here.
             </p>
             <table style={{fontSize:12, borderCollapse:'collapse', width:'100%'}}>
               <thead><tr style={{borderBottom:'1px solid #e0c060', textAlign:'left'}}>
@@ -11723,7 +11723,7 @@ function RemovePenguin({ token }: { token: string }) {
                 {plan.map((s, i) => (
                   <tr key={i} style={{borderBottom:'1px solid #f0e0b0'}}>
                     <td style={{padding:'3px 8px', fontWeight:600}}>{displayPengNum(s.from)} <span style={{color:'#999'}}>→</span> {displayPengNum(s.to)}</td>
-                    <td style={{padding:'3px 8px', color:'#666'}}>{s.chips} chip{s.chips === 1 ? '' : 's'}, {s.scans} scan{s.scans === 1 ? '' : 's'}, {s.biometrics} biometric{s.biometrics === 1 ? '' : 's'}</td>
+                    <td style={{padding:'3px 8px', color:'#666'}}>{s.chips} chip{s.chips === 1 ? '' : 's'}, {s.scans} scan{s.scans === 1 ? '' : 's'}, {s.biometrics} trait record{s.biometrics === 1 ? '' : 's'}</td>
                     <td style={{padding:'3px 8px', color:'#666'}}>{s.first_chip}</td>
                   </tr>
                 ))}

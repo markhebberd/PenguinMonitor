@@ -6850,16 +6850,14 @@ namespace PenguinMonitor
 
             // Conditions
             card.AddView(createLabel("Condition"));
-            // Moulting on its own line, then two columns: ticks / passive over dead / aggressive.
+            // Two columns: moulting / passive over dead / aggressive.
             var conditionRows = new (string label, string field)[][] {
-                new[] { ("Moulting", "condition_moulting") },
-                new[] { ("Ticks", "condition_ticks"), ("Passive", "disposition_passive") },
+                new[] { ("Moulting", "condition_moulting"), ("Passive", "disposition_passive") },
                 new[] { ("Dead", "condition_dead"), ("Aggressive", "disposition_aggressive") },
             };
             bool condChecked(string field) => existing != null && field switch
             {
                 "condition_moulting" => existing.ConditionMoulting,
-                "condition_ticks" => existing.ConditionTicks,
                 "condition_dead" => existing.ConditionDead,
                 "disposition_passive" => existing.DispositionPassive,
                 "disposition_aggressive" => existing.DispositionAggressive,
@@ -6933,7 +6931,6 @@ namespace PenguinMonitor
                     FlipperLength = string.IsNullOrEmpty(flipperInput.Text) ? null : flipperInput.Text,
                     ObservedSex = ObservedSexOptions.FirstOrDefault(o => o.label == selectedSexLabel).code,
                     ConditionMoulting = conditionChecks["condition_moulting"].Checked,
-                    ConditionTicks = conditionChecks["condition_ticks"].Checked,
                     ConditionDead = conditionChecks["condition_dead"].Checked,
                     DispositionPassive = conditionChecks["disposition_passive"].Checked,
                     DispositionAggressive = conditionChecks["disposition_aggressive"].Checked,
@@ -7276,7 +7273,7 @@ namespace PenguinMonitor
             }
 
             // --- Biometric data ---
-            var bioHeader = new TextView(this) { Text = "Biometric Data (optional)", TextSize = 15 };
+            var bioHeader = new TextView(this) { Text = "Traits (optional)", TextSize = 15 };
             bioHeader.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Normal);
             bioHeader.SetTextColor(UIFactory.TEXT_PRIMARY);
             bioHeader.SetPadding(0, 16, 0, 4);
@@ -9455,7 +9452,7 @@ namespace PenguinMonitor
                         .Select(b => new {
                             peng_num = b.PengNum, observation_date = b.ObservationDate,
                             weight = b.Weight, flipper_length = b.FlipperLength, observed_sex = b.ObservedSex,
-                            is_moulting = b.ConditionMoulting, condition_ticks = b.ConditionTicks,
+                            is_moulting = b.ConditionMoulting,
                             dead = b.ConditionDead, passive = b.DispositionPassive, aggressive = b.DispositionAggressive, notes = b.Notes,
                             biometric_id = b.BiometricId, unsent = b.IsPendingUpload,
                         }).ToList(),

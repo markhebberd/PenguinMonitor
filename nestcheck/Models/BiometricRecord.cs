@@ -16,7 +16,6 @@ namespace PenguinMonitor.Models
         public string? FlipperLength { get; set; }
         public string? ObservedSex { get; set; }
         public bool ConditionMoulting { get; set; }
-        public bool ConditionTicks { get; set; }
         public bool ConditionDead { get; set; }
         public bool DispositionPassive { get; set; }
         public bool DispositionAggressive { get; set; }
