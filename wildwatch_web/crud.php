@@ -815,6 +815,11 @@ function handleUpdate($pdo, $table, $pk, $id, $observer) {
     $input = json_decode(file_get_contents('php://input'), true);
     if (!$input) { http_response_code(400); echo json_encode(['error'=>'JSON body required']); return; }
     $input = wwNormalizePit($table, renameLegacyColumns($table, stripRetiredColumns($table, $input)));
+    // Same as create: a body peng_num arrives display-stripped ("1039"). Written bare it matches no
+    // penguin, and the FK rejects the whole update — the phone resends peng_num on every bio edit.
+    if (in_array($table, ['penguins', 'penguin_chips', 'penguin_biometric_data']) && isset($input['peng_num'])) {
+        $input['peng_num'] = dbPengNum($pdo, (int)($_GET['colony_id'] ?? 1), (string)$input['peng_num']);
+    }
 
     $stmt = $pdo->prepare("SELECT * FROM $table WHERE $pk = ?"); $stmt->execute([$id]);
     $old = $stmt->fetch();

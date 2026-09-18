@@ -68,8 +68,8 @@ namespace PenguinMonitor.Models
             public string? weight { get; set; }
             public string? flipper_length { get; set; }
             public string? observed_sex { get; set; }
-            public int is_moulting { get; set; }
-            public int condition_ticks { get; set; }
+            public int? is_moulting { get; set; }
+            public int? condition_ticks { get; set; }
             public string? notes { get; set; }
             public int is_deleted { get; set; }
         }

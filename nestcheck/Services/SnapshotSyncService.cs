@@ -234,7 +234,7 @@ namespace PenguinMonitor.Services
                 {
                     PengNum = b.peng_num!, ObservationDate = b.observation_date!,
                     Weight = b.weight, FlipperLength = b.flipper_length, ObservedSex = b.observed_sex,
-                    ConditionMoulting = b.is_moulting != 0, ConditionTicks = b.condition_ticks != 0,
+                    ConditionMoulting = b.is_moulting == 1, ConditionTicks = b.condition_ticks == 1,
                     Notes = b.notes, BiometricId = b.biometric_id, IsPendingUpload = false,
                 };
             }

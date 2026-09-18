@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="3963" android:versionName="39.63" package="nz.co.wildwatch.nestcheck">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="3964" android:versionName="39.64" package="nz.co.wildwatch.nestcheck">
 	<uses-sdk android:minSdkVersion="21" android:targetSdkVersion="36" />
 	<application 
 		android:allowBackup="true" 
