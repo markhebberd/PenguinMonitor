@@ -155,7 +155,8 @@ try {
         'locations'    => ['location_id' => 'int', 'location_name' => 'string?', 'persistent_notes' => 'string?', 'watched' => 'int'],
         'biometrics'   => ['biometric_id' => 'int', 'peng_num' => 'string?', 'observation_date' => 'string?',
                            'weight' => 'string?', 'flipper_length' => 'string?', 'observed_sex' => 'string?',
-                           'is_moulting' => 'int?', 'condition_ticks' => 'int?', 'notes' => 'string?', 'is_deleted' => 'int'],
+                           'is_moulting' => 'int?', 'condition_ticks' => 'int?', 'disposition_passive' => 'int?',
+                           'disposition_aggressive' => 'int?', 'notes' => 'string?', 'is_deleted' => 'int'],
         'day_notes'    => ['note_date' => 'string', 'note' => 'string?', 'observer_id' => 'int?', 'scribe_id' => 'int?'],
         // chip_acronym and falcon_id decide who may be named as a chipper on the phone; without
         // them the picker is empty, which is a silent failure rather than a loud one. role is how

@@ -891,6 +891,8 @@ namespace PenguinMonitor.Services
                 ConditionMoulting = B("is_moulting"),
                 ConditionTicks = B("condition_ticks"),
                 ConditionDead = B("condition_dead"),
+                DispositionPassive = B("disposition_passive"),
+                DispositionAggressive = B("disposition_aggressive"),
                 Notes = S("notes"),
                 BiometricId = I("biometric_id"),
                 IsPendingUpload = false,
@@ -1084,7 +1086,11 @@ namespace PenguinMonitor.Services
                     // Send 0/1, not a JSON bool: PDO binds a PHP `false` as '' and the tinyint
                     // column rejects it, which used to sink the whole biometric (sex guess and all).
                     fields["is_moulting"] = bio.ConditionMoulting ? 1 : 0;
-                    if (bio.ConditionTicks) fields["condition_ticks"] = 1;
+                    // Ticks and the dispositions are checkboxes on the form too, so like moulting they
+                    // always go up — unticking one has to clear it on the server.
+                    fields["condition_ticks"] = bio.ConditionTicks ? 1 : 0;
+                    fields["disposition_passive"] = bio.DispositionPassive ? 1 : 0;
+                    fields["disposition_aggressive"] = bio.DispositionAggressive ? 1 : 0;
                     if (!string.IsNullOrEmpty(bio.Notes)) fields["notes"] = bio.Notes;
                     // Dead is not a biometric column — the flag was retired in favour of a death
                     // date on the bird itself, and is written separately below.

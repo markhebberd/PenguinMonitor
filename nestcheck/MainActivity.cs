@@ -6850,24 +6850,36 @@ namespace PenguinMonitor
 
             // Conditions
             card.AddView(createLabel("Condition"));
-            var conditions = new (string label, string field)[] {
-                ("Moulting", "condition_moulting"),
-                ("Dead", "condition_dead"),
+            // Moulting on its own line, then two columns: ticks / passive over dead / aggressive.
+            var conditionRows = new (string label, string field)[][] {
+                new[] { ("Moulting", "condition_moulting") },
+                new[] { ("Ticks", "condition_ticks"), ("Passive", "disposition_passive") },
+                new[] { ("Dead", "condition_dead"), ("Aggressive", "disposition_aggressive") },
             };
             bool condChecked(string field) => existing != null && field switch
             {
                 "condition_moulting" => existing.ConditionMoulting,
+                "condition_ticks" => existing.ConditionTicks,
                 "condition_dead" => existing.ConditionDead,
+                "disposition_passive" => existing.DispositionPassive,
+                "disposition_aggressive" => existing.DispositionAggressive,
                 _ => false,
             };
             var conditionChecks = new Dictionary<string, CheckBox>();
-            foreach (var (label, field) in conditions)
+            foreach (var row in conditionRows)
             {
-                var cb = new CheckBox(this) { Text = label };
-                cb.SetTextColor(Color.Black);
-                cb.Checked = condChecked(field);
-                conditionChecks[field] = cb;
-                card.AddView(cb);
+                var rowLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
+                foreach (var (label, field) in row)
+                {
+                    var cb = new CheckBox(this) { Text = label };
+                    cb.SetTextColor(Color.Black);
+                    cb.Checked = condChecked(field);
+                    cb.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f);
+                    conditionChecks[field] = cb;
+                    rowLayout.AddView(cb);
+                }
+                if (row.Length == 1) rowLayout.AddView(new View(this) { LayoutParameters = new LinearLayout.LayoutParams(0, 0, 1f) });
+                card.AddView(rowLayout);
             }
 
             // Notes
@@ -6905,7 +6917,7 @@ namespace PenguinMonitor
                 // (date only, "Sex -") — e.g. Save pressed after the sex prompt popped up over the form.
                 bool nothingEntered = string.IsNullOrWhiteSpace(weightInput.Text) && string.IsNullOrWhiteSpace(flipperInput.Text)
                     && string.IsNullOrEmpty(ObservedSexOptions.FirstOrDefault(o => o.label == selectedSexLabel).code)
-                    && !conditionChecks["condition_moulting"].Checked && !conditionChecks["condition_dead"].Checked
+                    && !conditionChecks.Values.Any(cb => cb.Checked)
                     && string.IsNullOrWhiteSpace(notesInput.Text);
                 if (nothingEntered && existing == null)
                 {
@@ -6921,8 +6933,10 @@ namespace PenguinMonitor
                     FlipperLength = string.IsNullOrEmpty(flipperInput.Text) ? null : flipperInput.Text,
                     ObservedSex = ObservedSexOptions.FirstOrDefault(o => o.label == selectedSexLabel).code,
                     ConditionMoulting = conditionChecks["condition_moulting"].Checked,
-                    ConditionTicks = existing?.ConditionTicks ?? false, // checkbox removed — keep stored value
+                    ConditionTicks = conditionChecks["condition_ticks"].Checked,
                     ConditionDead = conditionChecks["condition_dead"].Checked,
+                    DispositionPassive = conditionChecks["disposition_passive"].Checked,
+                    DispositionAggressive = conditionChecks["disposition_aggressive"].Checked,
                     Notes = string.IsNullOrEmpty(notesInput.Text) ? null : notesInput.Text,
                     BiometricId = existing?.BiometricId,
                     IsPendingUpload = true,
@@ -9442,7 +9456,7 @@ namespace PenguinMonitor
                             peng_num = b.PengNum, observation_date = b.ObservationDate,
                             weight = b.Weight, flipper_length = b.FlipperLength, observed_sex = b.ObservedSex,
                             is_moulting = b.ConditionMoulting, condition_ticks = b.ConditionTicks,
-                            dead = b.ConditionDead, notes = b.Notes,
+                            dead = b.ConditionDead, passive = b.DispositionPassive, aggressive = b.DispositionAggressive, notes = b.Notes,
                             biometric_id = b.BiometricId, unsent = b.IsPendingUpload,
                         }).ToList(),
                     ["queued_birds"] = queuedBirds.Select(q => new {

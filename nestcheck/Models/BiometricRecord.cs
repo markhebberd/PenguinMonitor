@@ -18,6 +18,8 @@ namespace PenguinMonitor.Models
         public bool ConditionMoulting { get; set; }
         public bool ConditionTicks { get; set; }
         public bool ConditionDead { get; set; }
+        public bool DispositionPassive { get; set; }
+        public bool DispositionAggressive { get; set; }
         public string? Notes { get; set; }
 
         /// <summary>Server primary key. Null until first uploaded; used to update instead of duplicate.</summary>
