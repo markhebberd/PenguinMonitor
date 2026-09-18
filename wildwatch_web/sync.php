@@ -19,6 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 $pdo = getDbConnection();
 $observer = authenticate($pdo);
 if (!$observer) { http_response_code(401); echo json_encode(['error' => 'Not authenticated']); exit; }
+wwRequireFullPengClient();
 
 $action = $_GET['action'] ?? '';
 $colonyId = (int)($_GET['colony_id'] ?? 1);
@@ -163,7 +164,7 @@ function handleDownload($pdo, $colonyId, $observer) {
             $scansByObs[$scan['observation_id']][] = [
                 'pit_id' => $scan['pit_id'],
                 'scan_time_utc' => $scan['scan_time_utc'],
-                'peng_num' => displayPengNum($scan['peng_num'] ?? '', getColonyPrefix($pdo, $colonyId)),
+                'peng_num' => $scan['peng_num'] ?? '',
                 'sex' => $scan['sex'],
                 'chick_size_code' => $scan['chick_size_code'],
                 'chipped_as_adult' => $scan['chipped_as_adult'],
@@ -319,15 +320,12 @@ function handleUpload($pdo, $colonyId, $observer) {
 
     // Batch-fetch scans and day notes for conflict display
     $conflictDayNotes = dayNoteMap($pdo, $colonyId);
-    $viewPrefix = getColonyPrefix($pdo, $colonyId);
-    $fetchScansForObs = function($obsId) use ($pdo, $chipLookup, $viewPrefix) {
+    $fetchScansForObs = function($obsId) use ($pdo, $chipLookup) {
         $s = $pdo->prepare("SELECT ps.pit_id, ps.scan_time_utc, pc.peng_num, p.sex, p.chick_size_code, p.alert
             FROM penguin_scans ps LEFT JOIN penguin_chips pc ON ps.pit_id = pc.pit_id AND pc.is_active = 1
             LEFT JOIN penguins p ON pc.peng_num = p.peng_num WHERE ps.observation_id = ? AND (ps.is_deleted = FALSE OR ps.is_deleted IS NULL)");
         $s->execute([$obsId]);
-        $rows = $s->fetchAll();
-        stripPengPrefix($rows, $viewPrefix);
-        return $rows;
+        return $s->fetchAll();
     };
 
     $pdo->beginTransaction();

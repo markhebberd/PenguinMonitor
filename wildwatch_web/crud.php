@@ -44,6 +44,8 @@ if ($action === 'reset_password') { handleResetPassword($pdo); exit; }
 
 $observer = authenticate($pdo);
 if (!$observer) { http_response_code(401); echo json_encode(['error' => 'Not authenticated']); exit; }
+// 'me' is exempt: it carries no bird numbers, and the mirror's nightly check logs in with it.
+if ($action !== 'me') wwRequireFullPengClient();
 
 // FM dates are a Tarakohe (PT) field-book concept — the date_mappings table has no colony
 // column, so every FM endpoint gates on the caller's active colony instead. Non-PT colonies
@@ -128,7 +130,6 @@ if ($action === 'create_chipped_bird' && $_SERVER['REQUEST_METHOD'] === 'POST') 
 
     $cid = wwRequireColonyId();
     requireColonyAccess($pdo, $observer, $cid, true); // the new bird is stamped with this colony
-    $viewPrefix = getColonyPrefix($pdo, $cid);
     $pdo->beginTransaction();
     try {
         // Idempotency: this PIT is already chipped, so the bird exists — hand back its number
@@ -137,7 +138,7 @@ if ($action === 'create_chipped_bird' && $_SERVER['REQUEST_METHOD'] === 'POST') 
         $dup->execute([wwResolvePit($pdo, $pit) ?? $pit]);
         if ($existing = $dup->fetchColumn()) {
             $pdo->commit();
-            echo json_encode(['success'=>true, 'replayed'=>true, 'peng_num'=>displayPengNum($existing, $viewPrefix)]);
+            echo json_encode(['success'=>true, 'replayed'=>true, 'peng_num'=>$existing]);
             exit;
         }
 
@@ -184,7 +185,7 @@ if ($action === 'create_chipped_bird' && $_SERVER['REQUEST_METHOD'] === 'POST') 
         }
 
         $pdo->commit();
-        echo json_encode(['success'=>true, 'peng_num'=>displayPengNum($pengNum, $viewPrefix)]);
+        echo json_encode(['success'=>true, 'peng_num'=>$pengNum]);
     } catch (Exception $e) {
         $pdo->rollBack(); // nothing partial survives — the app can safely retry the whole thing
         http_response_code(400);
@@ -204,7 +205,7 @@ if ($action === 'create_chipped_bird' && $_SERVER['REQUEST_METHOD'] === 'POST') 
  *   { observation_id, half:'adults'|'chicks', verdict:'accepted'|'rejected'|'clear', note?,
  *     accept adults: male_peng_num, female_peng_num
  *     accept chicks: chicks:[peng_num...], dead_eggs, dead_chicks, fledged_unchipped }
- * peng_nums arrive display-stripped and are re-prefixed with dbPengNum. male/female are FK'd; the
+ * peng_nums arrive in full (PT1039) — a bare one is refused. male/female are FK'd; the
  * chicks list is stored as a JSON array of prefixed peng_nums (renumber-maintained in db_write.php).
  */
 if ($action === 'save_verification' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -229,7 +230,7 @@ if ($action === 'save_verification' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     requireColonyAccess($pdo, $observer, (int)$cid, true);
     $oid = $observer['observer_id'];
     $now = date('Y-m-d H:i:s');
-    $pref = function($p) use ($pdo, $cid) { return ($p === null || $p === '') ? null : dbPengNum($pdo, (int)$cid, (string)$p); };
+    $pref = function($p) { return ($p === null || $p === '') ? null : wwFullPengNum($p); };
     $clear = $verdict === 'clear';
 
     // The half's column set. Accept snapshots the detected data; reject holds a note only; clear nulls all.
@@ -647,10 +648,7 @@ function handleList($pdo, $table) {
             $where[] = "observation_time_utc < ?";  $params[] = gmdate('Y-m-d H:i:s', $dayStartUtc + 24 * 3600);
             continue;
         }
-        if ($k === 'peng_num' && !preg_match('/^[A-Z]/', $v)) {
-            $cid = (int)($_GET['colony_id'] ?? 1);
-            $v = dbPengNum($pdo, $cid, $v);
-        }
+        if ($k === 'peng_num') $v = wwFullPengNum($v);
         // A caller filtering by tag may still spell it the reader's way ("LA" + 15 digits) —
         // and the row may still be stored that way, so match it to what is actually there.
         if ($k === 'pit_id') $v = wwResolvePit($pdo, $v) ?? ww_pit($v);
@@ -662,22 +660,16 @@ function handleList($pdo, $table) {
     $sql .= " ORDER BY 1 DESC LIMIT $limit";
     $stmt = $pdo->prepare($sql); $stmt->execute($params);
     $rows = $stmt->fetchAll();
-    if (in_array($table, ['penguins', 'penguin_chips', 'penguin_biometric_data']))
-        stripPengPrefix($rows, getColonyPrefix($pdo, (int)($_GET['colony_id'] ?? 1)));
     echo json_encode($rows);
 }
 
 function handleGet($pdo, $table, $pk, $id) {
     if (!$id) { echo json_encode(['error'=>'id required']); return; }
     if ($pk === 'pit_id') $id = wwResolvePit($pdo, $id) ?? $id;
-    if ($table === 'penguins' && !preg_match('/^[A-Z]/', $id)) {
-        $cid = (int)($_GET['colony_id'] ?? 1);
-        $id = dbPengNum($pdo, $cid, $id);
-    }
+    if ($table === 'penguins') $id = wwFullPengNum($id);
     $stmt = $pdo->prepare("SELECT * FROM $table WHERE $pk = ?"); $stmt->execute([$id]);
     $row = $stmt->fetch();
     if (!$row) { http_response_code(404); echo json_encode(['error'=>'Not found']); return; }
-    if (isset($row['peng_num'])) $row['peng_num'] = displayPengNum($row['peng_num'], getColonyPrefix($pdo, (int)($_GET['colony_id'] ?? 1)));
     echo json_encode($row);
 }
 
@@ -732,7 +724,8 @@ function handleCreate($pdo, $table, $pk, $observer) {
     unset($input['_reason']);
 
     $cid = (int)($_GET['colony_id'] ?? 1);
-    $viewPrefix = getColonyPrefix($pdo, $cid);
+    if (in_array($table, ['penguins', 'penguin_chips', 'penguin_biometric_data']) && isset($input['peng_num']))
+        $input['peng_num'] = wwFullPengNum($input['peng_num']);
     $pdo->beginTransaction();
     try {
         // A scan references a chip row, so it must carry that row's pit_id exactly — resolve the
@@ -760,7 +753,7 @@ function handleCreate($pdo, $table, $pk, $observer) {
             $existing = $dup->fetch();
             if ($existing) {
                 $pdo->rollBack();
-                echo json_encode(['success' => false, 'error' => "pit_id already assigned to penguin #" . displayPengNum($existing['peng_num'], $viewPrefix), 'peng_num' => displayPengNum($existing['peng_num'], $viewPrefix)]);
+                echo json_encode(['success' => false, 'error' => "pit_id already assigned to penguin #" . displayPengNum($existing['peng_num'], getColonyPrefix($pdo, $cid)), 'peng_num' => $existing['peng_num']]);
                 return;
             }
         }
@@ -794,10 +787,6 @@ function handleCreate($pdo, $table, $pk, $observer) {
                 if (!empty($input[$k])) $has = true;
             if (!$has) { $pdo->rollBack(); http_response_code(400); echo json_encode(['error'=>'Empty biometric — nothing to save']); return; }
         }
-        // Prepend colony prefix to bare peng_num on penguin/chip/bio creates
-        if (in_array($table, ['penguins', 'penguin_chips', 'penguin_biometric_data']) && isset($input['peng_num'])) {
-            $input['peng_num'] = dbPengNum($pdo, $cid, $input['peng_num']);
-        }
         $newId = wwAuditedInsert($pdo, $table, $input, $observer['observer_id'], $reason);
         // Natural-key tables (penguins, penguin_chips) have no auto-increment id to return.
         $keyCol = WW_NATURAL_KEYS[$table] ?? null;
@@ -809,30 +798,21 @@ function handleCreate($pdo, $table, $pk, $observer) {
         $row->execute([$recordId]);
         $inserted = $row->fetch();
         if ($inserted) {
-            if (isset($inserted['peng_num'])) $inserted['peng_num'] = displayPengNum($inserted['peng_num'], $viewPrefix);
             $result = array_merge($result, $inserted);
         }
-        if (isset($result['id']) && is_string($result['id'])) $result['id'] = displayPengNum($result['id'], $viewPrefix);
         echo json_encode($result);
     } catch (Exception $e) { $pdo->rollBack(); http_response_code(400); echo json_encode(['error'=>$e->getMessage()]); }
 }
 
 function handleUpdate($pdo, $table, $pk, $id, $observer) {
     if (!$id) { http_response_code(400); echo json_encode(['error'=>'id required']); return; }
-    // Prepend colony prefix for penguin-keyed tables
-    if ($table === 'penguins' && !preg_match('/^[A-Z]/', $id)) {
-        $cid = (int)($_GET['colony_id'] ?? 1);
-        $id = dbPengNum($pdo, $cid, $id);
-    }
+    if ($table === 'penguins') $id = wwFullPengNum($id);
     if ($pk === 'pit_id') $id = wwResolvePit($pdo, $id) ?? $id;
     $input = json_decode(file_get_contents('php://input'), true);
     if (!$input) { http_response_code(400); echo json_encode(['error'=>'JSON body required']); return; }
     $input = wwNormalizePit($table, renameLegacyColumns($table, stripRetiredColumns($table, $input)));
-    // Same as create: a body peng_num arrives display-stripped ("1039"). Written bare it matches no
-    // penguin, and the FK rejects the whole update — the phone resends peng_num on every bio edit.
-    if (in_array($table, ['penguins', 'penguin_chips', 'penguin_biometric_data']) && isset($input['peng_num'])) {
-        $input['peng_num'] = dbPengNum($pdo, (int)($_GET['colony_id'] ?? 1), (string)$input['peng_num']);
-    }
+    if (in_array($table, ['penguins', 'penguin_chips', 'penguin_biometric_data']) && isset($input['peng_num']))
+        $input['peng_num'] = wwFullPengNum($input['peng_num']);
 
     $stmt = $pdo->prepare("SELECT * FROM $table WHERE $pk = ?"); $stmt->execute([$id]);
     $old = $stmt->fetch();
@@ -851,6 +831,7 @@ function handleUpdate($pdo, $table, $pk, $id, $observer) {
 
 function handleDelete($pdo, $table, $pk, $id, $observer) {
     if (!$id) { http_response_code(400); echo json_encode(['error'=>'id required']); return; }
+    if ($table === 'penguins') $id = wwFullPengNum($id);
     if ($pk === 'pit_id') $id = wwResolvePit($pdo, $id) ?? $id;
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
     $stmt = $pdo->prepare("SELECT * FROM $table WHERE $pk = ?"); $stmt->execute([$id]);

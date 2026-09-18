@@ -2,6 +2,7 @@
 require_once 'config.php';
 setHeaders();
 $observer = requireAuth();
+wwRequireFullPengClient();
 
 $pdo = getDbConnection();
 $colonyId = (int)($_GET['colony_id'] ?? $_GET['colony'] ?? 1);
@@ -187,7 +188,6 @@ function chickSex($pdo, $colonyId) {
     ");
     $stmt->execute([$colonyId]);
     $rows = $stmt->fetchAll();
-    stripPengPrefix($rows, getColonyPrefix($pdo, $colonyId));
 
     $groups = ['LC' => ['M'=>0,'F'=>0,'U'=>0,'total'=>0,'returned'=>0],
                'BC' => ['M'=>0,'F'=>0,'U'=>0,'total'=>0,'returned'=>0],
@@ -229,7 +229,6 @@ function chickReturn($pdo, $colonyId) {
     ");
     $stmt->execute([$colonyId]);
     $rows = $stmt->fetchAll();
-    stripPengPrefix($rows, getColonyPrefix($pdo, $colonyId));
 
     // Exclude chicks from the previous and current seasons (haven't had a chance to return)
     $now = new DateTime('now', new DateTimeZone('Pacific/Auckland'));
@@ -413,7 +412,6 @@ function chickSexBothReturned($pdo, $colonyId) {
     ");
     $stmt->execute([$colonyId]);
     $rows = $stmt->fetchAll();
-    stripPengPrefix($rows, getColonyPrefix($pdo, $colonyId));
 
     // Group by nest (chip_box + chip_season)
     $nests = [];

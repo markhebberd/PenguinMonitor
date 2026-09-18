@@ -59,6 +59,7 @@ function wwPitOut(array $rows, bool $legacy): array {
 }
 
 $observer = requireAuth();
+wwRequireFullPengClient();
 
 $pdo = getDbConnection();
 $colonyId = (int)($_GET['colony_id'] ?? 1);
@@ -127,9 +128,9 @@ if ($fmExcludedBoxes === false) $fmExcludedBoxes = '0,AA,AB,AC';
 
 /** Human-verified breeding truth for the colony — one row per verified clutch. Tiny, so it's
  *  fetched in FULL on every snapshot (full and incremental): the client replaces its store
- *  wholesale, which handles deletes without a full reload. peng_num columns (and each element of
- *  the chicks JSON array) are prefix-stripped to match the stripped penguins the client holds. */
-function getVerificationData($pdo, $colonyId, $viewPrefix) {
+ *  wholesale, which handles deletes without a full reload. Bird numbers are full (PT1039),
+ *  like everywhere else in the API; the chicks column is decoded from its JSON array. */
+function getVerificationData($pdo, $colonyId) {
     $ver = $pdo->prepare("SELECT " . SNAP_COLS_VER . " FROM breeding_verifications v
         JOIN observations o ON o.observation_id = v.observation_id
         JOIN observation_locations ol ON ol.location_id = o.location_id
@@ -138,11 +139,9 @@ function getVerificationData($pdo, $colonyId, $viewPrefix) {
         WHERE ol.colony_id = ?");
     $ver->execute([$colonyId]);
     $verRows = $ver->fetchAll();
-    stripPengPrefix($verRows, $viewPrefix, 'male_peng_num');
-    stripPengPrefix($verRows, $viewPrefix, 'female_peng_num');
     foreach ($verRows as &$vr) {
         $arr = json_decode($vr['chicks'] ?? 'null', true);
-        $vr['chicks'] = is_array($arr) ? array_map(fn($pn) => displayPengNum((string)$pn, $viewPrefix), $arr) : [];
+        $vr['chicks'] = is_array($arr) ? array_map('strval', $arr) : [];
     }
     unset($vr);
     return ['verifications' => $verRows];
@@ -256,10 +255,9 @@ if ($fieldScope) {
     $locations = $pdo->prepare("SELECT " . SNAP_COLS_LOC . " FROM observation_locations WHERE colony_id = ?");
     $locations->execute([$colonyId]);
 
-    $viewPrefix = getColonyPrefix($pdo, $colonyId);
-    $pengRows = $penguins->fetchAll(); stripPengPrefix($pengRows, $viewPrefix);
-    $chipRows = $chips->fetchAll(); stripPengPrefix($chipRows, $viewPrefix);
-    $bioRows = $bio->fetchAll(); stripPengPrefix($bioRows, $viewPrefix);
+    $pengRows = $penguins->fetchAll();
+    $chipRows = $chips->fetchAll();
+    $bioRows = $bio->fetchAll();
 
     echo json_encode(array_merge([
         'incremental' => false,
@@ -348,10 +346,9 @@ if ($since) {
     ) as wm");
     $snapshotTime = $wmStmt->fetch()['wm'];
 
-    $viewPrefix = getColonyPrefix($pdo, $colonyId);
-    $pengRows = $penguins->fetchAll(); stripPengPrefix($pengRows, $viewPrefix);
-    $chipRows = $chips->fetchAll(); stripPengPrefix($chipRows, $viewPrefix);
-    $bioRows = $bio->fetchAll(); stripPengPrefix($bioRows, $viewPrefix);
+    $pengRows = $penguins->fetchAll();
+    $chipRows = $chips->fetchAll();
+    $bioRows = $bio->fetchAll();
     echo json_encode(array_merge([
         'incremental' => true,
         'me' => wwSnapshotMe($observer),
@@ -367,7 +364,7 @@ if ($since) {
         'fm_excluded_boxes' => $fmExcludedBoxes,
         '_counts' => getTotalCounts($pdo, $colonyId),
         '_hashes' => wwSnapshotHashes($pdo, $colonyId),
-    ], getVerificationData($pdo, $colonyId, $viewPrefix), getDayNotes($pdo, $colonyId), getObservers($pdo)));
+    ], getVerificationData($pdo, $colonyId), getDayNotes($pdo, $colonyId), getObservers($pdo)));
     exit;
 }
 
@@ -412,10 +409,9 @@ $fullWm = $pdo->query("SELECT GREATEST(
     COALESCE((SELECT MAX(change_timestamp) FROM audit_log), '2000-01-01')
 ) as wm")->fetch()['wm'];
 
-$viewPrefix = getColonyPrefix($pdo, $colonyId);
-$pengRows = $penguins->fetchAll(); stripPengPrefix($pengRows, $viewPrefix);
-$chipRows = $chips->fetchAll(); stripPengPrefix($chipRows, $viewPrefix);
-$bioRows = $bio->fetchAll(); stripPengPrefix($bioRows, $viewPrefix);
+$pengRows = $penguins->fetchAll();
+$chipRows = $chips->fetchAll();
+$bioRows = $bio->fetchAll();
 $json = json_encode(array_merge([
     'incremental' => false,
     'me' => wwSnapshotMe($observer),
@@ -431,7 +427,7 @@ $json = json_encode(array_merge([
     'fm_excluded_boxes' => $fmExcludedBoxes,
     '_counts' => getTotalCounts($pdo, $colonyId),
     '_hashes' => wwSnapshotHashes($pdo, $colonyId),
-], getVerificationData($pdo, $colonyId, $viewPrefix), getDayNotes($pdo, $colonyId), getObservers($pdo)));
+], getVerificationData($pdo, $colonyId), getDayNotes($pdo, $colonyId), getObservers($pdo)));
 
 // Manual gzip with known Content-Length for accurate client progress
 $gz = gzencode($json, 6);

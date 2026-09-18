@@ -6,6 +6,7 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Cache-Control: no-cache');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 requireAuth();
+wwRequireFullPengClient();
 
 $pdo = getDbConnection();
 $colonyId = (int)($_GET['colony_id'] ?? 1);
@@ -28,8 +29,7 @@ if (!empty($num)) {
 }
 if (!$penguin) { echo json_encode(['error'=>'penguin not found']); exit; }
 
-$pid = $penguin['peng_num'];  // full prefixed value for DB queries
-$penguin['peng_num'] = displayPengNum($pid, $viewPrefix);  // strip home prefix for output
+$pid = $penguin['peng_num'];
 
 // Chips
 $chipsStmt = $pdo->prepare("SELECT pc.pit_id, pc.chip_date, pc.is_active, pc.chip_box, pc.solo,

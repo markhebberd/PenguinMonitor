@@ -171,7 +171,7 @@ namespace PenguinMonitor
         private Action<string>? _newBirdScanCapture;
 
         // ===== Pending chip workflow persistence (survives Android killing the app) =====
-        private const string PENDING_CHIP_FILENAME = "pendingChip.json";
+        private const string PENDING_CHIP_FILENAME = DataStorageService.PENDING_CHIP_FILENAME;
         // Set while the new-bird dialog is open; OnPause invokes it to snapshot the form
         private Action? _pendingChipCapture;
         private void SavePendingChip(PendingChipState st)
@@ -3330,6 +3330,13 @@ namespace PenguinMonitor
                         request.Headers.Add("Authorization", $"Bearer {_appSettings.AuthToken}");
                     var response = await Http.CreateClient(TimeSpan.FromSeconds(10)).SendAsync(request);
                     var json = await response.Content.ReadAsStringAsync();
+                    // A retired build gets an {"error"} object here, which the list parse below would
+                    // swallow into silence — say what the server said instead.
+                    if (Http.IsUpgradeRequired(response))
+                    {
+                        RunOnUiThread(() => Toast.MakeText(this, DataStorageService.ServerMessage(json, 426), ToastLength.Long)?.Show());
+                        return;
+                    }
                     var allColonies = JsonConvert.DeserializeObject<List<Dictionary<string, object>>>(json) ?? new();
 
                     RunOnUiThread(() =>
@@ -4476,7 +4483,7 @@ namespace PenguinMonitor
             {
                 sex = pd.Sex?.ToUpper() ?? "";
                 isChick = pd.ChipAs != "Adult" && pd.ChipDate > DateTime.MinValue && (DateTime.UtcNow - pd.ChipDate).TotalDays < 90;
-                var num = !string.IsNullOrEmpty(pd.PengNum) ? $"#{pd.PengNum}" : "";
+                var num = !string.IsNullOrEmpty(pd.PengNum) ? $"#{DisplayPengNum(pd.PengNum)}" : "";
                 // Sex is shown via the badge colour; chick size code (if any) is the only stage text.
                 var size = pd.ChickSizeCode ?? "";
                 label = string.Join(" ", new[] { num, size, pd.ScannedId }.Where(s => !string.IsNullOrEmpty(s))).Replace("  ", " ");
@@ -4494,12 +4501,14 @@ namespace PenguinMonitor
             return string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => char.ToUpper(w[0])));
         }
 
-        // Peng number with its colony acronym: bare "2" → "PT2"; already-prefixed "NI2" stays.
-        private string DisplayPengNum(string? pengNum)
-        {
-            if (string.IsNullOrEmpty(pengNum)) return "";
-            return char.IsLetter(pengNum[0]) ? pengNum : CurrentColonyAcronym() + pengNum;
-        }
+        // Peng numbers are held full ("PT1039") and nestcheck has always shown them that way, colony
+        // and all, so PT2 and NI2 never read alike in the field. The one place a number meets a person.
+        private string DisplayPengNum(string? pengNum) => pengNum ?? "";
+
+        // A number a person typed, in the form the server wants: "1039" → "PT1039" in Port
+        // Tarakohe, "ni7" → "NI7" anywhere.
+        private string FullPengNum(string? typed) =>
+            PengNums.Full(typed, _appSettings?.SelectedColonyPrefix);
 
         private TextView CreateScanBadge(string birdId, Action? onClick = null, float textSize = 10, string? labelOverride = null)
         {
@@ -4527,7 +4536,7 @@ namespace PenguinMonitor
             bool sizeLetterAtEnd = false;
             if (labelOverride == null && pd != null && !string.IsNullOrEmpty(pd.ChickSizeCode))
             {
-                var num = !string.IsNullOrEmpty(pd.PengNum) ? $"#{pd.PengNum}" : "";
+                var num = !string.IsNullOrEmpty(pd.PengNum) ? $"#{DisplayPengNum(pd.PengNum)}" : "";
                 var sizeLetter = pd.ChickSizeCode.TrimEnd('C', 'c');
                 label = string.Join(" ", new[] { num, pd.ScannedId, sizeLetter }.Where(s => !string.IsNullOrEmpty(s)));
                 sizeLetterAtEnd = true;
@@ -6313,25 +6322,27 @@ namespace PenguinMonitor
                 var query = _penguinSearchEditText.Text?.Trim().ToUpper() ?? "";
                 if (query.Length < 1 || _remotePenguinData == null) return;
 
-                // Search: exact peng# match first, then pit_id substring, then peng# prefix
+                // Search: exact peng# match first, then pit_id substring, then peng# prefix. Numbers
+                // are held full, so "1039" typed in Port Tarakohe is looked for as PT1039.
+                var fullQuery = FullPengNum(query);
                 var exactPengNum = new List<PenguinData>();
                 var pitIdMatches = new List<PenguinData>();
                 var pengNumPrefix = new List<PenguinData>();
 
                 foreach (var pd in _remotePenguinData.Values)
                 {
-                    if (pd.PengNum == query)
+                    if (pd.PengNum == fullQuery)
                         exactPengNum.Add(pd);
                     else if (pd.ScannedId.Contains(query))
                         pitIdMatches.Add(pd);
-                    else if (pd.PengNum.StartsWith(query))
+                    else if (pd.PengNum.StartsWith(fullQuery))
                         pengNumPrefix.Add(pd);
                 }
 
                 // Order: exact peng# → pit_id matches → peng# prefix
                 var results = exactPengNum
                     .Concat(pitIdMatches.OrderBy(p => p.ScannedId))
-                    .Concat(pengNumPrefix.OrderBy(p => int.TryParse(p.PengNum, out var n) ? n : 9999))
+                    .Concat(pengNumPrefix.OrderBy(p => PengNums.Number(p.PengNum)))
                     .Take(8)
                     .ToList();
 
@@ -6919,7 +6930,7 @@ namespace PenguinMonitor
                 };
                 _colonyState.SaveBiometric(record);
                 SaveToAppDataDir();
-                Toast.MakeText(this, $"Saved for #{pengNum} — will sync", ToastLength.Short)?.Show();
+                Toast.MakeText(this, $"Saved for #{DisplayPengNum(pengNum)} — will sync", ToastLength.Short)?.Show();
                 dialog.Dismiss();
 
                 // Prompt background flush so it uploads promptly; a full sync also flushes it.
@@ -6956,32 +6967,29 @@ namespace PenguinMonitor
                 ? () => RemoveUnsavedScanFromBox(scanCleanup.Value.box, fullPitId, scanCleanup.Value.decrementAdult)
                 : (Action?)null;
             // Predict the next penguin number for the title (server assigns the real one on
-            // create). Trailing digits handle both bare PT numbers ("1012") and prefixed
-            // display forms ("NI7"); the prefix of the highest bird carries into the prediction.
-            string nextPengLabel = "";
+            // create). The server numbers new birds within the colony being worked, so only this
+            // colony's prefix counts: a visiting RR bird with a high number must not push the
+            // prediction. With no prefix known yet, fall back to the highest bird of any colony.
+            // nextPengNum is the full form sent to the server; nextPengLabel is what people see.
+            string nextPengNum = "";
             if (_remotePenguinData != null && _remotePenguinData.Count > 0)
             {
+                var colonyPrefix = (_appSettings?.SelectedColonyPrefix ?? "").ToUpperInvariant();
                 int maxNum = 0; string maxPrefix = "";
-                foreach (var pd0 in _remotePenguinData.Values)
+                void Consider(string? pn)
                 {
-                    var m = Regex.Match(pd0.PengNum ?? "", @"^(.*?)(\d+)$");
-                    if (m.Success && int.TryParse(m.Groups[2].Value, out var n) && n > maxNum)
-                    {
-                        maxNum = n; maxPrefix = m.Groups[1].Value;
-                    }
+                    var m = Regex.Match(pn ?? "", @"^([A-Za-z]*)(\d+)$");
+                    if (!m.Success || !int.TryParse(m.Groups[2].Value, out var n) || n <= maxNum) return;
+                    if (colonyPrefix.Length > 0 && !string.Equals(m.Groups[1].Value, colonyPrefix, StringComparison.OrdinalIgnoreCase)) return;
+                    maxNum = n; maxPrefix = m.Groups[1].Value.ToUpperInvariant();
                 }
+                foreach (var pd0 in _remotePenguinData.Values) Consider(pd0.PengNum);
                 // Birds queued offline hold their predicted numbers too, so a restart can't
                 // double-book a number that's already promised to a queued bird.
-                foreach (var qc in _dataStorageService.LoadQueuedChips(this))
-                {
-                    var qm = Regex.Match(qc.RequestedPengNum ?? "", @"^(.*?)(\d+)$");
-                    if (qm.Success && int.TryParse(qm.Groups[2].Value, out var qn) && qn > maxNum)
-                    {
-                        maxNum = qn; maxPrefix = qm.Groups[1].Value;
-                    }
-                }
-                if (maxNum > 0) nextPengLabel = DisplayPengNum($"{maxPrefix}{maxNum + 1}");
+                foreach (var qc in _dataStorageService.LoadQueuedChips(this)) Consider(qc.RequestedPengNum);
+                if (maxNum > 0) nextPengNum = FullPengNum($"{maxPrefix}{maxNum + 1}");
             }
+            string nextPengLabel = DisplayPengNum(nextPengNum);
             var scrollView = new ScrollView(this);
             scrollView.SetClipChildren(false);
             scrollView.DescendantFocusability = Android.Views.DescendantFocusability.AfterDescendants;
@@ -7397,6 +7405,7 @@ namespace PenguinMonitor
                 if (q.Length < 1 || _remotePenguinData == null) return;
                 bool qIsNum = q.All(char.IsDigit);
                 long qVal = qIsNum && long.TryParse(q, out var qv) ? qv : -1;
+                var qFull = FullPengNum(q);
                 // Distinct birds ranked: exact peng-number match first (a "2" puts PT2 and
                 // NI2 on top), then number prefix, number contains, then chip-id contains.
                 var best = new Dictionary<string, (int rank, long num, PenguinData pd, string key)>();
@@ -7410,7 +7419,7 @@ namespace PenguinMonitor
                     var digits = new string(pnU.SkipWhile(c => !char.IsDigit(c)).TakeWhile(char.IsDigit).ToArray());
                     long.TryParse(digits, out var numVal);
                     int rank =
-                        (qIsNum && numVal == qVal) || pnU == q || disp == q ? 0 :
+                        (qIsNum && numVal == qVal) || pnU == q || pnU == qFull || disp == q ? 0 :
                         pnU.StartsWith(q) || disp.StartsWith(q) ? 1 :
                         pnU.Contains(q) || disp.Contains(q) ? 2 :
                         q.Length >= 3 && kv.Key.ToUpper().Contains(q) ? 3 : -1;
@@ -7513,7 +7522,7 @@ namespace PenguinMonitor
                     Flipper = flipperInput.Text ?? "",
                     Notes = notesInput.Text ?? "",
                     CreatedUtc = DateTime.UtcNow,
-                    RequestedPengNum = nextPengLabel,
+                    RequestedPengNum = nextPengNum,
                 };
                 var queue = _dataStorageService.LoadQueuedChips(this);
                 queue.Add(st);
@@ -7525,7 +7534,7 @@ namespace PenguinMonitor
                     var pd = new PenguinData
                     {
                         ScannedId = shortId,
-                        PengNum = nextPengLabel,
+                        PengNum = nextPengNum,
                         Sex = "",
                         LastKnownLifeStage = qIsChick ? LifeStage.Chick : LifeStage.Adult,
                         ChipDate = DateTime.UtcNow,
@@ -7641,7 +7650,7 @@ namespace PenguinMonitor
                             // Ask the server to honour the number written down in the field (same as the
                             // offline path). The queue is drained above, so the server is authoritative;
                             // it hands back a different number only if this one is genuinely taken.
-                            if (!string.IsNullOrEmpty(nextPengLabel)) birdFields["requested_peng_num"] = nextPengLabel;
+                            if (!string.IsNullOrEmpty(nextPengNum)) birdFields["requested_peng_num"] = nextPengNum;
                             if (chipperId > 0) birdFields["chipper_id"] = chipperId;
                             if (assistantId > 0) birdFields["assistant_id"] = assistantId;
                             if (!string.IsNullOrEmpty(chickSize)) birdFields["chick_size_code"] = chickSize;
@@ -7676,11 +7685,11 @@ namespace PenguinMonitor
                             }
                             // The server assigned a different number than the field wrote down —
                             // it was already taken. Say so, so the paper and the database agree.
-                            if (!string.IsNullOrEmpty(nextPengLabel) && pengNum != nextPengLabel)
+                            if (!string.IsNullOrEmpty(nextPengNum) && !string.Equals(pengNum, nextPengNum, StringComparison.OrdinalIgnoreCase))
                                 RunOnUiThread(() =>
                                     new AlertDialog.Builder(this)
                                         .SetTitle("Number changed")
-                                        .SetMessage($"Bird written down as {nextPengLabel} was saved as {pengNum} — that number was already taken. Rename on wildwatch if the written number matters.")
+                                        .SetMessage($"Bird written down as {nextPengLabel} was saved as {DisplayPengNum(pengNum)} — that number was already taken. Rename on wildwatch if the written number matters.")
                                         .SetPositiveButton("OK", (s6, e6) => { })
                                         .Show());
                         }
@@ -7714,7 +7723,7 @@ namespace PenguinMonitor
                                 {
                                     new AlertDialog.Builder(this)
                                         .SetTitle("Failed to create chip")
-                                        .SetMessage(chipJson)
+                                        .SetMessage(DataStorageService.ServerMessage(chipJson, (int)chipResp.StatusCode))
                                         .SetPositiveButton("OK", (s3, e3) => { })
                                         .Show();
                                 });
@@ -7820,14 +7829,14 @@ namespace PenguinMonitor
                                 }
                                 SaveCurrentBoxData();
                                 DrawPageLayouts();
-                                Toast.MakeText(this, $"#{pengNum} {verb} ({(isChick ? "+1 Chick" : "+1 Adult")})", ToastLength.Short)?.Show();
+                                Toast.MakeText(this, $"#{DisplayPengNum(pengNum)} {verb} ({(isChick ? "+1 Chick" : "+1 Adult")})", ToastLength.Short)?.Show();
                             }
 
                             if (noScanEntry != null)
                             {
                                 new AlertDialog.Builder(this)
                                     .SetTitle("Replace no-scan?")
-                                    .SetMessage($"#{pengNum} was {verb}. Is this the no-scan adult already recorded in box {_currentBoxName}?\n\nReplace it — the adult count stays as it is.")
+                                    .SetMessage($"#{DisplayPengNum(pengNum)} was {verb}. Is this the no-scan adult already recorded in box {_currentBoxName}?\n\nReplace it — the adult count stays as it is.")
                                     .SetPositiveButton("Yes, replace", (s3, e3) =>
                                     {
                                         // Swap, don't add: the no-scan already counted this bird as an adult.
@@ -7846,7 +7855,7 @@ namespace PenguinMonitor
                                         _colonyState.SaveBoxObservation(_currentBoxName, replaceBox);
                                         SaveToAppDataDir();
                                         DrawPageLayouts();
-                                        Toast.MakeText(this, $"#{pengNum} {verb} — replaced the no-scan in box {_currentBoxName}", ToastLength.Short)?.Show();
+                                        Toast.MakeText(this, $"#{DisplayPengNum(pengNum)} {verb} — replaced the no-scan in box {_currentBoxName}", ToastLength.Short)?.Show();
                                     })
                                     .SetNegativeButton("No, another bird", (s3, e3) => AddAsNewBird())
                                     .SetCancelable(false)   // one of the two must be applied — there is no sane default
@@ -8152,6 +8161,12 @@ namespace PenguinMonitor
 
                 // Load colony state (or migrate from legacy)
                 _colonyState = DataStorageService.LoadColonyState(this);
+                // First launch after the API went to full peng numbers: convert the unsent queues and
+                // the bird cache the old build left bare, and pull everything else fresh — the next
+                // sync is a full one anyway (LocalDb.SchemaVersion), so make it happen now.
+                bool pengNumsMigrated = _dataStorageService.MigratePengNumsToFull(this, _colonyState, _appSettings);
+                if (pengNumsMigrated)
+                    _remotePenguinData = await _dataStorageService.loadRemotePengInfoFromAppDataDir(this);
                 // Yesterday's label and people are cleared by ColonyState.RolloverDay(), which the
                 // first DrawPageLayouts() runs — and which parks an unsent note in PendingDayNotes
                 // on the way out. This used to clear the four fields here instead, which got there
@@ -8168,7 +8183,7 @@ namespace PenguinMonitor
                 // (e.g. another observer's afternoon visit missed by an evening relaunch).
                 var syncAgeMin = _colonyState.LastSyncedUtc > DateTime.MinValue
                     ? (DateTime.UtcNow - _colonyState.LastSyncedUtc).TotalMinutes : double.MaxValue;
-                _shouldAutoDownloadBirdStats = (_remotePenguinData == null || _remotePenguinData.Count == 0 || syncAgeMin > SyncStaleMinutes);
+                _shouldAutoDownloadBirdStats = (pengNumsMigrated || _remotePenguinData == null || _remotePenguinData.Count == 0 || syncAgeMin > SyncStaleMinutes);
             }
             catch (Exception ex)
             {

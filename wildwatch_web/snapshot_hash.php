@@ -9,7 +9,7 @@
  * server, re-sync, and — the point — report exactly which row/field drifted, so we can find the
  * incremental method that mishandled it.
  *
- * The hash is over the EXACT rows the server sends for a colony view (full, prefix-stripped set),
+ * The hash is over the EXACT rows the server sends for a colony view (full set, full bird numbers),
  * in a canonical form the client reproduces byte-for-byte:
  *   row      = implode("\x1f", each HASH column as a string, null => "")
  *   table    = sha1( implode("\x1e", rows sorted ascending by primary key) )
@@ -44,19 +44,17 @@ function wwHashRows(array $rows, array $spec): string {
     return sha1(implode("\x1e", array_values($lines)));
 }
 
-/** Build the full per-colony row set for each hashed table, prefix-stripped exactly as the
- *  snapshot sends it, and hash each. (Separate curated SELECTs so the hash is self-contained and
+/** Build the full per-colony row set for each hashed table, exactly as the snapshot sends it
+ *  (full bird numbers, no stripping), and hash each. (Separate curated SELECTs so the hash is self-contained and
  *  can't silently drift when SNAP_COLS_* change.) */
 function wwComputeSnapshotHashes(PDO $pdo, int $colonyId): array {
-    $viewPrefix = getColonyPrefix($pdo, $colonyId);
     $out = [];
     // Hash each table then free its rows before loading the next, so peak memory is one table's
     // worth, not all six at once — the difference between fitting under the pool limit and OOMing.
-    $do = function(string $key, string $sql, array $params, bool $strip) use ($pdo, $viewPrefix, &$out) {
+    $do = function(string $key, string $sql, array $params) use ($pdo, &$out) {
         if ($params) { $st = $pdo->prepare($sql); $st->execute($params); }
         else { $st = $pdo->query($sql); }
         $rows = $st->fetchAll();
-        if ($strip) stripPengPrefix($rows, $viewPrefix);
         $out[$key] = wwHashRows($rows, WW_HASH_COLS[$key]);
         unset($rows);
     };
@@ -66,22 +64,22 @@ function wwComputeSnapshotHashes(PDO $pdo, int $colonyId): array {
            FROM penguin_biometric_data b WHERE b.peng_num = penguins.peng_num AND (b.is_deleted=FALSE OR b.is_deleted IS NULL)) AS sex_guess_m,
         (SELECT COALESCE(SUM(CASE WHEN UPPER(b.observed_sex) IN ('PF','F') THEN 2 WHEN UPPER(b.observed_sex)='MF' THEN 1 ELSE 0 END),0)
            FROM penguin_biometric_data b WHERE b.peng_num = penguins.peng_num AND (b.is_deleted=FALSE OR b.is_deleted IS NULL)) AS sex_guess_f
-        FROM penguins", [], true);
+        FROM penguins", []);
 
-    $do('chips', "SELECT pit_id, peng_num, chip_date, is_active, chip_box, location_id, chipper_id, assistant_id, solo FROM penguin_chips", [], true);
+    $do('chips', "SELECT pit_id, peng_num, chip_date, is_active, chip_box, location_id, chipper_id, assistant_id, solo FROM penguin_chips", []);
 
     $do('observations', "SELECT o.observation_id, o.location_id, o.observation_time_utc, o.adults, o.eggs, o.chicks, o.breeding_status, o.gate_status, o.notes, o.no_scan, o.fledged_unchipped, o.failed_eggs, o.dead_chicks, o.is_deleted, o.observer_id
-        FROM observations o JOIN observation_locations ol ON o.location_id = ol.location_id WHERE ol.colony_id = ?", [$colonyId], false);
+        FROM observations o JOIN observation_locations ol ON o.location_id = ol.location_id WHERE ol.colony_id = ?", [$colonyId]);
 
     $do('scans', "SELECT ps.scan_id, ps.observation_id, ps.pit_id FROM penguin_scans ps
         JOIN observations o ON ps.observation_id = o.observation_id
         JOIN observation_locations ol ON o.location_id = ol.location_id
-        WHERE ol.colony_id = ? AND (ps.is_deleted = FALSE OR ps.is_deleted IS NULL)", [$colonyId], false);
+        WHERE ol.colony_id = ? AND (ps.is_deleted = FALSE OR ps.is_deleted IS NULL)", [$colonyId]);
 
     $do('locations', "SELECT location_id, location_name, persistent_notes, watched, pit_id, scan_time_utc
-        FROM observation_locations WHERE colony_id = ?", [$colonyId], false);
+        FROM observation_locations WHERE colony_id = ?", [$colonyId]);
 
-    $do('biometrics', "SELECT biometric_id, peng_num, observation_id, observation_date, sex, observed_sex, condition_healthy, condition_ticks, is_moulting, disposition_aggressive, disposition_passive, notes, is_deleted FROM penguin_biometric_data", [], true);
+    $do('biometrics', "SELECT biometric_id, peng_num, observation_id, observation_date, sex, observed_sex, condition_healthy, condition_ticks, is_moulting, disposition_aggressive, disposition_passive, notes, is_deleted FROM penguin_biometric_data", []);
 
     return $out;
 }

@@ -6,10 +6,10 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization, X-API-Key');
 header('Cache-Control: no-cache');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 $auth = requireReadAuth();
+wwRequireFullPengClient();
 
 $pdo = getDbConnection();
 $colonyId = (int)($_GET['colony_id'] ?? 1);
-$viewPrefix = getColonyPrefix($pdo, $colonyId);
 
 // All penguins across every colony the caller may view — the "All penguins" page.
 // Newest initial chip first. peng_nums stay fully prefixed: the list spans colonies,
@@ -73,9 +73,6 @@ if (isset($_GET['all'])) {
     $birds = array_values($birds);
     usort($birds, fn($a, $b2) => strcmp($b2['first_chip_date'] ?? '', $a['first_chip_date'] ?? '')
         ?: strcmp($b2['peng_num'], $a['peng_num']));
-    // Same display form as the rest of the app (and the local cache): the viewing colony's
-    // bare-number standard applies, other colonies keep their prefix.
-    stripPengPrefix($birds, $viewPrefix);
     echo json_encode($birds);
     exit;
 }
@@ -96,8 +93,7 @@ if ($chipId) {
     $penguin = $stmt->fetch();
 
     if ($penguin) {
-        $penguin['chips'] = getChips($pdo, $penguin['peng_num']); // full peng_num for the FK lookup
-        $penguin['peng_num'] = displayPengNum($penguin['peng_num'], $viewPrefix);
+        $penguin['chips'] = getChips($pdo, $penguin['peng_num']);
         echo json_encode($penguin);
     } else {
         http_response_code(404);
@@ -150,7 +146,6 @@ $sql = "SELECT
 
 $stmt = $pdo->query($sql);
 $penguins = $stmt->fetchAll();
-stripPengPrefix($penguins, $viewPrefix);
 
 echo json_encode($penguins);
 

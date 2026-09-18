@@ -748,7 +748,7 @@ namespace PenguinMonitor.Models
             }
         }
 
-        // Colony acronym (e.g. "PT", "NI") — prefixes bare peng numbers for display
+        // Colony acronym (e.g. "PT", "NI") — what a typed bare peng number is completed with
         private string selectedColonyPrefix = "";
         public string SelectedColonyPrefix
         {

@@ -1,7 +1,7 @@
 import React, { Fragment, Suspense, createContext, lazy, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { updateRecord, createRecord, deleteRecord, fetchHistory, fetchColonies, saveVerification } from './api/boxtags';
-import { getStoreVersion, syncDatabase, triggerSync, primeFromCache, queryAllLocations, queryCarryForward, getDcmBoxes, prevNonIgnObs, queryPreviousObservations, getDateStats, computeDateStats, startPolling, stopPolling, getColonyId, setActiveColony, observedSexGuess, observedSexScore, SEX_CONFIRM_SCORE, queryBoxDetailSync, splitDismissed, dismissError, undismissError, computeAllPenguinsRows, computeBoxesSeenByPit, queryChipOnlyBoxes, getDayNote, getDayPeople, getUsers, getUserName, saveDayNote, getObserverName, getCachedFmDates, setCachedFmDates, searchLocal } from './api/localdb';
+import { getStoreVersion, syncDatabase, triggerSync, primeFromCache, queryAllLocations, queryCarryForward, getDcmBoxes, prevNonIgnObs, queryPreviousObservations, getDateStats, computeDateStats, startPolling, stopPolling, getColonyId, setActiveColony, observedSexGuess, observedSexScore, SEX_CONFIRM_SCORE, queryBoxDetailSync, splitDismissed, dismissError, undismissError, computeAllPenguinsRows, computeBoxesSeenByPit, queryChipOnlyBoxes, getDayNote, getDayPeople, getUsers, getUserName, saveDayNote, getObserverName, getCachedFmDates, setCachedFmDates, searchLocal, displayPengNum, fullPengNum, pengNumValue, comparePengNum, activeColonyPrefix } from './api/localdb';
 import { useAllPenguins, useBoxInfo, useOverview, useBoxTags, useDateStats, useBoxDetail, useBirdDetail, useDayData, useEggArrival, useFirstEgg, useDistinctAdults, usePeakAdults, useChickReturn, useMissedScans, useMissingNoScans, useDbVersion, useBirdTwoBoxes, useScanBeforeChip, useDeadScanned, useImprobableCounts, useFutureObservations, useRetiredTagScans, useChicksNoScan, useDuplicateObservations, useDuplicateScans, useSameGenderConflicts, useChickSizeMismatch, useMissingChipMeasures } from './api/useLocalDb';
 import { getSeasonStart, getSeasonLabel, SEASON_START_MONTH, SEASON_START_DAY } from './config';
 import { DAY, BREEDING_OFFSETS, SECOND_EGG_LAG_DAYS, MAX_OFFSPRING_SHOWN, PAIR_WEIGHTS, IMPLIED_SHARE_CONFIDENCE, PRE_BREEDING_SIGHTINGS_CAP } from './breedingConstants';
@@ -823,7 +823,7 @@ function toggleSelectedPengMinis() {
 
 function PenguinMini({ scan, onClick, observationDate, navigateDirectly, currentStatus, title }: { scan: Scan | ChippedHere | any; onClick: () => void; observationDate?: string; navigateDirectly?: boolean; currentStatus?: boolean; title?: string }) {
   const sex = (scan.sex || '').toUpperCase();
-  const num = scan.peng_num ? `#${scan.peng_num}` : '';
+  const num = scan.peng_num ? `#${displayPengNum(scan.peng_num)}` : '';
   const chip = scan.pit_id ? scan.pit_id.slice(-8) : '';
   const wasChippedAsChick = !scan.chipped_as_adult;
   // currentStatus (bird-page header): solid yellow only while the bird is actually
@@ -1290,9 +1290,9 @@ function seasonDataIssues(obs: Observation[]) {
     }
     for (const [pit, n] of pitCounts) if (n > 1) {
       const peng = pitPeng.get(pit);
-      dupScans.push({ day, text: `${day} — ${peng ? `#${peng}` : pit.slice(-8)} ×${n}` });
+      dupScans.push({ day, text: `${day} — ${peng ? `#${displayPengNum(peng)}` : pit.slice(-8)} ×${n}` });
     }
-    for (const [peng, pits] of pengPits) if (pits.size > 1) dupScans.push({ day, text: `${day} — #${peng} (${pits.size} chips)` });
+    for (const [peng, pits] of pengPits) if (pits.size > 1) dupScans.push({ day, text: `${day} — #${displayPengNum(peng)} (${pits.size} chips)` });
   }
   // Same-gender conflicts: 2+ distinct penguins of the same sex on the same day
   const conflicts: DataIssue[] = [];
@@ -1306,7 +1306,7 @@ function seasonDataIssues(obs: Observation[]) {
       }
     }
     for (const [sex, pengs] of bySex) if (pengs.size > 1) {
-      conflicts.push({ day, text: `${day} — ${pengs.size} ${sex} (${Array.from(pengs).map(p => `#${p}`).join(', ')})` });
+      conflicts.push({ day, text: `${day} — ${pengs.size} ${sex} (${Array.from(pengs).map(p => `#${displayPengNum(p)}`).join(', ')})` });
     }
   }
   return { dupObs, dupScans, conflicts };
@@ -1958,16 +1958,18 @@ function ObsCard({ obs, box, onBirdClick, onDayClick, highlight, scrollTo, token
   };
   const cancelEdit = () => { setEditing(false); setDraft(null); setDraftScans([]); setBirdSearch(''); };
 
-  // The peng# you typed comes first, then chip numbers containing it — "12" is #12 (or PT12),
-  // not the four PIT IDs with 12 somewhere in them. Matching ignores the colony prefix, so it
-  // works whether the number is held prefixed or bare.
+  // The peng# you typed comes first, then chip numbers containing it — "12" is #12, not the four
+  // PIT IDs with 12 somewhere in them. The typed number resolves to this colony's bird first; a
+  // visitor with the same number follows it, since the prefix is easy to leave off.
   const filteredAdd = (() => {
     const q = birdSearch.trim().toUpperCase();
     if (!q || !allPenguins) return [];
+    const full = fullPengNum(q);
     const bare = (n: any) => String(n ?? '').toUpperCase().replace(/^[A-Z]+/, '');
     const free = (p: any) => !draftScans.some(s => s.pit_id === p.pit_id);
-    const isNum = (p: any) => p.peng_num && (String(p.peng_num).toUpperCase() === q || bare(p.peng_num) === bare(q));
-    const byNum = allPenguins.filter((p: any) => isNum(p) && free(p));
+    const isNum = (p: any) => p.peng_num && (p.peng_num === full || bare(p.peng_num) === bare(q));
+    const byNum = allPenguins.filter((p: any) => isNum(p) && free(p))
+      .sort((a: any, b: any) => Number(b.peng_num === full) - Number(a.peng_num === full));
     const byPit = allPenguins.filter((p: any) => !isNum(p) && p.pit_id && p.pit_id.toUpperCase().includes(q) && free(p));
     return [...byNum, ...byPit].slice(0, 8);
   })();
@@ -2637,23 +2639,25 @@ function BiometricsEditor({ pengNum, biometrics, deleted, token, canEdit, editin
 function BirdPage({ data, onBirdClick, onBoxClick, onSightingClick, onDayClick, token, canEdit, onClose }: { data: any; onBirdClick: (tag:string)=>void; onBoxClick: (box:string)=>void; onSightingClick: (box:string, date:string)=>void; onDayClick?: (day:string)=>void; token?: string; canEdit?: boolean; onClose?: () => void }) {
   const p = data.penguin;
   // Step to the next penguin by number. The colony prefix is part of the key, so ordering is
-  // on the numeric tail, and it lands on the next bird that EXISTS rather than peng_num + 1 —
-  // the numbering has gaps wherever a bird was never created or has since gone.
+  // on the numeric tail within this bird's own prefix — PT7 steps to PT8, never to NI8 — and it
+  // lands on the next bird that EXISTS rather than peng_num + 1: the numbering has gaps wherever
+  // a bird was never created or has since gone.
   const allPenguins = useAllPenguins();
   const [prevPeng, nextPeng] = useMemo(() => {
-    const num = (n: any) => parseInt(String(n ?? '').replace(/^[A-Z]+/, ''), 10);
-    const here = num(p.peng_num);
+    const prefixOf = (n: any) => String(n ?? '').match(/^[A-Z]*/)![0];
+    const mine = prefixOf(p.peng_num);
+    const here = pengNumValue(p.peng_num);
     if (isNaN(here)) return [null, null];
     let below: string | null = null, belowNum = -Infinity;
     let above: string | null = null, aboveNum = Infinity;
     for (const row of allPenguins) {
-      const v = num(row.peng_num);
+      if (prefixOf(row.peng_num) !== mine) continue;
+      const v = pengNumValue(row.peng_num);
       if (v < here && v > belowNum) { belowNum = v; below = row.peng_num; }
       if (v > here && v < aboveNum) { aboveNum = v; above = row.peng_num; }
     }
     return [below, above];
   }, [allPenguins, p.peng_num]);
-  const bare = (n: any) => String(n ?? '').replace(/^[A-Z]+/, '');
   // Left/right step down/up the numbering; . and , step the container the bird sits in (the
   // box, or the day when the panel is docked in the day overlay). Splitting them that way is
   // what keeps the two window listeners out of each other's way — sharing a key moved the bird
@@ -2771,7 +2775,7 @@ function BirdPage({ data, onBirdClick, onBoxClick, onSightingClick, onDayClick, 
   const savePenguin = (field: string) => async (val: any) => {
     const oldVal = p[field] ?? '';
     if (String(oldVal) === String(val ?? '')) return;
-    const reason = prompt(`Change ${field} on penguin #${p.peng_num} from "${oldVal}" to "${val ?? ''}"?\n\nReason (optional):`);
+    const reason = prompt(`Change ${field} on penguin #${displayPengNum(p.peng_num)} from "${oldVal}" to "${val ?? ''}"?\n\nReason (optional):`);
     if (reason === null) return;
     return updateRecord(token || '', 'penguins', p.peng_num, {[field]: val}, reason || undefined);
   };
@@ -2789,7 +2793,7 @@ function BirdPage({ data, onBirdClick, onBoxClick, onSightingClick, onDayClick, 
   const saveChippedAsChick = async (val: any) => {
     const asAdult = val === 'Yes' ? 0 : 1;
     if ((p.chipped_as_adult ? 1 : 0) === asAdult) return;
-    const reason = prompt(`Change chipped as chick on penguin #${p.peng_num} from "${p.chipped_as_adult ? 'No' : 'Yes'}" to "${val}"?\n\nReason (optional):`);
+    const reason = prompt(`Change chipped as chick on penguin #${displayPengNum(p.peng_num)} from "${p.chipped_as_adult ? 'No' : 'Yes'}" to "${val}"?\n\nReason (optional):`);
     if (reason === null) return;
     return updateRecord(token || '', 'penguins', p.peng_num, { chipped_as_adult: asAdult }, reason || undefined);
   };
@@ -2839,9 +2843,9 @@ function BirdPage({ data, onBirdClick, onBoxClick, onSightingClick, onDayClick, 
             {canEdit && hasHistory && <button className="history-btn" onClick={() => setShowHistory({table:'penguins', id:p.peng_num})}>History</button>}
           </span>
           <button className="peng-step" onClick={() => prevPeng && onBirdClick(prevPeng)} disabled={!prevPeng}
-            title={prevPeng ? `Previous penguin (#${bare(prevPeng)}) — ←` : 'No lower peng#'} aria-label="Previous penguin">‹</button>
+            title={prevPeng ? `Previous penguin (#${displayPengNum(prevPeng)}) — ←` : 'No lower peng#'} aria-label="Previous penguin">‹</button>
           <button className="peng-step" onClick={() => nextPeng && onBirdClick(nextPeng)} disabled={!nextPeng}
-            title={nextPeng ? `Next penguin (#${bare(nextPeng)}) — →` : 'No higher peng#'} aria-label="Next penguin">›</button>
+            title={nextPeng ? `Next penguin (#${displayPengNum(nextPeng)}) — →` : 'No higher peng#'} aria-label="Next penguin">›</button>
           {onClose && <button className="day-bird-close" onClick={onClose} title="Close" aria-label="Close">×</button>}
         </span>
       </div>
@@ -3057,7 +3061,7 @@ function BirdPage({ data, onBirdClick, onBoxClick, onSightingClick, onDayClick, 
             }
           }
           const companions = Array.from(companionMap.values())
-            .sort((x, y) => y.count - x.count || String(x.scan.peng_num).localeCompare(String(y.scan.peng_num)));
+            .sort((x, y) => y.count - x.count || comparePengNum(x.scan.peng_num, y.scan.peng_num));
           const boxKey = `box-${b}`;
           const boxOpen = !!expandedSections[boxKey];
           return (
@@ -3259,8 +3263,10 @@ function PenguinSearch({ penguins, search, onSearchChange, onBirdClick }: {
   const filtered = useMemo(() => {
     if (search.length === 0) return { exact: [] as any[], pit: [] as any[] };
     const s = search.toUpperCase();
-    const exact = penguins.filter(p => p.peng_num && p.peng_num.toUpperCase() === s);
-    const pit = penguins.filter(p => p.pit_id && p.pit_id.toUpperCase().includes(s) && !(p.peng_num && p.peng_num.toUpperCase() === s));
+    // A bare number is the one on screen — this colony's bird — so match it in full form.
+    const full = fullPengNum(s);
+    const exact = penguins.filter(p => p.peng_num && p.peng_num === full);
+    const pit = penguins.filter(p => p.pit_id && p.pit_id.toUpperCase().includes(s) && !(p.peng_num && p.peng_num === full));
     return { exact, pit };
   }, [penguins, search]);
 
@@ -5309,7 +5315,9 @@ function NestcheckJsonImport({ token, colonyId }: { token: string; colonyId: num
     let birds = 0;
     for (const q of list('queued_birds')) {
       try {
-        let pengNum = q.rechip_peng_num || null;
+        // The phone's file carries numbers as the phone shows them (bare at PT); writes take the
+        // full form, and a bare number there means this colony's bird.
+        let pengNum = q.rechip_peng_num ? fullPengNum(q.rechip_peng_num) : null;
         if (!pengNum) {
           const r = await createRecord(token, 'penguins', {
             chipped_as_adult: Number(q.chipped_as_adult) ? 1 : 0,
@@ -5341,13 +5349,13 @@ function NestcheckJsonImport({ token, colonyId }: { token: string; colonyId: num
     for (const b of unsentBio) {
       try {
         await createRecord(token, 'penguin_biometric_data', {
-          peng_num: b.peng_num, observation_date: b.observation_date,
+          peng_num: fullPengNum(b.peng_num), observation_date: b.observation_date,
           weight: b.weight ?? null, flipper_length: b.flipper_length ?? null,
           observed_sex: b.observed_sex || null, notes: b.notes || null,
           is_moulting: b.is_moulting ? 1 : 0, condition_ticks: b.condition_ticks ? 1 : 0,
         });
         bios++;
-      } catch (e: any) { failed.push(`biometric ${b.peng_num}: ${e?.message || e}`); }
+      } catch (e: any) { failed.push(`biometric ${displayPengNum(fullPengNum(b.peng_num))}: ${e?.message || e}`); }
     }
     count(bios, 'bird detail');
 
@@ -5970,7 +5978,7 @@ function MissingNoScansReport({ hrefFor, token }: { hrefFor: (box: string, time:
                               onClick={() => _adminOpenBird?.(String(b.peng_num))} />
                             <button className="edit-btn" disabled={busyPit === b.pit_id}
                               onClick={() => addScan(r, b)}
-                              title={`Add #${b.peng_num} to this observation`}>
+                              title={`Add #${displayPengNum(b.peng_num)} to this observation`}>
                               {busyPit === b.pit_id ? '…' : '+'}
                             </button>
                           </span>
@@ -6059,7 +6067,7 @@ function TopChickParentsReport({ onOpenBird }: { onOpenBird: (num: string) => vo
   const [sortKey, setSortKey] = useState('chipped');
   const sorted = useMemo(() => {
     const col = COLS.find(c => c.key === sortKey) || COLS[2];
-    const byPeng = (a: any, b: any) => (parseInt(a.bird.peng_num) || 0) - (parseInt(b.bird.peng_num) || 0);
+    const byPeng = (a: any, b: any) => comparePengNum(a.bird.peng_num, b.bird.peng_num);
     return [...rows].sort((a, b) => (col.value(b) - col.value(a)) || byPeng(a, b));
   }, [rows, sortKey]);
   const arrow = (key: string) => sortKey === key ? ' ▼' : '';
@@ -6125,7 +6133,7 @@ function UnproductiveParentsReport({ onOpenBird }: { onOpenBird: (num: string) =
     return Array.from(byParent.values())
       .map(e => ({ bird: e.bird, windows: e.windows, chipped: e.chicks.size }))
       .filter(r => r.windows >= 2)
-      .sort((a, b) => a.chipped - b.chipped || b.windows - a.windows || (parseInt(a.bird.peng_num) || 0) - (parseInt(b.bird.peng_num) || 0))
+      .sort((a, b) => a.chipped - b.chipped || b.windows - a.windows || comparePengNum(a.bird.peng_num, b.bird.peng_num))
       .slice(0, 25);
   }, [v]);
 
@@ -6161,7 +6169,7 @@ function UnsexedByGuessesReport() {
     .filter((p: any) => !(p.sex || '').trim())
     .map((p: any) => { const g = observedSexGuess(p.peng_num); return { p, m: g.m, f: g.f, total: g.m + g.f }; })
     .filter((r: any) => r.total > 0)
-    .sort((a: any, b: any) => b.total - a.total || b.f - a.f || (parseInt(a.p.peng_num) || 0) - (parseInt(b.p.peng_num) || 0)),
+    .sort((a: any, b: any) => b.total - a.total || b.f - a.f || comparePengNum(a.p.peng_num, b.p.peng_num)),
   [allPenguins]);
   const [shown, showAllBtn] = useTopRows(rows);
 
@@ -7420,7 +7428,7 @@ function PhilandererReport({ onOpenBird }: { onOpenBird: (num: string) => void }
       .filter((r: any) => r.n >= 2) // one partner is a faithful bird, not a philanderer
       .sort((a: any, b: any) => (col.value(b) - col.value(a))
         || (COLS[0].value(b) - COLS[0].value(a))
-        || (parseInt(a.bird.peng_num) || 0) - (parseInt(b.bird.peng_num) || 0));
+        || comparePengNum(a.bird.peng_num, b.bird.peng_num));
   }, [data, sortKey, sex, mode]);
 
   // Podium by default, like the other leaderboards — the tail is long and rarely read.
@@ -8074,7 +8082,7 @@ function DayView({ date, dates, highlightBox, onBoxClick, onBirdClick: _onBirdCl
                       {oScans.map((s: any, si: number) => (
                         <span key={s.scan_id || `${s.peng_num}-${si}`}
                           style={scanCounts[s.peng_num] > 1 ? {outline:'2px solid #F44336', borderRadius:3} : undefined}
-                          title={scanCounts[s.peng_num] > 1 ? `Duplicate scan: #${s.peng_num} recorded ${scanCounts[s.peng_num]}× in this observation` : undefined}>
+                          title={scanCounts[s.peng_num] > 1 ? `Duplicate scan: #${displayPengNum(s.peng_num)} recorded ${scanCounts[s.peng_num]}× in this observation` : undefined}>
                           <PenguinMini scan={s} onClick={() => handleBirdClick(s.peng_num)} observationDate={o.observation_time_utc} />
                         </span>
                       ))}
@@ -8136,7 +8144,9 @@ function parseUrl(): { box?: string; bird?: string; enter?: boolean; admin?: boo
   if (Array.from(q.keys()).length > 0) {
     return {
       box: q.get('box') || undefined,
-      bird: q.get('bird') || undefined,
+      // Full form, so a bare number in an old link or bookmark names the same bird as the
+      // app's own links do.
+      bird: q.get('bird') ? fullPengNum(q.get('bird')) : undefined,
       day: q.get('day') || undefined,
       obs: q.get('obs') || undefined,
       enter: q.has('enter'),
@@ -8151,7 +8161,7 @@ function parseUrl(): { box?: string; bird?: string; enter?: boolean; admin?: boo
   const boxMatch = path.match(/^\/box\/(.+)/);
   const birdMatch = path.match(/^\/bird\/(.+)/);
   const dayMatch = path.match(/^\/day\/(.+)/);
-  return { box: boxMatch?.[1], bird: birdMatch?.[1], enter: path === '/enter', admin: path === '/admin', reports: path === '/reports', docs: path === '/docs', birds: path === '/birds', day: dayMatch?.[1] };
+  return { box: boxMatch?.[1], bird: birdMatch ? fullPengNum(birdMatch[1]) : undefined, enter: path === '/enter', admin: path === '/admin', reports: path === '/reports', docs: path === '/docs', birds: path === '/birds', day: dayMatch?.[1] };
 }
 
 /**
@@ -8224,6 +8234,10 @@ export function EmbeddedPanel() {
       } catch (e) {
         if (!cancelled && !primed) { setStatus('error'); setErrMsg(String((e as any)?.message || e)); }
       }
+      // The colony prefixes decide how a peng# reads and what a bare one from the host means
+      // (nestcheck hands over the number as it shows it). Held in localStorage, so after the
+      // first time this is only a background refresh and offline still works.
+      fetchColonies().catch(() => { /* offline — the held list stands */ });
       // Same 30s change-poll as the full app (events.php watermark -> triggerSync). The
       // store-version bump re-renders any open panel; no extra onChanged work needed.
       if (!cancelled) startPolling(() => {});
@@ -8319,7 +8333,7 @@ export function EmbeddedPanel() {
       </div>
     );
   } else {
-    if (!birdData?.penguin) return <div className="embed-state embed-error">Bird {view.id} not found</div>;
+    if (!birdData?.penguin) return <div className="embed-state embed-error">Bird {displayPengNum(view.id)} not found</div>;
     body = (
       <div className="embed-bird">
         <BirdPage data={birdData} onBirdClick={goBird} onBoxClick={goBox} onSightingClick={(box: string) => goBox(box)} onDayClick={goDay} token={token} canEdit={false} />
@@ -8482,21 +8496,19 @@ function AddPenguinDialog({ token, chipBox, colonyPrefix, defaultChipperId, allP
   const dup = pitValid ? allPenguins.find((p: any) =>
     (p.pit_id || '').toUpperCase().replace(/^[A-Z]+/, '') === pitNorm) : null;
   // Predict the peng_num the server will assign, scoped to THIS colony. allPenguins spans every
-  // colony: PT birds show bare ("319"), every other colony keeps its prefix ("RR1"). So match only
-  // the current colony's birds — bare digits when it's PT, else "<prefix><digits>" — take MAX + 1,
-  // and re-attach the prefix for display, so a new RR bird reads "RR1" rather than "1038" (which was
-  // PT's global max + 1, from counting every colony's birds together).
-  const bareColony = colonyPrefix === '' || colonyPrefix === 'PT';
+  // colony, each number in its full prefixed form, so match only "<this prefix><digits>" and take
+  // MAX + 1 — counting every colony's birds together once gave a new RR bird PT's global max + 1.
+  const prefix = (colonyPrefix || activeColonyPrefix()).toUpperCase();
   const nextPengNum = useMemo(() => {
-    const re = bareColony ? /^(\d+)$/ : new RegExp(`^${colonyPrefix}(\\d+)$`);
+    const re = new RegExp(`^${prefix}(\\d+)$`);
     const max = allPenguins.reduce((m: number, p: any) => {
       const hit = String(p.peng_num).match(re);
       return hit ? Math.max(m, parseInt(hit[1], 10)) : m;
     }, 0);
     return max + 1;
-  }, [allPenguins, colonyPrefix, bareColony]);
-  // Prefixed for display everywhere but PT, whose local standard is bare numbers.
-  const nextPengLabel = bareColony ? String(nextPengNum) : `${colonyPrefix}${nextPengNum}`;
+  }, [allPenguins, prefix]);
+  // Read the way the colony reads its numbers: bare at PT, prefixed everywhere else.
+  const nextPengLabel = displayPengNum(`${prefix}${nextPengNum}`);
 
   // An adult being chipped is often the very bird recorded as "no scan" on that day's visit —
   // offer to swap the marker for a real scan of the new bird.
@@ -8510,11 +8522,11 @@ function AddPenguinDialog({ token, chipBox, colonyPrefix, defaultChipperId, allP
     setError('');
     if (!date) { setError('Date required'); return; }
     if (!pitValid) { setError('PIT id must be the 15-digit number on the chip label'); return; }
-    if (dup) { setError(`PIT already assigned to #${dup.peng_num}`); return; }
+    if (dup) { setError(`PIT already assigned to #${displayPengNum(dup.peng_num)}`); return; }
     // Chip box is optional — a bird chipped elsewhere (e.g. rehab intake) often has no box here.
     if (!chipperId) { setError('Chipper is required'); return; }
     if (mode === 'rechip' && !rechipTarget) { setError('Search for the penguin to rechip'); return; }
-    if (rechipTarget && !confirm(`Are you sure you would like to rechip #${rechipTarget.peng_num}?`)) return;
+    if (rechipTarget && !confirm(`Are you sure you would like to rechip #${displayPengNum(rechipTarget.peng_num)}?`)) return;
     if (!rechipTarget && !confirm(`Are you sure you would like to add penguin #${nextPengLabel}?`)) return;
     setSaving(true);
     try {
@@ -8534,7 +8546,7 @@ function AddPenguinDialog({ token, chipBox, colonyPrefix, defaultChipperId, allP
         pit_id: pitNorm, peng_num: pengNum, chip_date: date,
         chip_box: box.trim() || null, location_id: chipLoc?.location_id ?? null, chipper_id: chipperId, is_active: 1,
       }, rechipTarget ? `Rechip of #${pengNum}` : undefined);
-      if (!chipRes.success) { setError('Chip: ' + (chipRes.error || 'failed') + (rechipTarget ? '' : ` (penguin #${pengNum} was created)`)); setSaving(false); return; }
+      if (!chipRes.success) { setError('Chip: ' + (chipRes.error || 'failed') + (rechipTarget ? '' : ` (penguin #${displayPengNum(pengNum)} was created)`)); setSaving(false); return; }
 
       // Retire the bird's previous chip so the new PIT becomes the active one.
       if (rechipTarget?.pit_id && rechipTarget.pit_id.toUpperCase() !== pitNorm) {
@@ -8558,7 +8570,7 @@ function AddPenguinDialog({ token, chipBox, colonyPrefix, defaultChipperId, allP
       // Swap the day's "no scan" marker for a real scan of the new bird: scan +1, no_scan −1,
       // so the observation's adults = scans + no-scans balance is preserved. Asked only
       // now — after the server confirmed the bird and chip were created.
-      if (noScanObs && confirm(`#${pengNum} saved. This visit recorded ${noScanObs.no_scan} unscanned adult${noScanObs.no_scan === 1 ? '' : 's'} in box ${box.trim()} — replace a no-scan with this bird?`)) {
+      if (noScanObs && confirm(`#${displayPengNum(pengNum)} saved. This visit recorded ${noScanObs.no_scan} unscanned adult${noScanObs.no_scan === 1 ? '' : 's'} in box ${box.trim()} — replace a no-scan with this bird?`)) {
         try {
           const why = `Replaced a no-scan with ${rechipTarget ? 'rechipped' : 'newly chipped'} #${pengNum}`;
           await createRecord(token, 'penguin_scans', {
@@ -8568,7 +8580,7 @@ function AddPenguinDialog({ token, chipBox, colonyPrefix, defaultChipperId, allP
           await updateRecord(token, 'observations', noScanObs.observation_id,
             { no_scan: (noScanObs.no_scan || 1) - 1 }, why);
         } catch (e: any) {
-          alert(`Penguin #${pengNum} was added, but replacing the no-scan failed: ${e?.message || e}`);
+          alert(`Penguin #${displayPengNum(pengNum)} was added, but replacing the no-scan failed: ${e?.message || e}`);
         }
       }
 
@@ -8582,7 +8594,7 @@ function AddPenguinDialog({ token, chipBox, colonyPrefix, defaultChipperId, allP
   return (
     <div className="login-page" onClick={onClose}>
       <div className="login-card add-penguin-card" onClick={e => e.stopPropagation()}>
-        <h2>{rechipTarget ? `Rechip penguin #${rechipTarget.peng_num}` : mode === 'rechip' ? 'Rechip penguin' : `New bird #${nextPengLabel}`}{(box.trim() || chipBox) ? ` · Box ${box.trim() || chipBox}` : ''}</h2>
+        <h2>{rechipTarget ? `Rechip penguin #${displayPengNum(rechipTarget.peng_num)}` : mode === 'rechip' ? 'Rechip penguin' : `New bird #${nextPengLabel}`}{(box.trim() || chipBox) ? ` · Box ${box.trim() || chipBox}` : ''}</h2>
         {/* New penguin / Rechip mode row with the rechip search inline (mirrors nestcheck). */}
         <div className="rechip-penguin">
           <div className="app-toggle" style={{ flexShrink: 0 }}>
@@ -8619,7 +8631,7 @@ function AddPenguinDialog({ token, chipBox, colonyPrefix, defaultChipperId, allP
           const n = 15 - pitNorm.length;
           return `${n} more digit${n === 1 ? '' : 's'} required`;
         })()}</div>}
-        {dup && <div className="app-pit-error">Already assigned to #{dup.peng_num}</div>}
+        {dup && <div className="app-pit-error">Already assigned to #{displayPengNum(dup.peng_num)}</div>}
         {/* Chipped as + Sex share a row; the right column swaps to Chick size for chicks.
             The whole row is hidden in rechip mode (the bird's identity already exists). */}
         {mode === 'new' && (
@@ -8686,7 +8698,7 @@ let allPenguinsServerCache: { rows: any[] | null; colonyId: number; dbVersion: n
   { rows: null, colonyId: -1, dbVersion: -1 };
 
 /** Every penguin across the colonies the user can view, newest initial chip first.
- *  peng_nums arrive fully prefixed — the list spans colonies, so bare numbers would be ambiguous. */
+ *  peng_nums stay fully prefixed — the list spans colonies, so bare numbers would be ambiguous. */
 function AllPenguinsPage({ token, colonyName, onBack, onOpenBird, onEnterBird }: { token: string; colonyName?: string; onBack?: () => void; onOpenBird?: (n: string) => void; onEnterBird?: () => void }) {
   // The snapshot's penguins/chips/biometrics are global, so the table builds straight from
   // the local cache — no network needed. A background server fetch then replaces it: it adds
@@ -8717,8 +8729,7 @@ function AllPenguinsPage({ token, colonyName, onBack, onOpenBird, onEnterBird }:
     return () => { live = false; };
   }, [token, dbv]);
   const rows = serverRows || (localRows.length ? localRows : null);
-  // Until the server refresh lands, label birds by their peng_num prefix; bare numbers are
-  // the viewing colony's own standard.
+  // Until the server refresh lands, label birds by their peng_num prefix (every number carries it).
   const colonyOf = (r: any) => r.colony_name || String(r.peng_num).match(/^[A-Z]{2,4}/)?.[0] || colonyName || '—';
 
   // Adults are the default — the column only calls out chick chippings.
@@ -8762,7 +8773,9 @@ function AllPenguinsPage({ token, colonyName, onBack, onOpenBird, onEnterBird }:
     // sequential), independent of the table's current sort. Prefix then number, so a mixed
     // list (e.g. PT/NI) groups by colony and orders numerically within each.
     // Tarakohe (PT) birds export as a bare number; every other colony prepends its acronym.
-    // colony_prefix comes from the server payload; fall back to any prefix left on peng_num.
+    // This is the reader's convention, not the viewing colony's display rule, so it holds
+    // whichever colony is being viewed. colony_prefix comes from the server payload; the
+    // peng_num's own prefix covers the cache-built rows.
     const acronymOf = (r: any): string => r.colony_prefix || String(r.peng_num).match(/^[A-Z]+/)?.[0] || '';
     const bareNum = (r: any): string => String(r.peng_num).replace(/^[A-Z]+/, '');
     const pengOut = (r: any): string => acronymOf(r) === 'PT' ? bareNum(r) : `${acronymOf(r)}${bareNum(r)}`;
@@ -9008,7 +9021,7 @@ function RevertButton({ entry, fields, token, onReverted }: { entry: any; fields
   if (!revert) return null;
   const onClick = async () => {
     const lines = Object.entries(revert).map(([k, oldV]) => `  ${fieldLabel(k)}: ${auditValue((fields[k] as any).new)} → ${auditValue(oldV)}`);
-    if (!window.confirm(`Revert this change on ${entry.table_name} #${entry.record_id}?\n\n${lines.join('\n')}\n\nThis is itself recorded as an audited edit.`)) return;
+    if (!window.confirm(`Revert this change on ${entry.table_name} #${displayPengNum(entry.record_id)}?\n\n${lines.join('\n')}\n\nThis is itself recorded as an audited edit.`)) return;
     setBusy(true);
     try {
       const res = await updateRecord(token, entry.table_name, entry.record_id, revert, `Revert of change #${entry.audit_id} (${entry.nz_time || ''} by ${entry.observer_name || 'unknown'})`);
@@ -9039,7 +9052,7 @@ function ChangeDateGroup({ date, entries, token, onReverted }: { date: string; e
             <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', fontSize:12}}>
               <span style={{fontFamily:'monospace', fontSize:11, color:'#666', minWidth:34}}>{e.nz_time || ''}</span>
               <span style={{background: e.action === 'DELETE' ? '#F44336' : e.action === 'INSERT' ? '#4CAF50' : e.action === 'IMPORT' ? '#00897b' : '#2196F3', color:'#fff', fontSize:10, padding:'1px 6px', borderRadius:3}}>{e.action}</span>
-              <span>{e.table_name === '__sql_console' ? 'SQL console' : e.table_name === '__import' ? (fields?.filename || 'Import') : e.table_name === 'date_mappings' ? `Date table · season ${String(e.record_id).slice(-2)}` : `${e.table_name}${e.box_name ? ` · Box ${e.box_name}` : ''} #${e.record_id}`}</span>
+              <span>{e.table_name === '__sql_console' ? 'SQL console' : e.table_name === '__import' ? (fields?.filename || 'Import') : e.table_name === 'date_mappings' ? `Date table · season ${String(e.record_id).slice(-2)}` : `${e.table_name}${e.box_name ? ` · Box ${e.box_name}` : ''} #${displayPengNum(e.record_id)}`}</span>
               <span style={{color:'#1a6b8f', fontWeight:600}}>{e.observer_name || 'unknown user'}</span>
               {e.change_reason && <span style={{fontStyle:'italic', color:'#666'}}>"{e.change_reason}"</span>}
               {e.action === 'UPDATE' && REVERTABLE_TABLES.has(e.table_name) && (
@@ -10462,7 +10475,7 @@ function AdminPanel({ token, observationDates, checkTarget, allPenguins, fmColon
                   </summary>
                   <div style={{ fontSize: 12, fontFamily: 'monospace', marginTop: 6, maxHeight: 140, overflow: 'auto' }}>
                     {impAnalysis.unmatched_chips.map((u: any) => (
-                      <div key={u.chip}>{u.chip} · ×{u.count} · box {u.boxes.join(', ')} · <span style={{ color: '#c0392b' }}>{u.reason}</span>{u.suggest ? <span style={{ color: '#1a7a1a' }}> → maybe #{u.suggest}</span> : ''}</div>
+                      <div key={u.chip}>{u.chip} · ×{u.count} · box {u.boxes.join(', ')} · <span style={{ color: '#c0392b' }}>{u.reason}</span>{u.suggest ? <span style={{ color: '#1a7a1a' }}> → maybe #{displayPengNum(u.suggest)}</span> : ''}</div>
                     ))}
                   </div>
                 </details>
@@ -10522,7 +10535,7 @@ function AdminPanel({ token, observationDates, checkTarget, allPenguins, fmColon
                               <span onClick={e => e.stopPropagation()} style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap', marginLeft: 6, verticalAlign: 'middle' }}>
                                 {r.mini_pengs.map((pn: string) => {
                                   const p = pengByNumMini.get(String(pn));
-                                  if (!p) return <span key={pn} className="muted" style={{ fontSize: 11 }}>#{pn}</span>;
+                                  if (!p) return <span key={pn} className="muted" style={{ fontSize: 11 }}>#{displayPengNum(pn)}</span>;
                                   return <PenguinMini key={pn}
                                     scan={{ peng_num: p.peng_num, pit_id: p.pit_id, sex: p.sex, chip_date: p.chip_date, chipped_as_adult: p.chipped_as_adult, chick_size_code: p.chick_size_code, hasReturned: p.hasReturned }}
                                     onClick={() => setAdminBird(String(pn))} observationDate={r.date} />;
@@ -11508,9 +11521,9 @@ function RenumberPenguin({ token }: { token: string }) {
       const d = await r.json();
       if (d.success) {
         if (action === 'rename_penguin') {
-          setResult(`Renamed ${d.from} → ${d.to} (${d.chips} chip${d.chips === 1 ? '' : 's'}, ${d.biometrics} biometric record${d.biometrics === 1 ? '' : 's'} carried; scans follow the chips).`);
+          setResult(`Renamed ${displayPengNum(d.from)} → ${displayPengNum(d.to)} (${d.chips} chip${d.chips === 1 ? '' : 's'}, ${d.biometrics} biometric record${d.biometrics === 1 ? '' : 's'} carried; scans follow the chips).`);
         } else {
-          setResult(`Swapped ${d.a} ↔ ${d.b}. Each bird keeps its chips, scans, biometrics and history under its new number.`);
+          setResult(`Swapped ${displayPengNum(d.a)} ↔ ${displayPengNum(d.b)}. Each bird keeps its chips, scans, biometrics and history under its new number.`);
         }
         setFrom(''); setTo('');
       } else {
@@ -11522,11 +11535,13 @@ function RenumberPenguin({ token }: { token: string }) {
     setBusy(false);
   };
 
-  const a = from.trim().replace('#', ''), b = to.trim().replace('#', '');
+  // Sent in full: a bare number is this colony's bird, and the server refuses a bare one on writes.
+  const a = fullPengNum(from), b = fullPengNum(to);
+  const da = displayPengNum(a), db = displayPengNum(b);
   const rename = () => post('rename_penguin', { from: a, to: b },
-    `Rename penguin #${a} to #${b}?\n\nThe bird keeps its chips, scans, biometrics and audit history — only the number changes. #${b} must be vacant.`);
+    `Rename penguin #${da} to #${db}?\n\nThe bird keeps its chips, scans, biometrics and audit history — only the number changes. #${db} must be vacant.`);
   const swap = () => post('swap_penguins', { a, b },
-    `Swap the numbers of penguins #${a} and #${b}?\n\nEach bird keeps its own chips, scans, biometrics and audit history — the two numbers simply trade places.`);
+    `Swap the numbers of penguins #${da} and #${db}?\n\nEach bird keeps its own chips, scans, biometrics and audit history — the two numbers simply trade places.`);
 
   const box = { padding: '4px 8px', fontSize: 13, border: '1px solid #ccc', borderRadius: 4, width: 100 };
   return (
@@ -11557,7 +11572,7 @@ function RemovePenguin({ token }: { token: string }) {
   const [compacting, setCompacting] = useState(false);
 
   const search = async () => {
-    const num = pengNum.trim().replace('#', '');
+    const num = fullPengNum(pengNum);
     if (!num) return;
     setLoading(true); setPreview(null); setResult(null);
     const r = await fetch(`/api/admin.php?action=preview_penguin_delete&peng_num=${encodeURIComponent(num)}&colony_id=${getColonyId()}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -11572,7 +11587,7 @@ function RemovePenguin({ token }: { token: string }) {
     const num = preview.penguin.peng_num;
     const scanTotal = preview.scan_count + (preview.scans_soft_deleted || 0);
     const bioTotal = preview.biometrics.length + (preview.bio_soft_deleted || 0);
-    if (!confirm(`Permanently delete penguin #${num}?\n\nHard-deletes:\n- ${scanTotal} scan(s)\n- ${bioTotal} biometric record(s)\n- ${preview.chips.length} chip record(s)\n- the penguin itself\n\nEach deleted row is copied to the audit log first.`)) return;
+    if (!confirm(`Permanently delete penguin #${displayPengNum(num)}?\n\nHard-deletes:\n- ${scanTotal} scan(s)\n- ${bioTotal} biometric record(s)\n- ${preview.chips.length} chip record(s)\n- the penguin itself\n\nEach deleted row is copied to the audit log first.`)) return;
     setLoading(true);
     const r = await fetch('/api/admin.php?action=delete_penguin', {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -11580,7 +11595,7 @@ function RemovePenguin({ token }: { token: string }) {
     });
     const d = await r.json();
     if (d.success) {
-      setResult(`Penguin #${num} deleted. ${d.scans_deleted} scans removed, ${d.chips_deleted} chips removed.`);
+      setResult(`Penguin #${displayPengNum(num)} deleted. ${d.scans_deleted} scans removed, ${d.chips_deleted} chips removed.`);
       setPreview(null); setPengNum('');
       setCompaction(d.compaction || null);   // if a fillable gap was left, offer to close it
     } else {
@@ -11598,7 +11613,7 @@ function RemovePenguin({ token }: { token: string }) {
     });
     const d = await r.json();
     if (d.success) {
-      const moves = (d.applied || []).map((a: any) => `${a.from}→${a.to}`).join(', ');
+      const moves = (d.applied || []).map((a: any) => `${displayPengNum(a.from)}→${displayPengNum(a.to)}`).join(', ');
       setResult(`Compacted: ${d.renumbered} penguin${d.renumbered === 1 ? '' : 's'} renumbered${moves ? ` (${moves})` : ''}.`);
       setCompaction(null);
     } else {
@@ -11621,7 +11636,7 @@ function RemovePenguin({ token }: { token: string }) {
         <div className="obs-card" style={{marginBottom:8}}>
           <table style={{fontSize:12, borderCollapse:'collapse', width:'100%'}}>
             <tbody>
-              <tr><td style={{padding:'2px 8px', color:'#666'}}>Peng #</td><td style={{padding:'2px 8px', fontWeight:600}}>{preview.penguin.peng_num}</td></tr>
+              <tr><td style={{padding:'2px 8px', color:'#666'}}>Peng #</td><td style={{padding:'2px 8px', fontWeight:600}}>{displayPengNum(preview.penguin.peng_num)}</td></tr>
               <tr><td style={{padding:'2px 8px', color:'#666'}}>Sex</td><td style={{padding:'2px 8px'}}>{preview.penguin.sex || '—'}</td></tr>
               <tr><td style={{padding:'2px 8px', color:'#666'}}>Status</td><td style={{padding:'2px 8px'}}>{preview.penguin.death_date ? `Dead (${preview.penguin.death_date.slice(0, 10)})` : 'Alive'}</td></tr>
               <tr><td style={{padding:'2px 8px', color:'#666'}}>Chipped as</td><td style={{padding:'2px 8px'}}>{preview.penguin.chipped_as_adult ? 'Adult' : 'Chick'}</td></tr>
@@ -11683,7 +11698,7 @@ function RemovePenguin({ token }: { token: string }) {
 
           <button onClick={deletePenguin} disabled={loading}
             style={{marginTop:12, background:'#F44336', color:'#fff', border:'none', padding:'8px 20px', borderRadius:4, cursor:'pointer', fontWeight:600}}>
-            Delete penguin #{preview.penguin.peng_num}
+            Delete penguin #{displayPengNum(preview.penguin.peng_num)}
           </button>
         </div>
       )}
@@ -11693,9 +11708,9 @@ function RemovePenguin({ token }: { token: string }) {
         const newFree = plan.length ? plan[plan.length - 1].from : null;   // top of the run vacates
         return (
           <div className="obs-card" style={{marginBottom:8, border:'1px solid #ffb300', background:'#fff8e1'}}>
-            <h4 style={{margin:'0 0 6px', fontSize:14}}>Numbering gap left by deleting {compaction.gap_peng}</h4>
+            <h4 style={{margin:'0 0 6px', fontSize:14}}>Numbering gap left by deleting {displayPengNum(compaction.gap_peng)}</h4>
             <p style={{fontSize:12, margin:'0 0 8px', color:'#5d4037'}}>
-              Deleting {compaction.gap_peng} left a gap in this colony's numbering. The {plan.length} penguin{plan.length === 1 ? '' : 's'} below
+              Deleting {displayPengNum(compaction.gap_peng)} left a gap in this colony's numbering. The {plan.length} penguin{plan.length === 1 ? '' : 's'} below
               {' '}can each be shifted <b>down by one</b> to close it. Only penguins first chipped in the last 7 days are eligible, so
               {' '}the shift stops at the first established or unchipped bird. This renames each penguin's number — its chips, scans and
               {' '}biometrics move with it — and every change is recorded in the audit log. It cannot be undone from here.
@@ -11707,14 +11722,14 @@ function RemovePenguin({ token }: { token: string }) {
               <tbody>
                 {plan.map((s, i) => (
                   <tr key={i} style={{borderBottom:'1px solid #f0e0b0'}}>
-                    <td style={{padding:'3px 8px', fontWeight:600}}>{s.from} <span style={{color:'#999'}}>→</span> {s.to}</td>
+                    <td style={{padding:'3px 8px', fontWeight:600}}>{displayPengNum(s.from)} <span style={{color:'#999'}}>→</span> {displayPengNum(s.to)}</td>
                     <td style={{padding:'3px 8px', color:'#666'}}>{s.chips} chip{s.chips === 1 ? '' : 's'}, {s.scans} scan{s.scans === 1 ? '' : 's'}, {s.biometrics} biometric{s.biometrics === 1 ? '' : 's'}</td>
                     <td style={{padding:'3px 8px', color:'#666'}}>{s.first_chip}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {newFree && <p style={{fontSize:12, margin:'8px 0 0', color:'#5d4037'}}>After compacting, <b>{newFree}</b> becomes the next free number.</p>}
+            {newFree && <p style={{fontSize:12, margin:'8px 0 0', color:'#5d4037'}}>After compacting, <b>{displayPengNum(newFree)}</b> becomes the next free number.</p>}
             <div style={{display:'flex', gap:8, marginTop:12}}>
               <button onClick={runCompaction} disabled={compacting}
                 style={{background:'#ff8f00', color:'#fff', border:'none', padding:'8px 20px', borderRadius:4, cursor:'pointer', fontWeight:600}}>
@@ -11917,7 +11932,7 @@ const boxCell = (b: string) => b ? <span className="clickable">Box {b}</span> : 
 // tables open the panel on the right instead of following the enclosing row anchor.
 let _adminOpenBird: ((n: string) => void) | null = null;
 const pengCell = (n: string) => n
-  ? <span className="clickable" onClick={e => { if (_adminOpenBird && n) { e.preventDefault(); e.stopPropagation(); _adminOpenBird(String(n)); } }}>#{n}</span>
+  ? <span className="clickable" onClick={e => { if (_adminOpenBird && n) { e.preventDefault(); e.stopPropagation(); _adminOpenBird(String(n)); } }}>#{displayPengNum(n)}</span>
   : '';
 const redNum = (v: any) => <span style={{ color: '#F44336', fontWeight: 600 }}>{v}</span>;
 const boxesCell = (csv: string) => (csv || '').split(',').map((b: string, i: number) => (

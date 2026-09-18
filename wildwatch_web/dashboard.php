@@ -6,6 +6,7 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization, X-API-Key');
 header('Cache-Control: no-cache');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 $observer = requireReadAuth();
+wwRequireFullPengClient();
 $pdo = getDbConnection();
 $view = $_GET['view'] ?? 'overview';
 $colonyId = (int)($_GET['colony_id'] ?? 1);
@@ -61,17 +62,13 @@ function handleBox($pdo, $colonyId, $boxName) {
     }
     unset($obs);
 
-    // Batch fetch all scans for all observations in one query. Strip the viewing
-    // colony's prefix HERE, before the rows are attached to observations — a
-    // later by-value foreach over $scansByObs would only mutate copies.
-    $viewPrefix = getColonyPrefix($pdo, $colonyId);
+    // Batch fetch all scans for all observations in one query.
     $scansByObs = [];
     if (!empty($obsIds)) {
         $ph = implode(',', array_fill(0, count($obsIds), '?'));
         $s = $pdo->prepare("SELECT ps.observation_id, ps.scan_id, ps.pit_id, pc.peng_num, p.sex, p.is_dead, p.chipped_as_adult, p.chick_size_code, pc.chip_date FROM penguin_scans ps LEFT JOIN penguin_chips pc ON ps.pit_id = pc.pit_id LEFT JOIN penguins p ON pc.peng_num = p.peng_num WHERE ps.observation_id IN ($ph) AND (ps.is_deleted = FALSE OR ps.is_deleted IS NULL)");
         $s->execute(array_values($obsIds));
         foreach ($s->fetchAll() as $scan) {
-            if (isset($scan['peng_num'])) $scan['peng_num'] = displayPengNum($scan['peng_num'], $viewPrefix);
             $scansByObs[$scan['observation_id']][] = $scan;
         }
     }
@@ -105,7 +102,7 @@ function handleBox($pdo, $colonyId, $boxName) {
         LEFT JOIN users u ON u.id = pc.chipper_id WHERE pc.chip_box = ?");
     $chipStmt->execute([$boxName]);
     foreach ($chipStmt->fetchAll() as $c) {
-        $pnum = displayPengNum($c['peng_num'], $viewPrefix);
+        $pnum = $c['peng_num'];
         if (!isset($allPenguins[$pnum])) {
             $allPenguins[$pnum] = ['peng_num'=>$pnum, 'pit_id'=>$c['pit_id'], 'sex'=>$c['sex'],
                 'is_dead'=>$c['is_dead'], 'chipped_as_adult'=>$c['chipped_as_adult'],

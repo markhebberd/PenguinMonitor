@@ -36,6 +36,8 @@ namespace PenguinMonitor.Services
             /// sex_guess tally moves), so that counts here too.</summary>
             public bool BirdsChanged => BirdsRebuilt || Penguins > 0 || Chips > 0;
             public string? Error;
+            /// <summary>The server refused this build (426); Error holds its message.</summary>
+            public bool UpgradeRequired;
             public HashSet<string> PayloadWarnings = new();
             /// <summary>The colony's people, for the observer/scribe/chipper pickers. Carried whole
             /// on every payload, so this list is the phone's answer to a rename or a departure.</summary>
@@ -138,6 +140,14 @@ namespace PenguinMonitor.Services
                 var resp = await http.SendAsync(req);
                 if (!resp.IsSuccessStatusCode)
                 {
+                    // A 426 carries the server's "update from the Play Store" — that sentence is the
+                    // whole fix, so it is passed on as it came rather than as a status code.
+                    if (Http.IsUpgradeRequired(resp))
+                    {
+                        result.UpgradeRequired = true;
+                        result.Error = DataStorageService.ServerMessage(await ReadBodyAsync(resp), 426);
+                        return result;
+                    }
                     result.Error = $"Snapshot: HTTP {(int)resp.StatusCode}";
                     return result;
                 }

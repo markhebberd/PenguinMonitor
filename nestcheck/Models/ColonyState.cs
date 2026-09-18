@@ -55,7 +55,7 @@ namespace PenguinMonitor.Models
         public Dictionary<string, BoxObservation> TodayBoxes { get; set; } = new();
 
         /// <summary>
-        /// Today's penguin biometric records, keyed by peng_num.
+        /// Today's penguin biometric records, keyed by full peng_num + date (see BiometricKey).
         /// Downloaded during sync and/or edited locally (IsPendingUpload until uploaded).
         /// </summary>
         public Dictionary<string, BiometricRecord> TodayBiometrics { get; set; } = new();
@@ -169,6 +169,36 @@ namespace PenguinMonitor.Models
             foreach (var obs in PendingObservations.Concat(PreviousBoxes.Values).Concat(TodayBoxes.Values))
                 foreach (var scan in obs.ScannedIds)
                     scan.BirdId = BluetoothManager.BareEid(scan.BirdId ?? "");
+        }
+
+        /// <summary>Which spelling of peng_num this state holds: 0, the bare numbers the API used to
+        /// hand out for the viewing colony ("1039"); PengNumFormatFull, the stored form ("PT1039")
+        /// it speaks now. Defaults to 0 so a file from an older build reads as needing migration.</summary>
+        public int PengNumFormat { get; set; }
+        public const int PengNumFormatFull = 1;
+
+        /// <summary>Re-key biometrics held from before the API spoke full numbers. The unsent ones
+        /// are the point: the server now refuses a bare peng_num on a write, so a record queued by
+        /// the old build would sit in the queue for good. Needs the colony's prefix — a bare number
+        /// only ever meant "this colony's bird" — so with none known yet it waits and runs on a later
+        /// load. Idempotent: a number that already has letters is left as it is.</summary>
+        public bool MigratePengNumsToFull(string colonyPrefix)
+        {
+            if (PengNumFormat >= PengNumFormatFull || string.IsNullOrEmpty(colonyPrefix)) return false;
+            foreach (var old in TodayBiometrics.ToList())
+            {
+                var full = PengNums.Full(old.Value.PengNum, colonyPrefix);
+                var key = BiometricKey(full, old.Value.ObservationDate);
+                if (key == old.Key && full == old.Value.PengNum) continue;
+                TodayBiometrics.Remove(old.Key);
+                old.Value.PengNum = full;
+                // Two spellings of one bird's day: unsent work wins over a downloaded copy.
+                if (TodayBiometrics.TryGetValue(key, out var there) && there.IsPendingUpload && !old.Value.IsPendingUpload)
+                    continue;
+                TodayBiometrics[key] = old.Value;
+            }
+            PengNumFormat = PengNumFormatFull;
+            return true;
         }
 
         public BoxObservation? GetTodayForBox(string boxName)

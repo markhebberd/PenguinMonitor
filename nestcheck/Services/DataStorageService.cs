@@ -34,6 +34,7 @@ namespace PenguinMonitor.Services
                     var result = await action();
                     return result;
                 }
+                catch (UpgradeRequiredException) { throw; }   // thirty seconds of retries won't update the app
                 catch (Exception ex)
                 {
                     if (DateTime.UtcNow >= deadline || (isCancelled?.Invoke() == true))
@@ -255,6 +256,7 @@ namespace PenguinMonitor.Services
                     return "Deleting an observation needs editor access — ask an admin on wildwatch.";
                 if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                     return "Session expired. Please log in again.";
+                if (Http.IsUpgradeRequired(resp)) return ServerMessage(body, 426);
                 if (!resp.IsSuccessStatusCode) return $"Server refused it (HTTP {(int)resp.StatusCode}).";
 
                 var parsed = JsonConvert.DeserializeObject<Dictionary<string, object>>(body);
@@ -379,6 +381,14 @@ namespace PenguinMonitor.Services
                         var colonyRequest = new HttpRequestMessage(HttpMethod.Get, $"{WILDWATCH_BASE_URL}/colonies.php");
                         colonyRequest.Headers.Add("Authorization", $"Bearer {token}");
                         var colonyResponse = await _httpClient.SendAsync(colonyRequest);
+                        // The first request of every sync, so a build the server has retired stops
+                        // here with the server's own words, before any upload is tried: the queues
+                        // are left exactly as they are for the updated app to send.
+                        if (Http.IsUpgradeRequired(colonyResponse))
+                        {
+                            result.Error = ServerMessage(await colonyResponse.Content.ReadAsStringAsync(), 426);
+                            return result;
+                        }
                         if (colonyResponse.IsSuccessStatusCode)
                         {
                             var colonyJson = await colonyResponse.Content.ReadAsStringAsync();
@@ -419,6 +429,11 @@ namespace PenguinMonitor.Services
                         : "No colony selected. Log in and sync to load your colony.";
                     return result;
                 }
+
+                // The colony's prefix may have only just arrived (first sync after an upgrade, or a
+                // phone that never had one), and every upload below sends peng numbers the server
+                // now refuses bare — so unsent work written by the old build is converted first.
+                MigratePengNumsToFull(context, colonyState, appSettings);
 
                 // Step 0: Download-first reconcile — drop pending boxes whose data already
                 // matches the server (a lost reply on a patchy connection re-queues an
@@ -524,6 +539,7 @@ namespace PenguinMonitor.Services
                     var applied = await SnapshotSyncService.SyncAsync(_httpClient, context, db, token, ColonyIdOf(appSettings));
                     if (!applied.Ok)
                     {
+                        if (applied.UpgradeRequired) throw new UpgradeRequiredException(applied.Error ?? "Update the app");
                         if (applied.Error?.Contains("401") == true) { authFailed = true; return 0; }
                         throw new Exception(applied.Error);
                     }
@@ -655,7 +671,9 @@ namespace PenguinMonitor.Services
                     // Tags come down with the boxes now, so they fail with them. Left blank the line
                     // would read as "no tags in this colony" rather than "not fetched".
                     onLineProgress?.Invoke(2, "Box tags ✗");
-                    result.Error = $"Boxes: {boxesTask.Exception?.InnerException?.Message ?? "Failed"}";
+                    result.Error = boxesTask.Exception?.InnerException is UpgradeRequiredException upgrade
+                        ? upgrade.Message
+                        : $"Boxes: {boxesTask.Exception?.InnerException?.Message ?? "Failed"}";
                     return result;
                 }
                 if (birdsTask.IsFaulted)
@@ -1385,6 +1403,78 @@ namespace PenguinMonitor.Services
             }
         }
 
+        // ===== peng_num: bare → full, once, on upgrade =====
+
+        /// <summary>The in-progress chipping form, saved so a process kill doesn't lose it.</summary>
+        internal const string PENDING_CHIP_FILENAME = "pendingChip.json";
+
+        /// <summary>Convert what an older build left on the phone from bare peng numbers ("1039") to
+        /// the full form the API now speaks and insists on ("PT1039").
+        ///
+        /// Only unsent work is converted in place — queued biometrics, queued birds' requested
+        /// numbers, a half-finished chipping form. The server now refuses a bare number on a write,
+        /// so a queue left bare would never drain. The downloaded caches are rebuilt instead (LocalDb
+        /// SchemaVersion forces a full pull); the bird cache is converted too, only so scanning and
+        /// rechipping work offline in the gap before that pull lands.
+        ///
+        /// A bare number is taken to be the current colony's: it was the only colony the old API
+        /// handed out bare, and these queues are cleared or blocked on a colony switch. With no
+        /// prefix known yet nothing is touched and the flag stays down, so it runs on the first
+        /// sync that learns one. Returns true when it converted this time round.</summary>
+        internal bool MigratePengNumsToFull(Context context, ColonyState colonyState, AppSettings appSettings)
+        {
+            var prefix = appSettings.SelectedColonyPrefix ?? "";
+            if (colonyState.PengNumFormat >= ColonyState.PengNumFormatFull || prefix.Length == 0) return false;
+            var dir = context.FilesDir?.AbsolutePath ?? "";
+
+            var queue = LoadQueuedChips(context);
+            if (queue.Count > 0)
+            {
+                foreach (var q in queue)
+                {
+                    q.RequestedPengNum = PengNums.Full(q.RequestedPengNum, prefix);
+                    q.RechipPengNum = PengNums.Full(q.RechipPengNum, prefix);
+                }
+                SaveQueuedChips(context, queue);
+            }
+
+            try
+            {
+                var formPath = Path.Combine(dir, PENDING_CHIP_FILENAME);
+                if (File.Exists(formPath))
+                {
+                    var form = JsonConvert.DeserializeObject<PendingChipState>(File.ReadAllText(formPath));
+                    if (form != null)
+                    {
+                        form.RequestedPengNum = PengNums.Full(form.RequestedPengNum, prefix);
+                        form.RechipPengNum = PengNums.Full(form.RechipPengNum, prefix);
+                        File.WriteAllText(formPath, JsonConvert.SerializeObject(form));
+                    }
+                }
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"MigratePengNums form: {ex.Message}"); }
+
+            try
+            {
+                var birdPath = Path.Combine(dir, REMOTE_BIRD_DATA_FILENAME);
+                if (File.Exists(birdPath))
+                {
+                    var birds = JsonConvert.DeserializeObject<Dictionary<string, PenguinData>>(File.ReadAllText(birdPath));
+                    if (birds != null)
+                    {
+                        foreach (var b in birds.Values) b.PengNum = PengNums.Full(b.PengNum, prefix);
+                        File.WriteAllText(birdPath, JsonConvert.SerializeObject(birds, Formatting.Indented));
+                    }
+                }
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"MigratePengNums birds: {ex.Message}"); }
+
+            // Last, so the flag only goes up once everything above has been written.
+            colonyState.MigratePengNumsToFull(prefix);
+            SaveColonyState(context, colonyState);
+            return true;
+        }
+
         // ===== Offline chip queue =====
         internal const string QUEUED_CHIPS_FILENAME = "queuedChips.json";
 
@@ -1438,6 +1528,13 @@ namespace PenguinMonitor.Services
 
                 foreach (var q in queue.ToList())
                 {
+                    // A 400 drops the bird from the queue, and the server 400s a bare peng_num. One still
+                    // bare here was queued by an older build with no colony prefix learnt since to
+                    // complete it — keep it (and everything after it, to hold the order) for a later
+                    // sync rather than lose a bird to a number format.
+                    var requested = PengNums.Full(q.RequestedPengNum, appSettings.SelectedColonyPrefix);
+                    if (requested.Length > 0 && !char.IsLetter(requested[0])) break;
+
                     var chipDate = MainActivity.ToNzTime(q.CreatedUtc).ToString("yyyy-MM-dd");
                     var fields = new Dictionary<string, object>
                     {
@@ -1451,7 +1548,7 @@ namespace PenguinMonitor.Services
                     else if (!string.IsNullOrEmpty(q.ChipBy)) fields["chip_by"] = q.ChipBy;   // legacy queued item (pre-dropdown)
                     if (q.AssistantId > 0) fields["assistant_id"] = q.AssistantId;
                     if (!string.IsNullOrEmpty(q.ChickSizeCode)) fields["chick_size_code"] = q.ChickSizeCode;
-                    if (!string.IsNullOrEmpty(q.RequestedPengNum)) fields["requested_peng_num"] = q.RequestedPengNum;
+                    if (!string.IsNullOrEmpty(requested)) fields["requested_peng_num"] = requested;
                     if (!string.IsNullOrEmpty(q.Weight)) fields["weight"] = q.Weight;
                     if (!string.IsNullOrEmpty(q.Flipper)) fields["flipper_length"] = q.Flipper;
                     if (!string.IsNullOrEmpty(q.SexCode)) fields["observed_sex"] = q.SexCode;
@@ -1459,6 +1556,7 @@ namespace PenguinMonitor.Services
 
                     System.Net.HttpStatusCode status;
                     Dictionary<string, object>? body;
+                    string raw = "";
                     try
                     {
                         var req = new HttpRequestMessage(HttpMethod.Post,
@@ -1467,7 +1565,7 @@ namespace PenguinMonitor.Services
                         req.Content = new StringContent(JsonConvert.SerializeObject(fields), Encoding.UTF8, "application/json");
                         var resp = await _httpClient.SendAsync(req);
                         status = resp.StatusCode;
-                        var raw = await resp.Content.ReadAsStringAsync();
+                        raw = await resp.Content.ReadAsStringAsync();
                         body = JsonConvert.DeserializeObject<Dictionary<string, object>>(raw);
                     }
                     catch (Exception ex)
@@ -1487,6 +1585,9 @@ namespace PenguinMonitor.Services
                         // because a token went stale would be real field data lost.
                         if (status != System.Net.HttpStatusCode.BadRequest)
                         {
+                            // A retired build: the birds stay queued for the updated app, and the
+                            // chipper is told why they aren't going up rather than left guessing.
+                            if ((int)status == 426) warnings.Add($"Queued birds not sent — {ServerMessage(raw, 426)}");
                             System.Diagnostics.Debug.WriteLine($"FlushQueuedChips: {(int)status}, keeping queue");
                             break;
                         }
@@ -1495,14 +1596,14 @@ namespace PenguinMonitor.Services
                         // Retrying can't help, so drop it — but never silently: say enough
                         // that the bird can be re-entered by hand.
                         var why = body?.GetValueOrDefault("error")?.ToString() ?? "unknown error";
-                        var who = string.IsNullOrEmpty(q.RequestedPengNum) ? q.FullPitId : q.RequestedPengNum;
+                        var who = string.IsNullOrEmpty(requested) ? q.FullPitId : requested;
                         warnings.Add($"Queued bird {who} (PIT {q.FullPitId}, box {q.BoxName}) rejected: {why}");
                     }
-                    else if (pengNum != q.RequestedPengNum && !string.IsNullOrEmpty(q.RequestedPengNum))
+                    else if (!string.IsNullOrEmpty(requested) && !string.Equals(pengNum, requested, StringComparison.OrdinalIgnoreCase))
                     {
                         // The predicted number was taken, so the server gave the next free one.
                         // Surface it — the field notes say one number and the database another.
-                        warnings.Add($"Bird written down as {q.RequestedPengNum} synced as {pengNum} (number was taken — rename on wildwatch).");
+                        warnings.Add($"Bird written down as {requested} synced as {pengNum} (number was taken — rename on wildwatch).");
                     }
 
                     queue.Remove(q);

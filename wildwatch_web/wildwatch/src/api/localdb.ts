@@ -35,9 +35,13 @@ let coloniesMem: ColonyRow[] | null = null;
 export function setCachedColonies(list: any[]): void {
   if (!Array.isArray(list) || list.length === 0) return;
   const slim: ColonyRow[] = list.map(c => ({ colony_id: Number(c.colony_id), colony_name: c.colony_name, colony_prefix: c.colony_prefix }));
+  const changed = JSON.stringify(slim) !== JSON.stringify(getCachedColonies());
   coloniesMem = slim;
   colonyByPrefix = null;
   try { localStorage.setItem(COLONY_LIST_KEY, JSON.stringify(slim)); } catch { /* quota — the fetch still fills it in */ }
+  // The prefixes decide how every peng# reads and how a typed one resolves, so screens that
+  // rendered before the list first arrived (a fresh browser, the nestcheck embed) redraw.
+  if (changed) notifySubscribers();
 }
 export function getCachedColonies(): ColonyRow[] {
   if (coloniesMem) return coloniesMem;
@@ -55,16 +59,70 @@ function prefixMap(): Map<string, string> {
 /**
  * Which colony a peng# belongs to, by name.
  *
- * The prefix IS the colony: it's part of the primary key, and only the viewing colony's own
- * prefix is ever stripped — and only for colonies whose local standard is bare numbers (PT).
- * So a bare number means the bare-number colony and anything else carries its own prefix,
- * which is what makes this answerable offline. Unknown prefixes fall back to the acronym,
- * which is still better than an empty cell.
+ * The prefix IS the colony: it's part of the primary key, and the API hands every number over
+ * in that full stored form, which is what makes this answerable offline. Unknown prefixes fall
+ * back to the acronym, which is still better than an empty cell.
  */
 export function colonyNameForPeng(pengNum: string): string {
-  // No prefix left on the number: it belongs to the colony that writes bare numbers (PT).
+  // A bare number can only be something a person typed or an old link; bare is PT's standard.
   const prefix = (String(pengNum).match(/^[A-Z]{2,4}/)?.[0] || 'PT').toUpperCase();
   return prefixMap().get(prefix) || (prefix === 'PT' ? '' : prefix);
+}
+
+// ============ Peng# forms ============
+// The API speaks full stored numbers only ("PT1039", "NI7") and the cache holds exactly what it
+// was sent, so every key, comparison, route and write uses the full form. Stripping happens at
+// one place — the moment a number is put in front of a person — and prefixing at one other —
+// the moment a person hands one over. The server used to strip on the way out and re-add on the
+// way in, and the one write path that forgot to re-add it wrote a bird into the wrong number.
+
+// Mirror of BARE_NUMBER_PREFIXES in config.php: colonies whose local standard is bare numbers.
+// Only these drop their prefix, and only at home — an NI view still reads "NI7", and a visiting
+// bird always keeps its prefix so a bare number is never ambiguous on screen.
+const BARE_NUMBER_PREFIXES = ['PT'];
+
+/** The viewing colony's peng# prefix (uppercase), or '' while the colony list isn't known yet. */
+export function activeColonyPrefix(): string {
+  const id = getColonyId();
+  return (getCachedColonies().find(c => c.colony_id === id)?.colony_prefix || '').toUpperCase();
+}
+
+/** A full peng# as a person should read it in the viewing colony: "PT1039" → "1039" in a PT
+ *  view, everything else unchanged. For screens, prints and people-facing exports only —
+ *  never as a key, a comparison or anything sent back to the server. */
+export function displayPengNum(pengNum: string | null | undefined): string {
+  if (pengNum === null || pengNum === undefined) return '';
+  const s = String(pengNum);
+  const vp = activeColonyPrefix();
+  if (vp && BARE_NUMBER_PREFIXES.includes(vp) && s.startsWith(vp) && /^\d+$/.test(s.slice(vp.length))) return s.slice(vp.length);
+  return s;
+}
+
+/**
+ * The full stored form of a peng# a person typed (or an old link carried): letters first means
+ * it's already full, so it's just uppercased; a bare number is the viewing colony's bird, as it
+ * is on screen. Only short digit runs are prefixed — a PIT ID (15 digits, or the 8-char tail
+ * the pills show) goes to the same bird-lookups and must come through untouched.
+ */
+export function fullPengNum(typed: string | null | undefined): string {
+  const s = String(typed ?? '').trim().replace(/^#/, '').replace(/\s+/g, '').toUpperCase();
+  if (/^\d{1,6}$/.test(s)) return activeColonyPrefix() + s;
+  return s;
+}
+
+/** The numeric part of a peng# ("PT1039" → 1039), NaN when there is none. */
+export function pengNumValue(pengNum: string | null | undefined): number {
+  const m = String(pengNum ?? '').match(/(\d+)$/);
+  return m ? parseInt(m[1], 10) : NaN;
+}
+
+/** Order peng#s by their number, then prefix, so PT2 < PT10 and a mixed list interleaves by
+ *  number the way people read it. Numberless values sort last. */
+export function comparePengNum(a: string | null | undefined, b: string | null | undefined): number {
+  const na = pengNumValue(a), nb = pengNumValue(b);
+  if (isNaN(na) !== isNaN(nb)) return isNaN(na) ? 1 : -1;
+  if (!isNaN(na) && na !== nb) return na - nb;
+  return String(a ?? '').localeCompare(String(b ?? ''));
 }
 export function getColonyId(): number {
   return parseInt(localStorage.getItem(COLONY_KEY) || '1', 10) || 1;
@@ -90,7 +148,7 @@ function colonyQS(): string { return `colony_id=${getColonyId()}`; }
 try { indexedDB.deleteDatabase('wildwatch'); } catch { /* ignore */ }
 function dbName(): string { return 'wildwatch-' + getColonyKey(); }
 const DB_VERSION = 5; // v5: observers store
-const CACHE_VERSION = 23; // Bump to force all clients to full re-sync (v23: pit_id lost its "LA" reader prefix — every cached tag value changed)
+const CACHE_VERSION = 24; // Bump to force all clients to full re-sync (v24: the API now sends every peng_num in full "PT1039" form — caches holding the old stripped "1039" must be replaced; v23: pit_id lost its "LA" reader prefix)
 const STORES = ['observations', 'scans', 'penguins', 'chips', 'locations', 'biometrics',
   'verifications', 'day_notes', 'observers', 'meta'] as const;
 // Stores from earlier DB versions that no longer exist; dropped on upgrade.
@@ -984,10 +1042,13 @@ export function queryBirdDetailSync(pengNum: string): any {
 export function queryBirdDetail(pengNum: string): Promise<any> {
   return Promise.resolve(queryBirdDetailInner(pengNum));
 }
-function queryBirdDetailInner(pengNum: string): any {
+function queryBirdDetailInner(key: string): any {
   if (!mem) return { error: 'not loaded' };
   const c = mem;
 
+  // Keys arrive full from the app's own links, but an old bookmark, a typed route or the
+  // nestcheck embed can still hand over the bare on-screen number.
+  const pengNum = c.pengByNum.has(key) ? key : fullPengNum(key);
   const penguin = c.pengByNum.get(pengNum);
   if (!penguin) return { error: 'penguin not found' };
 
@@ -2254,6 +2315,7 @@ export function searchLocal(query: string, limit = 8): LocalSearchResults {
   if (!c || terms.length === 0) return empty;
   const hits = (v: any) => { const s = String(v ?? '').toLowerCase(); return !!s && terms.some(t => s.includes(t)); };
   const tail = (n: any) => String(n ?? '').replace(/^[A-Z]+/i, '').toLowerCase();
+  const fullTerms = new Set(terms.map(t => fullPengNum(t)));
 
   // "box 2" names box 2 as surely as "2" does, so the word is stripped before matching.
   const boxTerms = terms.map(t => t.replace(/^box[\s#]*/, '')).filter(Boolean);
@@ -2305,7 +2367,8 @@ export function searchLocal(query: string, limit = 8): LocalSearchResults {
 
   return {
     boxes: boxes.sort(byNum),
-    pengs: pengs.slice(0, limit),
+    // "7" names this colony's #7 as it reads on screen; a visitor's NI7 still shows, after it.
+    pengs: pengs.sort((a, b) => Number(fullTerms.has(b.peng_num)) - Number(fullTerms.has(a.peng_num))).slice(0, limit),
     pits: pits.slice(0, limit),
     pengNotes: pengNotes.slice(0, limit),
     obsNotes,

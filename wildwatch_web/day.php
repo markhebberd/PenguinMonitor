@@ -2,11 +2,11 @@
 require_once 'config.php';
 setHeaders();
 $observer = requireAuth();
+wwRequireFullPengClient();
 
 $pdo = getDbConnection();
 $colonyId = (int)($_GET['colony_id'] ?? 1);
 requireColonyAccess($pdo, $observer, $colonyId); // view access
-$viewPrefix = getColonyPrefix($pdo, $colonyId);
 $date = $_GET['date'] ?? '';
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     echo json_encode(['error' => 'date required (YYYY-MM-DD)']);
@@ -42,7 +42,6 @@ if (!empty($obsIds)) {
         GROUP BY ps.observation_id, pc.peng_num");
     $stmt->execute(array_values($obsIds));
     foreach ($stmt->fetchAll() as $row) {
-        $row['peng_num'] = displayPengNum($row['peng_num'] ?? '', $viewPrefix);
         $scans[$row['observation_id']][] = $row;
     }
 }
@@ -62,7 +61,6 @@ $stmt = $pdo->prepare("SELECT pc.pit_id, pc.peng_num, pc.chip_box, p.sex, p.chip
     ORDER BY pc.chip_box + 0");
 $stmt->execute([$date]);
 $chippings = $stmt->fetchAll();
-stripPengPrefix($chippings, $viewPrefix);
 
 // The day's note and who was out — one row for this colony on this date, or none.
 $noteStmt = $pdo->prepare("SELECT note, observer_id, scribe_id FROM day_notes WHERE colony_id = ? AND note_date = ?");

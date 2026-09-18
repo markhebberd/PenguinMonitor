@@ -89,7 +89,8 @@ function fetchJson(string $path, string $token): array {
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_RESOLVE => [WW_HOST . ':443:127.0.0.1'],
-        CURLOPT_HTTPHEADER => ["Authorization: Bearer $token"],
+        // Speaks the current bird-number contract, as the apps do; without it every endpoint answers 426.
+        CURLOPT_HTTPHEADER => ["Authorization: Bearer $token", "X-Peng-Format: full"],
         CURLOPT_TIMEOUT => 30,
     ]);
     $body = curl_exec($ch);

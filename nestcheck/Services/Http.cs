@@ -23,8 +23,21 @@ namespace PenguinMonitor.Services
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5),
                 ConnectTimeout = TimeSpan.FromSeconds(10),
             };
-            return new HttpClient(handler) { Timeout = timeout };
+            var client = new HttpClient(handler) { Timeout = timeout };
+            // Every client comes from here, so every request says it speaks full peng numbers
+            // ("PT1039"). The API used to strip the viewing colony's prefix and re-add it on the
+            // way back in; one write path that forgot to re-add it broke biometric saves. It now
+            // refuses (426) a client that doesn't declare this, rather than guess which it has.
+            client.DefaultRequestHeaders.Add(PengFormatHeader, "full");
+            return client;
         }
+
+        internal const string PengFormatHeader = "X-Peng-Format";
+
+        /// <summary>426: the server won't talk to a build this old. Its body says to update from the
+        /// Play Store; nothing a retry or a queue can fix, so it is carried as its own kind of
+        /// failure rather than read as a flaky network.</summary>
+        internal static bool IsUpgradeRequired(HttpResponseMessage resp) => (int)resp.StatusCode == 426;
 
         /// <summary>True for the failures that mean "the network moved", not "the request was
         /// wrong": a dropped socket, a reset, a name that didn't resolve while the radio was
@@ -39,5 +52,11 @@ namespace PenguinMonitor.Services
                     return true;
             return false;
         }
+    }
+
+    /// <summary>The server refused this build (HTTP 426). Message is the server's own words.</summary>
+    internal sealed class UpgradeRequiredException : Exception
+    {
+        internal UpgradeRequiredException(string message) : base(message) { }
     }
 }

@@ -53,13 +53,32 @@ function dbPengNum($pdo, int $colonyId, string $pengNum): string {
     return getColonyPrefix($pdo, $colonyId) . $pengNum;
 }
 
-/** Strip the viewing colony's prefix from peng_num in all rows. Modifies in-place and returns. */
-function stripPengPrefix(array &$rows, string $viewPrefix, string $field = 'peng_num'): array {
-    foreach ($rows as &$row) {
-        if (isset($row[$field])) $row[$field] = displayPengNum($row[$field], $viewPrefix);
-    }
-    return $rows;
+/**
+ * Every endpoint that carries bird numbers speaks them in full ("PT1039"), in and out; only the
+ * clients shorten them, and only on screen. Clients built before that change still expect the
+ * viewing colony's prefix stripped and would send bare numbers back, so they are turned away
+ * with a message to update rather than half-working. Call after authentication, so an
+ * unauthenticated probe (deploy/mirror health checks) still gets its 401.
+ */
+function wwRequireFullPengClient(): void {
+    if (($_SERVER['HTTP_X_PENG_FORMAT'] ?? '') === 'full') return;
+    http_response_code(426);
+    echo json_encode(['error' => 'This app version is out of date — update NestCheck from the Play Store (or reload wildwatch) to keep syncing. Nothing on this device has been lost.']);
+    exit;
 }
+
+/** A bird number a client is WRITING: must be the full stored form. A bare one is refused —
+ *  guessing its colony is how a Ngawhiti bird once got filed under Tarakohe's number. */
+function wwFullPengNum($pengNum): string {
+    $p = strtoupper(trim((string)$pengNum));
+    if (!preg_match('/^[A-Z]{2,4}\d+$/', $p)) {
+        http_response_code(400);
+        echo json_encode(['error' => "Bird number '$pengNum' must include its colony prefix (e.g. PT1039)"]);
+        exit;
+    }
+    return $p;
+}
+
 
 /**
  * The stored form of a PIT/tag number: the 15 digits of the ISO tag, nothing else.
@@ -746,12 +765,7 @@ function getSightings($pdo, $pengNum = null, $boxName = null, $colonyId = 1) {
     }
 
     usort($sightings, function($a, $b) { return strcmp($b['date'], $a['date']); });
-    $viewPrefix = getColonyPrefix($pdo, $colonyId);
-    $pengArr = array_values($penguins); stripPengPrefix($pengArr, $viewPrefix);
-    $sightArr = array_values($sightings); stripPengPrefix($sightArr, $viewPrefix);
-    // Also strip peng_num in seen_with arrays
-    foreach ($sightArr as &$s) { if (!empty($s['seen_with'])) stripPengPrefix($s['seen_with'], $viewPrefix); }
-    return ['penguins' => $pengArr, 'sightings' => $sightArr];
+    return ['penguins' => array_values($penguins), 'sightings' => array_values($sightings)];
 }
 
 // ============ Day notes ============

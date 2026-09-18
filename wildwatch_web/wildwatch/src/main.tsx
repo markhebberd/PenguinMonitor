@@ -1,3 +1,5 @@
+// First: every /api/ request must carry the peng# format header (see pengFormat.ts).
+import './api/pengFormat'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
