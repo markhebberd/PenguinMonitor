@@ -623,6 +623,30 @@ h3.collapsible:hover { color:#1a5276; }
 /* Each expanded biometric needs air from the one above it — most of all in edit mode, where
    every record is a stack of inputs and they otherwise run together as one wall. */
 .bird-table tr.bio-record-head td { padding-top:14px; border-top:1px solid #eee; }
+/* Biometric edit card: date + actions on top, measurements as a grid of labelled boxes with the
+   unit inside the box, flags as toggle chips, note last. */
+.bio-card { display:flex; flex-direction:column; gap:10px; background:#fafbfc; border:1px solid #e6e9ed; border-radius:8px; padding:10px 12px; }
+.bio-card-head { display:flex; align-items:center; gap:8px; }
+.bio-card-head .edit-btn { margin-left:auto; }
+.bio-card-title { font-size:12px; font-weight:600; color:#1a5276; }
+.bio-card-foot { display:flex; gap:6px; }
+.bio-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(96px, 1fr)); gap:8px 10px; }
+.bio-field { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.bio-field > span { font-size:11px; color:#888; }
+.bio-in { font:inherit; font-size:13px; padding:5px 8px; border:1px solid #d5dce3; border-radius:5px; background:#fff; color:#222; width:100%; box-sizing:border-box; min-width:0; }
+.bio-in:focus { outline:none; border-color:#2196F3; box-shadow:0 0 0 2px rgba(33,150,243,.15); }
+input[type=date].bio-in { width:auto; font-weight:600; }
+.bio-in-wrap { position:relative; display:block; }
+.bio-in-wrap .bio-in { padding-right:30px; }
+.bio-in-wrap .bio-unit { position:absolute; right:8px; top:50%; transform:translateY(-50%); font-size:11px; color:#999; pointer-events:none; }
+.bio-in-wrap input[type=number]::-webkit-inner-spin-button, .bio-in-wrap input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+.bio-in-wrap input[type=number] { -moz-appearance:textfield; }
+.bio-flags { display:flex; flex-wrap:wrap; gap:6px; }
+.bio-flag { display:inline-flex; align-items:center; font-size:12px; padding:3px 10px; border:1px solid #d5dce3; border-radius:12px; background:#fff; color:#555; cursor:pointer; user-select:none; }
+.bio-flag input { display:none; }
+.bio-flag:hover { border-color:#b9c6d2; }
+.bio-flag.on { background:#e3f2fd; border-color:#90caf9; color:#1a5276; font-weight:600; }
+.bio-note { resize:vertical; line-height:1.4; }
 .bird-notes { font-style:italic; color:#666; font-size:13px; margin-top:4px; }
 .copy-pit-btn { font-size:10px; padding:1px 8px; border:1px solid #90caf9; background:#e3f2fd; color:#1a5276; border-radius:4px; cursor:pointer; }
 .copy-pit-btn:hover { background:#bbdefb; }

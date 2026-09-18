@@ -2489,6 +2489,31 @@ function BoxPanel({ data, boxName, allPenguins, onBirdClick, onDayClick, highlig
   );
 }
 
+// One biometric input in the edit card. Holds its own draft and commits on blur / Enter, and
+// only when the value actually changed — a keystroke-by-keystroke save would fire an update per
+// digit. The unit sits inside the box as a suffix, not as a placeholder.
+function BioInput({ value, onCommit, unit, type = 'number', multiline }: {
+  value: any; onCommit: (v: string) => void; unit?: string; type?: 'number' | 'text' | 'date'; multiline?: boolean;
+}) {
+  const shown = value === null || value === undefined ? '' : (type === 'number' && value !== '' ? String(Math.round(parseFloat(value))) : String(value));
+  const [draft, setDraft] = useState(shown);
+  const focused = useRef(false);
+  useEffect(() => { if (!focused.current) setDraft(shown); }, [shown]);
+  const commit = () => { focused.current = false; if (draft.trim() !== shown) onCommit(draft.trim()); };
+  const common = {
+    value: draft, onFocus: () => { focused.current = true; }, onBlur: commit,
+    onChange: (e: any) => setDraft(e.target.value),
+  };
+  if (multiline) return <textarea className="bio-in bio-note" rows={2} placeholder="Note" {...common} />;
+  return (
+    <span className="bio-in-wrap">
+      <input className="bio-in" type={type} inputMode={type === 'number' ? 'decimal' : undefined} {...common}
+        onKeyDown={e => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur(); if (e.key === 'Escape') { setDraft(shown); } }} />
+      {unit && <span className="bio-unit">{unit}</span>}
+    </span>
+  );
+}
+
 // Biometrics for a bird: summary line that expands to per-record view/edit, an add form,
 // and a "removed" section (soft-deleted records) with restore. Renders table rows for bird-table.
 function BiometricsEditor({ pengNum, biometrics, deleted, token, canEdit, editing }: {
@@ -2539,25 +2564,59 @@ function BiometricsEditor({ pengNum, biometrics, deleted, token, canEdit, editin
   const range = (vals: number[], unit: string) => { if (!vals.length) return ''; const lo = Math.round(Math.min(...vals)), hi = Math.round(Math.max(...vals)); return `${lo === hi ? lo : `${lo}-${hi}`}${unit}${vals.length > 1 ? ` (${vals.length}x)` : ''}`; };
   const summary = [sexSummary, range(weights, 'g'), range(flippers, 'mm'), lastComment ? `"${lastComment.slice(0, 40)}"` : ''].filter(Boolean).join(' · ');
 
+  // Edit layout: one card per record — date and actions across the top, measurements in a
+  // grid of labelled boxes, flags as toggle chips, note underneath.
+  const editCard = (key: string, v: any, set: (k: string, val: any) => void, head: any, foot?: any) => (
+    <tr key={key} className="bio-record-head"><td colSpan={2}>
+      <div className="bio-card">
+        <div className="bio-card-head">
+          <BioInput type="date" value={v.observation_date} onCommit={val => set('observation_date', val)} />
+          {head}
+        </div>
+        <div className="bio-grid">
+          <label className="bio-field"><span>Sex</span>
+            <select className="bio-in" value={v.observed_sex || ''} onChange={e => set('observed_sex', e.target.value)}>
+              {SEX_OPTS.map(s => <option key={s} value={s}>{s ? observedSexLabel(s, false) : '-'}</option>)}
+            </select>
+          </label>
+          {MEASURES.map(([k, label, unit]) => (
+            <label key={k} className="bio-field"><span>{label}</span><BioInput value={v[k]} unit={unit} onCommit={val => set(k, val)} /></label>
+          ))}
+          {v.sex && <label className="bio-field"><span>Sex (legacy)</span><BioInput type="text" value={v.sex} onCommit={val => set('sex', val)} /></label>}
+        </div>
+        <div className="bio-flags">
+          {FLAGS.map(([k, label]) => (
+            <label key={k} className={`bio-flag${v[k] && v[k] !== '0' ? ' on' : ''}`}>
+              <input type="checkbox" checked={!!v[k] && v[k] !== '0'} onChange={e => set(k, e.target.checked)} />{label}
+            </label>
+          ))}
+        </div>
+        <BioInput multiline type="text" value={v.notes} onCommit={val => set('notes', val)} />
+        {foot}
+      </div>
+    </td></tr>
+  );
+
   const record = (b: any, i: number, removed: boolean) => {
     const flags = FLAGS.filter(([k]) => b[k]).map(([, label]) => label);
-    const ed = editing && !removed;
+    if (editing && !removed) return editCard(`bio${b.biometric_id ?? i}`, b,
+      (k, val) => {
+        if (FLAGS.some(([f]) => f === k)) toggle(b, k, val);
+        else if (MEASURES.some(([m]) => m === k)) saveField(b.biometric_id, k)(val === '' ? '' : parseFloat(val));
+        else saveField(b.biometric_id, k)(val);
+      },
+      <button className="edit-btn" onClick={() => remove(b)}>Remove</button>);
     return (<Fragment key={`${removed ? 'del' : 'bio'}${b.biometric_id ?? i}`}>
       <tr className="bio-record-head"><td className="muted" colSpan={2} style={{ fontWeight: 600, fontSize: 11 }}>
-        {ed ? <EditableField value={b.observation_date} type="date" onSave={saveField(b.biometric_id, 'observation_date')} canEdit={true} /> : (b.observation_date || '')}
+        {b.observation_date || ''}
         {removed && <span className="bird-badge" style={{ background: '#FFCDD2', marginLeft: 6 }}>removed</span>}
         {removed && canEdit && <button className="edit-btn" style={{ marginLeft: 8 }} onClick={() => restore(b)}>Restore</button>}
-        {ed && <button className="edit-btn" style={{ marginLeft: 8 }} onClick={() => remove(b)}>Remove</button>}
       </td></tr>
-      <tr><td className="muted">Sex</td><td>{ed ? <EditableField value={b.observed_sex} type="select" options={SEX_OPTS} onSave={saveField(b.biometric_id, 'observed_sex')} canEdit={true} placeholder="-" /> : (observedSexLabel(b.observed_sex, false) || <span className="muted">-</span>)}</td></tr>
-      {(ed || b.sex) && <tr><td className="muted">Sex (legacy)</td><td>{ed ? <EditableField value={b.sex} onSave={saveField(b.biometric_id, 'sex')} placeholder="-" canEdit={true} /> : b.sex}</td></tr>}
-      {MEASURES.map(([k, label, unit]) => (
-        (ed || b[k]) ? <tr key={k}><td className="muted">{label}</td><td>{ed ? <><EditableField value={b[k] ? parseFloat(b[k]).toFixed(0) : ''} type="number" onSave={saveField(b.biometric_id, k)} placeholder={unit} canEdit={true} /><span>{unit}</span></> : (b[k] ? `${parseFloat(b[k]).toFixed(0)}${unit}` : <span className="muted">-</span>)}</td></tr> : null
-      ))}
-      {ed
-        ? <tr><td className="muted">Flags</td><td>{FLAGS.map(([k, label]) => <label key={k} style={{ marginRight: 8 }}><input type="checkbox" checked={!!b[k]} onChange={e => toggle(b, k, e.target.checked)} /> {label}</label>)}</td></tr>
-        : (flags.length > 0 ? <tr><td className="muted">Flags</td><td>{flags.join(', ')}</td></tr> : null)}
-      <tr><td className="muted">Note</td><td style={{ fontSize: 11 }}>{ed ? <EditableField value={b.notes} onSave={saveField(b.biometric_id, 'notes')} placeholder="-" canEdit={true} multiline /> : (b.notes || <span className="muted">-</span>)}</td></tr>
+      <tr><td className="muted">Sex</td><td>{observedSexLabel(b.observed_sex, false) || <span className="muted">-</span>}</td></tr>
+      {b.sex && <tr><td className="muted">Sex (legacy)</td><td>{b.sex}</td></tr>}
+      {MEASURES.map(([k, label, unit]) => b[k] ? <tr key={k}><td className="muted">{label}</td><td>{`${parseFloat(b[k]).toFixed(0)}${unit}`}</td></tr> : null)}
+      {flags.length > 0 && <tr><td className="muted">Flags</td><td>{flags.join(', ')}</td></tr>}
+      <tr><td className="muted">Note</td><td style={{ fontSize: 11 }}>{b.notes || <span className="muted">-</span>}</td></tr>
     </Fragment>);
   };
 
@@ -2565,15 +2624,9 @@ function BiometricsEditor({ pengNum, biometrics, deleted, token, canEdit, editin
     <tr><td className="muted">Biometrics</td><td className="clickable" onClick={() => setShowBio(!showBio)}>{summary || <span className="muted">-</span>} <span className="muted small">{biometrics.length} records {showBio ? '▲' : '▼'}</span></td></tr>
     {showBio && <>
       {editing && !adding && <tr><td></td><td><button className="edit-btn" onClick={() => setAdding(true)}>+ Add biometric</button></td></tr>}
-      {editing && adding && <>
-        <tr><td className="muted" colSpan={2} style={{ fontWeight: 600, paddingTop: 6, fontSize: 11 }}>New biometric</td></tr>
-        <tr><td className="muted">Date</td><td><input type="date" value={form.observation_date} onChange={e => setF('observation_date', e.target.value)} /></td></tr>
-        <tr><td className="muted">Sex</td><td><select value={form.observed_sex} onChange={e => setF('observed_sex', e.target.value)}>{SEX_OPTS.map(s => <option key={s} value={s}>{s ? observedSexLabel(s, false) : '-'}</option>)}</select></td></tr>
-        {MEASURES.map(([k, label, unit]) => <tr key={k}><td className="muted">{label}</td><td><input type="number" value={form[k]} onChange={e => setF(k, e.target.value)} placeholder={unit} style={{ width: 80 }} /> {unit}</td></tr>)}
-        <tr><td className="muted">Flags</td><td>{FLAGS.map(([k, label]) => <label key={k} style={{ marginRight: 8 }}><input type="checkbox" checked={form[k]} onChange={e => setF(k, e.target.checked)} /> {label}</label>)}</td></tr>
-        <tr><td className="muted">Note</td><td><input type="text" value={form.notes} onChange={e => setF('notes', e.target.value)} placeholder="-" /></td></tr>
-        <tr><td></td><td><button className="edit-btn done-btn" disabled={busy} onClick={submitAdd}>{busy ? 'Saving…' : 'Save'}</button> <button className="edit-btn" onClick={() => { setAdding(false); setForm(emptyForm); }}>Cancel</button></td></tr>
-      </>}
+      {editing && adding && editCard('bio-new', form, setF,
+        <span className="bio-card-title">New biometric</span>,
+        <div className="bio-card-foot"><button className="edit-btn done-btn" disabled={busy} onClick={submitAdd}>{busy ? 'Saving…' : 'Save'}</button> <button className="edit-btn" onClick={() => { setAdding(false); setForm(emptyForm); }}>Cancel</button></div>)}
       {biometrics.map((b, i) => record(b, i, false))}
       {deleted.length > 0 && <tr><td></td><td className="clickable muted small" onClick={() => setShowRemoved(!showRemoved)}>{deleted.length} removed {showRemoved ? '▲' : '▼'}</td></tr>}
       {showRemoved && deleted.map((b, i) => record(b, i, true))}
