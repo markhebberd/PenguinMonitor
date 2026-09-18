@@ -6890,6 +6890,18 @@ namespace PenguinMonitor
                 // Save to the local cache + sync queue — instant, offline-safe. The next sync (and the
                 // prompt background flush below) uploads it; the server id is preserved so edits update.
                 var selectedSexLabel = sexSpinner.SelectedItem?.ToString() ?? "";
+                // A blank form is not a measurement. Saved, it became an empty biometric on wildwatch
+                // (date only, "Sex -") — e.g. Save pressed after the sex prompt popped up over the form.
+                bool nothingEntered = string.IsNullOrWhiteSpace(weightInput.Text) && string.IsNullOrWhiteSpace(flipperInput.Text)
+                    && string.IsNullOrEmpty(ObservedSexOptions.FirstOrDefault(o => o.label == selectedSexLabel).code)
+                    && !conditionChecks["condition_moulting"].Checked && !conditionChecks["condition_dead"].Checked
+                    && string.IsNullOrWhiteSpace(notesInput.Text);
+                if (nothingEntered && existing == null)
+                {
+                    Toast.MakeText(this, "Nothing entered — not saved", ToastLength.Short)?.Show();
+                    dialog.Dismiss();
+                    return;
+                }
                 var record = new BiometricRecord
                 {
                     PengNum = pengNum,

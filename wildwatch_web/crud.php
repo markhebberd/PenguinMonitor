@@ -784,6 +784,16 @@ function handleCreate($pdo, $table, $pk, $observer) {
         if ($table === 'penguins' && !isset($input['colony_id'])) {
             $input['colony_id'] = $cid;
         }
+        // A biometric with nothing in it is a stray Save, not a measurement — refuse it rather than
+        // leave an empty "Sex -" row on the bird. Flags only count when set.
+        if ($table === 'penguin_biometric_data') {
+            $has = false;
+            foreach (['weight','flipper_length','body_length','beak_length','observed_sex','sex','notes'] as $k)
+                if (isset($input[$k]) && trim((string)$input[$k]) !== '') $has = true;
+            foreach (['is_moulting','condition_ticks','condition_healthy','disposition_aggressive','disposition_passive'] as $k)
+                if (!empty($input[$k])) $has = true;
+            if (!$has) { $pdo->rollBack(); http_response_code(400); echo json_encode(['error'=>'Empty biometric — nothing to save']); return; }
+        }
         // Prepend colony prefix to bare peng_num on penguin/chip/bio creates
         if (in_array($table, ['penguins', 'penguin_chips', 'penguin_biometric_data']) && isset($input['peng_num'])) {
             $input['peng_num'] = dbPengNum($pdo, $cid, $input['peng_num']);
