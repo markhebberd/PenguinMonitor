@@ -234,6 +234,17 @@ function requireAuth($pdo = null) {
  *
  * Returns the effective per-colony role ('admin' | 'edit' | 'view'), or sends 403 + exits.
  */
+/**
+ * The colony a write belongs to, from ?colony_id= (or the body's colony_id). A write that decides
+ * where data lands — box by name, bird number prefix, day note, FM dates — must say which colony;
+ * defaulting a missing one to Port Tarakohe once filed a Ngawhiti N4 as a new box there.
+ */
+function wwRequireColonyId(?array $body = null): int {
+    $cid = (int)($body['colony_id'] ?? $_GET['colony_id'] ?? 0);
+    if ($cid <= 0) { http_response_code(400); echo json_encode(['error' => 'colony_id required']); exit; }
+    return $cid;
+}
+
 function requireColonyAccess($pdo, $observer, $colonyId, $needWrite = false) {
     // Global API key (requireReadAuth returns `true`, not an observer row) is the trusted
     // app identity used by nestcheck — treat it as full access so field sync never breaks.

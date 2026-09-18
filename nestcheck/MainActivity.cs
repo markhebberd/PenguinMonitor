@@ -1821,14 +1821,21 @@ namespace PenguinMonitor
                     {
                         _ = Task.Run(async () =>
                         {
-                            await _dataStorageService.UploadConfirmedEdits(_colonyState, _appSettings,
+                            var (_, error) = await _dataStorageService.UploadConfirmedEdits(_colonyState, _appSettings,
                                 new List<(string, string?)> { (boxName, conflictNzDate) });
                             new Handler(Looper.MainLooper).Post(() =>
                             {
                                 DataStorageService.SaveColonyState(this, _colonyState);
                                 UpdateSyncButtonLabel();
                                 DrawPageLayouts();
-                                ShowNext(idx + 1);
+                                if (error == null) { ShowNext(idx + 1); return; }
+                                // The replace didn't land — say why before moving on; the box stays queued.
+                                new AlertDialog.Builder(this)
+                                    .SetTitle($"Box {boxName} not replaced")
+                                    .SetMessage($"{error}\n\nYour entry is still on this phone and will be offered again next sync.")
+                                    .SetCancelable(false)
+                                    .SetPositiveButton("OK", (s3, e3) => ShowNext(idx + 1))
+                                    .Show();
                             });
                         });
                     },
@@ -4932,14 +4939,14 @@ namespace PenguinMonitor
                 {
                     _ = Task.Run(async () =>
                     {
-                        var n = await _dataStorageService.UploadConfirmedEdits(_colonyState, _appSettings,
+                        var (n, error) = await _dataStorageService.UploadConfirmedEdits(_colonyState, _appSettings,
                             new List<(string, string?)> { (stuckBox, ToNzTime(stuckObs.WhenDataCollectedUtc).ToString("yyyy-MM-dd")) });
                         new Handler(Looper.MainLooper).Post(() =>
                         {
                             DataStorageService.SaveColonyState(this, _colonyState);
                             UpdateSyncButtonLabel();
                             DrawPageLayouts();
-                            Toast.MakeText(this, n > 0 ? $"Box {stuckBox} synced" : $"Box {stuckBox}: sync failed — try again", ToastLength.Short)?.Show();
+                            Toast.MakeText(this, n > 0 ? $"Box {stuckBox} synced" : $"Box {stuckBox} not synced: {error ?? "try again"}", ToastLength.Long)?.Show();
                         });
                     });
                 };
@@ -7573,7 +7580,7 @@ namespace PenguinMonitor
                         var token = _appSettings.AuthToken;
                         // New birds belong to the colony being worked — the server numbers
                         // them within it (e.g. NI7) and stamps penguins.colony_id.
-                        var colonyId = _appSettings.SelectedColonyId > 0 ? _appSettings.SelectedColonyId : 1;
+                        var colonyId = _appSettings.SelectedColonyId;
 
                         var today = NzNow.ToString("yyyy-MM-dd");
                         string? pengNum;
@@ -7648,7 +7655,7 @@ namespace PenguinMonitor
                                 {
                                     new AlertDialog.Builder(this)
                                         .SetTitle("Failed to save bird")
-                                        .SetMessage(birdJson + "\n\nNothing was saved — safe to retry.")
+                                        .SetMessage(DataStorageService.ServerMessage(birdJson, (int)birdResp.StatusCode) + "\n\nNothing was saved — safe to retry.")
                                         .SetPositiveButton("OK", (s2, e2) => { })
                                         .Show();
                                 });

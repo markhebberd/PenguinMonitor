@@ -27,6 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === '') {
     requireColonyAccess($pdo, $observer, $colonyId);        // view
     handleDownload($pdo, $colonyId, $observer);
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'upload' || $action === 'confirm')) {
+    // Boxes are looked up by name within this colony and an unknown name becomes a new box in it.
+    $colonyId = wwRequireColonyId();
     requireColonyAccess($pdo, $observer, $colonyId, true);  // edit
     handleUpload($pdo, $colonyId, $observer);
 } else {

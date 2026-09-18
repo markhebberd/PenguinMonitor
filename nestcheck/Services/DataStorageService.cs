@@ -272,8 +272,9 @@ namespace PenguinMonitor.Services
             double.TryParse(s, System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : null;
 
-        // The colony every crud.php write belongs to. Bare peng_nums are resolved against it
-        // server-side, so leaving it off silently files another colony's bird under Tarakohe's.
+        // The colony to READ, falling back to Tarakohe when none is chosen yet. Writes send
+        // SelectedColonyId as-is instead: with none chosen the server refuses and the work stays
+        // queued, where a colony-1 fallback would file it under Port Tarakohe.
         private static int ColonyIdOf(AppSettings s) => s.SelectedColonyId > 0 ? s.SelectedColonyId : 1;
 
         // Observation time for upload. If the observation has no valid timestamp
@@ -442,7 +443,7 @@ namespace PenguinMonitor.Services
                 if (pendingBoxes.Count > 0)
                 {
                     var uploadBody = JsonConvert.SerializeObject(BuildUploadBody(colonyState, pendingBoxes));
-                    var uploadRequest = new HttpRequestMessage(HttpMethod.Post, $"{WILDWATCH_SYNC_URL}?action=upload&colony_id={(appSettings.SelectedColonyId > 0 ? appSettings.SelectedColonyId : 1)}");
+                    var uploadRequest = new HttpRequestMessage(HttpMethod.Post, $"{WILDWATCH_SYNC_URL}?action=upload&colony_id={appSettings.SelectedColonyId}");
                     uploadRequest.Headers.Add("Authorization", $"Bearer {token}");
                     uploadRequest.Content = new StringContent(uploadBody, Encoding.UTF8, "application/json");
 
@@ -455,6 +456,10 @@ namespace PenguinMonitor.Services
                     }
 
                     var uploadJson = await uploadResponse.Content.ReadAsStringAsync();
+                    // A refused upload (no colony, no access) answers with an {"error"} body: say so
+                    // and leave everything queued, rather than reading it as "nothing was created".
+                    if (!uploadResponse.IsSuccessStatusCode)
+                        throw new Exception($"Upload refused: {ServerMessage(uploadJson, (int)uploadResponse.StatusCode)}. Nothing was lost — still queued on this phone.");
                     // A gateway error page or an empty body here used to surface as a raw JSON
                     // parser message with nothing to act on; name the responder instead.
                     if (string.IsNullOrWhiteSpace(uploadJson) || !uploadJson.TrimStart().StartsWith("{"))
@@ -492,7 +497,7 @@ namespace PenguinMonitor.Services
                 }
 
                 // Step 1b: Upload any pending biometric edits (independent of pending observations)
-                await UploadPendingBiometrics(colonyState, token, result, ColonyIdOf(appSettings));
+                await UploadPendingBiometrics(colonyState, token, result, appSettings.SelectedColonyId);
 
                 // Step 1c: watched flags are kept locally and pushed here (offline-safe queue)
                 var localBoxNotes = LoadBoxNotesFromDisk(context);
@@ -666,13 +671,15 @@ namespace PenguinMonitor.Services
         /// <summary>
         /// Upload confirmed edits after user approval.
         /// </summary>
-        internal async Task<int> UploadConfirmedEdits(ColonyState colonyState, AppSettings appSettings,
+        /// <returns>How many boxes landed, and — when the server refused or couldn't be reached —
+        /// why, in words to show the person who pressed Replace. Refused boxes stay queued.</returns>
+        internal async Task<(int uploaded, string? error)> UploadConfirmedEdits(ColonyState colonyState, AppSettings appSettings,
             List<(string boxName, string? nzDate)> confirmedBoxes)
         {
             var token = appSettings.AuthToken;
-            if (string.IsNullOrEmpty(token)) return 0;
-            // Never confirm-upload to the colony-1 fallback — stays queued until a colony is resolved.
-            if (appSettings.SelectedColonyId <= 0) return 0;
+            if (string.IsNullOrEmpty(token)) return (0, "Not logged in");
+            // Never confirm-upload without a colony — stays queued until one is resolved.
+            if (appSettings.SelectedColonyId <= 0) return (0, "No colony selected");
 
             var uploads = new List<object>();
             foreach (var (boxName, nzDate) in confirmedBoxes)
@@ -701,20 +708,29 @@ namespace PenguinMonitor.Services
                 });
             }
 
-            if (uploads.Count == 0) return 0;
+            if (uploads.Count == 0) return (0, null);
 
             var body = JsonConvert.SerializeObject(new { daily_label = colonyState.DailyLabel,
                 daily_observer_id = colonyState.DailyObserverId, daily_scribe_id = colonyState.DailyScribeId,
                 observations = uploads });
-            var request = new HttpRequestMessage(HttpMethod.Post, $"{WILDWATCH_SYNC_URL}?action=confirm");
+            // colony_id is what the server looks box names up in — without it a replaced Ngawhiti box
+            // landed in Port Tarakohe as a new box of the same name.
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{WILDWATCH_SYNC_URL}?action=confirm&colony_id={appSettings.SelectedColonyId}");
             request.Headers.Add("Authorization", $"Bearer {token}");
             request.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
-            var json = await response.Content.ReadAsStringAsync();
-            // Nothing usable came back (gateway page, empty body): report none uploaded rather than
-            // throwing — this runs inside a dialog flow whose continuation must still fire.
-            if (string.IsNullOrWhiteSpace(json) || !json.TrimStart().StartsWith("{")) return 0;
+            HttpResponseMessage response;
+            string json;
+            try
+            {
+                response = await _httpClient.SendAsync(request);
+                json = await response.Content.ReadAsStringAsync();
+            }
+            catch (Exception ex) { return (0, $"Couldn't reach the server: {ex.Message}"); }
+            // Refused, or nothing usable came back (gateway page, empty body): report why rather
+            // than throwing — this runs inside a dialog flow whose continuation must still fire.
+            if (!response.IsSuccessStatusCode || string.IsNullOrWhiteSpace(json) || !json.TrimStart().StartsWith("{"))
+                return (0, ServerMessage(json, (int)response.StatusCode));
             var uploadResult = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
 
             int uploaded = 0;
@@ -739,7 +755,7 @@ namespace PenguinMonitor.Services
                     }
                 }
             }
-            return uploaded;
+            return (uploaded, null);
         }
 
         /// <summary>One observation in the shape sync.php's upload action accepts. Shared with the
@@ -792,7 +808,7 @@ namespace PenguinMonitor.Services
                 .ToList();
 
             var uploadBody = JsonConvert.SerializeObject(BuildUploadBody(colonyState, pendingBoxes));
-            var request = new HttpRequestMessage(HttpMethod.Post, $"{WILDWATCH_SYNC_URL}?action=upload&colony_id={(appSettings.SelectedColonyId > 0 ? appSettings.SelectedColonyId : 1)}");
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{WILDWATCH_SYNC_URL}?action=upload&colony_id={appSettings.SelectedColonyId}");
             request.Headers.Add("Authorization", $"Bearer {token}");
             request.Content = new StringContent(uploadBody, Encoding.UTF8, "application/json");
 
@@ -801,7 +817,7 @@ namespace PenguinMonitor.Services
 
             var json = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode || string.IsNullOrEmpty(json) || !json.TrimStart().StartsWith("{"))
-            { result.Error = $"Upload failed ({(int)response.StatusCode}): {json?.Substring(0, Math.Min(json?.Length ?? 0, 200))}"; return result; }
+            { result.Error = $"Upload refused: {ServerMessage(json, (int)response.StatusCode)}. Still queued on this phone."; return result; }
 
             var uploadResult = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
             if (uploadResult != null && uploadResult.ContainsKey("created"))
@@ -999,7 +1015,7 @@ namespace PenguinMonitor.Services
 
         /// <summary>The server's own words for a failed request: its "error" field where the body is
         /// JSON, otherwise the status and a short snippet of whatever came back instead.</summary>
-        private static string ServerMessage(string? body, int statusCode)
+        internal static string ServerMessage(string? body, int statusCode)
         {
             try
             {
@@ -1163,7 +1179,7 @@ namespace PenguinMonitor.Services
             if (string.IsNullOrEmpty(token)) { result.Error = "Not logged in"; result.AuthFailed = true; return result; }
             // Never upload to the colony-1 fallback — biometrics stay queued until a colony is resolved.
             if (appSettings.SelectedColonyId <= 0) { result.Error = "No colony selected — kept local until you sync with colony access."; return result; }
-            await UploadPendingBiometrics(colonyState, token, result, ColonyIdOf(appSettings));
+            await UploadPendingBiometrics(colonyState, token, result, appSettings.SelectedColonyId);
             return result;
         }
 
@@ -1418,7 +1434,7 @@ namespace PenguinMonitor.Services
             try
             {
                 var queue = LoadQueuedChips(context); // re-read under the lock
-                var colonyId = appSettings.SelectedColonyId > 0 ? appSettings.SelectedColonyId : 1;
+                var colonyId = appSettings.SelectedColonyId;
 
                 foreach (var q in queue.ToList())
                 {
@@ -1611,7 +1627,7 @@ namespace PenguinMonitor.Services
         {
             var token = appSettings.AuthToken;
             if (string.IsNullOrEmpty(token)) return;
-            int colonyId = ColonyIdOf(appSettings);
+            int colonyId = appSettings.SelectedColonyId;
             bool changed = false;
 
             // Earlier days first — each goes to the date it was written on, not today.

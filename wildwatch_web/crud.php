@@ -126,7 +126,7 @@ if ($action === 'create_chipped_bird' && $_SERVER['REQUEST_METHOD'] === 'POST') 
         http_response_code(400); echo json_encode(['error'=>'pit_id must be the 15-digit ISO tag number']); exit;
     }
 
-    $cid = (int)($_GET['colony_id'] ?? 1);
+    $cid = wwRequireColonyId();
     requireColonyAccess($pdo, $observer, $cid, true); // the new bird is stamped with this colony
     $viewPrefix = getColonyPrefix($pdo, $cid);
     $pdo->beginTransaction();
@@ -288,7 +288,7 @@ if ($action === 'save_day_note' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!is_array($in)) { http_response_code(400); echo json_encode(['error'=>'JSON body required']); exit; }
     $date = (string)($in['date'] ?? '');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) { http_response_code(400); echo json_encode(['error'=>'date required (YYYY-MM-DD)']); exit; }
-    $colonyId = (int)($in['colony_id'] ?? $_GET['colony_id'] ?? 1);
+    $colonyId = wwRequireColonyId($in);
     requireColonyAccess($pdo, $observer, $colonyId, true);
     // Collapse whitespace so a note pasted over two lines still fits the column and reads as one line.
     $clean = fn($v, $max) => mb_substr(trim(preg_replace('/\s+/', ' ', (string)$v)), 0, $max);
@@ -375,6 +375,7 @@ if ($action === 'me') { echo json_encode(['name'=>$observer['observer_name'], 'r
 
 // Season field-monitoring dates — write (POST) requires auth
 if ($action === 'season_fm_dates') {
+    wwRequireColonyId();
     if (!wwFmDatesApply($pdo)) { http_response_code(403); echo json_encode(['error'=>'FM dates only apply to colony PT']); exit; }
     $seasonInput = $_GET['season'] ?? '';
     $season = strlen($seasonInput) === 2 ? 2000 + intval($seasonInput) : intval($seasonInput);
@@ -421,6 +422,8 @@ switch ($action) {
     case 'update':
     case 'delete':
         if (!$canWrite) { http_response_code(403); echo json_encode(['error'=>'Editors only']); break; }
+        // Bird numbers are prefixed by the request's colony — never guess it.
+        if (in_array($table, ['penguins', 'penguin_chips', 'penguin_biometric_data'])) wwRequireColonyId();
         requireWriteColony($pdo, $observer, $table, $id, json_decode(file_get_contents('php://input'), true) ?: []);
         if ($action === 'create') handleCreate($pdo, $table, $pk, $observer);
         elseif ($action === 'update') handleUpdate($pdo, $table, $pk, $id, $observer);
