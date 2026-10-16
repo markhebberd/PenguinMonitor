@@ -1,7 +1,7 @@
 import React, { Fragment, Suspense, createContext, lazy, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { updateRecord, createRecord, deleteRecord, fetchHistory, fetchColonies, saveVerification } from './api/boxtags';
-import { getStoreVersion, syncDatabase, triggerSync, primeFromCache, queryAllLocations, queryCarryForward, getDcmBoxes, prevNonIgnObs, queryPreviousObservations, getDateStats, computeDateStats, startPolling, stopPolling, getColonyId, setActiveColony, observedSexGuess, observedSexScore, SEX_CONFIRM_SCORE, queryBoxDetailSync, splitDismissed, dismissError, undismissError, computeAllPenguinsRows, computeBoxesSeenByPit, queryChipOnlyBoxes, getDayNote, getDayPeople, getUsers, getUserName, saveDayNote, getObserverName, getCachedFmDates, setCachedFmDates, searchLocal, displayPengNum, fullPengNum, pengNumValue, comparePengNum, activeColonyPrefix } from './api/localdb';
+import { getStoreVersion, syncDatabase, triggerSync, primeFromCache, queryAllLocations, queryCarryForward, getDcmBoxes, prevNonIgnObs, queryPreviousObservations, getDateStats, computeDateStats, startPolling, stopPolling, getColonyId, setActiveColony, observedSexGuess, observedSexScore, scanTimesForPeng, SEX_CONFIRM_SCORE, queryBoxDetailSync, splitDismissed, dismissError, undismissError, computeAllPenguinsRows, computeBoxesSeenByPit, queryChipOnlyBoxes, getDayNote, getDayPeople, getUsers, getUserName, saveDayNote, getObserverName, getCachedFmDates, setCachedFmDates, searchLocal, displayPengNum, fullPengNum, pengNumValue, comparePengNum, activeColonyPrefix } from './api/localdb';
 import { useAllPenguins, useBoxInfo, useOverview, useBoxTags, useDateStats, useBoxDetail, useBirdDetail, useDayData, useEggArrival, useFirstEgg, useDistinctAdults, usePeakAdults, useChickReturn, useMissedScans, useMissingNoScans, useDbVersion, useBirdTwoBoxes, useScanBeforeChip, useDeadScanned, useImprobableCounts, useFutureObservations, useRetiredTagScans, useChicksNoScan, useDuplicateObservations, useDuplicateScans, useSameGenderConflicts, useChickSizeMismatch, useMissingChipMeasures } from './api/useLocalDb';
 import { getSeasonStart, getSeasonLabel, SEASON_START_MONTH, SEASON_START_DAY } from './config';
 import { DAY, BREEDING_OFFSETS, SECOND_EGG_LAG_DAYS, MAX_OFFSPRING_SHOWN, PAIR_WEIGHTS, IMPLIED_SHARE_CONFIDENCE, PRE_BREEDING_SIGHTINGS_CAP } from './breedingConstants';
@@ -6013,9 +6013,9 @@ function TopChickParentsReport({ onOpenBird }: { onOpenBird: (num: string) => vo
     // Per detected parent, breeding outcomes summed over every clutch where they were a
     // parent (same nest-family detection the box overview / bird panel use). Eggs/chicks
     // are per-clutch peaks summed; chipped and returned chicks are DISTINCT birds.
-    // Fledged counts chipped chicks that have since gone from the nest without being recorded
-    // dead (fledgedChippedChicks). Chipping alone is not a fledge: a chipped chick still has
-    // days in the nest, so counting it fledged overstated every bird.
+    // Fledged counts chipped chicks that left the nest and stayed gone (fledgedChippedChicks).
+    // Chipping alone is not a fledge: a chipped chick still has days in the nest, and one that
+    // turns up again elsewhere in the colony never left, so counting chips overstated every bird.
     const byParent = new Map<string, { bird: any; eggs: number; chicksProduced: number; fledged: number; chicks: Set<string>; returned: Set<string> }>();
     for (const { families } of allColonyBoxes()) {
       for (const sd of families) {
@@ -6026,7 +6026,7 @@ function TopChickParentsReport({ onOpenBird }: { onOpenBird: (num: string) => vo
             if (!e) { e = { bird: parent, eggs: 0, chicksProduced: 0, fledged: 0, chicks: new Set(), returned: new Set() }; byParent.set(parent.peng_num, e); }
             e.eggs += fam.clutch.maxEggs;
             e.chicksProduced += fam.clutch.maxChicks;
-            e.fledged += fledgedChippedChicks(fam.clutch, fam.chicks.length, sd.seasonObs);
+            e.fledged += fledgedChippedChicks(fam.clutch, fam.chicks, sd.seasonObs);
             for (const ck of fam.chicks) if (ck.peng_num) {
               e.chicks.add(ck.peng_num);
               if (ck.hasReturned) e.returned.add(ck.peng_num);
@@ -6078,7 +6078,7 @@ function TopChickParentsReport({ onOpenBird }: { onOpenBird: (num: string) => vo
   return (
     <div className="report-card">
       <h3>Most successful parents</h3>
-      <p className="muted">Breeding outcomes summed over every clutch where the bird was a detected parent. Eggs and chicks are each clutch's peak count; fledged counts chipped chicks that have since gone from the nest without being recorded dead. Click a column to sort.</p>
+      <p className="muted">Breeding outcomes summed over every clutch where the bird was a detected parent. Eggs and chicks are each clutch's peak count; fledged counts chipped chicks that left the nest and were not scanned anywhere in the colony in the {FLEDGE_REAPPEAR_DAYS} days after — one found again never left. Click a column to sort.</p>
       {sorted.length === 0 ? <p className="muted">No data available</p> : (
         <div className="table-scroll">
           <table className="guess-rank-table rank-table">
@@ -9349,25 +9349,43 @@ function BreedingCalibration() {
  *  Hatch switches to the observed midpoint once chicks have actually been recorded. Dates that
  *  have already passed are dimmed a touch; the next one due is bold. Built entirely from the
  *  local cache. */
+/** How long after a nest reads empty a chick can still turn up and so count as not yet gone.
+ *  Past that, a sighting is a bird coming back to the colony, not a chick that never left. */
+const FLEDGE_REAPPEAR_DAYS = 90;
+
 /**
- * Chicks taken as fledged: the clutch's chipped chicks that are no longer in the nest and were
- * never recorded dead. Chipping by itself says nothing — a chipped chick still has days in the
- * nest — so a chick counts only once a later check stops finding it.
+ * Chicks taken as fledged: this clutch's chipped chicks that left and stayed gone.
  *
- * Chicks still counted at the clutch's last check are read as the chipped ones, so a brood
- * where only some were chipped can never over-report. `clutchObs` is the box's season
- * observations, chronological; only those inside the clutch are used.
+ * Chipping by itself says nothing — a chipped chick still has days in the nest. A chick counts
+ * only once a check of its own box finds the nest empty AND nothing scans it anywhere in the
+ * colony for the {@link FLEDGE_REAPPEAR_DAYS} that follow: one that skipped a monitor and turned
+ * up on a later day, or in a different box, never left. Chicks recorded dead come off the count,
+ * and a sighting beyond the window is a returning bird, not a failure to fledge.
+ *
+ * `clutchObs` is the box's season observations, chronological; only those inside the clutch are
+ * read. A chick still about simply isn't counted — the column shows no mark for it.
  */
-function fledgedChippedChicks(clutch: Clutch, chippedCount: number, clutchObs: any[]): number {
-  if (chippedCount <= 0) return 0;
+function fledgedChippedChicks(clutch: Clutch, chicks: any[], clutchObs: any[]): number {
+  if (!chicks.length) return 0;
   const inClutch = clutchObs.filter(o => {
     const t = parseDate(o.observation_time_utc).getTime();
     return t >= clutch.start && t <= (clutch.end ?? Infinity);
   });
-  const last = inClutch[inClutch.length - 1];
-  const stillInNest = last ? Number(last.chicks) || 0 : 0;
+  let gone = 0;
+  for (const ck of chicks) {
+    const chippedT = ck.chip_date ? new Date(ck.chip_date).getTime() : clutch.start;
+    // The first check after chipping that found the nest empty. Until one does, the chick is
+    // still in there and there is nothing to say yet.
+    const emptied = inClutch.find(o => parseDate(o.observation_time_utc).getTime() > chippedT
+      && (Number(o.chicks) || 0) === 0);
+    if (!emptied) continue;
+    const emptiedT = parseDate(emptied.observation_time_utc).getTime();
+    const seenAgain = scanTimesForPeng(ck.peng_num)
+      .some(t => t > emptiedT && t <= emptiedT + FLEDGE_REAPPEAR_DAYS * DAY);
+    if (!seenAgain) gone++;
+  }
   const recordedDead = inClutch.reduce((s, o) => s + (Number(o.dead_chicks) || 0), 0);
-  return Math.max(0, chippedCount - stillInNest - recordedDead);
+  return Math.max(0, gone - recordedDead);
 }
 
 function SeasonBreedingReport() {
@@ -9422,7 +9440,7 @@ function SeasonBreedingReport() {
           clutch: c, hatch, hatchObserved,
           twoEggs: (c.maxEggs || 2) >= 2,
           chipped,
-          fledged: fledgedChippedChicks(c, chipped, inClutch),
+          fledged: fledgedChippedChicks(c, fam ? fam.chicks : [], inClutch),
           status: latest ? displayStatusOrPrev(latest, box) : null,
           startObsTime: c.startObsTime,
         });
@@ -9471,8 +9489,9 @@ function SeasonBreedingReport() {
         laid date (2nd egg +2d, hatch +{BREEDING_OFFSETS.hatch}d, guard ends +{BREEDING_OFFSETS.pg}d,
         chip window +{BREEDING_OFFSETS.chip}d to +{BREEDING_OFFSETS.chip + 7}d, fledge +{BREEDING_OFFSETS.fledge}d);
         an observed hatch replaces the predicted one. Chipped shows one ✓ per chick chipped;
-        Fledged one ✓ per chipped chick that has since gone from the nest without being recorded
-        dead — a dash while they are still in there.
+        Fledged one ✓ per chipped chick whose nest has since read empty with no sighting of it
+        anywhere in the colony for the {FLEDGE_REAPPEAR_DAYS} days after — a chick found again on
+        a later day, or in another box, never left, and one recorded dead comes off the count.
         Past dates are dimmed, the next one due is bold.
       </p>
       <BreedingCalibration />
@@ -9483,7 +9502,7 @@ function SeasonBreedingReport() {
               <th>Clutch</th><th>Box</th><th>1st egg</th><th>2nd egg</th><th>Hatch</th><th>PG (guard ends)</th>
               <th>Chip from</th><th>Chip to</th><th>Fledge</th>
               <th title="Chicks chipped in this clutch">Chipped</th>
-              <th title="Chipped chicks no longer in the nest and never recorded dead — one ✓ each; — while they are still there">Fledged</th>
+              <th title="Chipped chicks that left the nest and stayed gone — one ✓ each. A chick scanned again anywhere in the colony within 90 days never left, and a chick recorded dead comes off the count">Fledged</th>
             </tr>
           </thead>
           <tbody>
@@ -9522,7 +9541,7 @@ function SeasonBreedingReport() {
                   <Cell t={parts[5]} next={nextIdx === 5} est title="Chip window closes — 7 days after it opens (estimated)" />
                   <Cell t={parts[6]} next={nextIdx === 6} est />
                   <Ticks n={r.chipped} title={`${r.chipped} chick${r.chipped !== 1 ? 's' : ''} chipped`} />
-                  <Ticks n={r.fledged} title={`${r.fledged} chipped chick${r.fledged !== 1 ? 's' : ''} gone from the nest, none recorded dead`} />
+                  <Ticks n={r.fledged} title={`${r.fledged} chipped chick${r.fledged !== 1 ? 's' : ''} left the nest and stayed gone`} />
                 </tr>
               );
             })}

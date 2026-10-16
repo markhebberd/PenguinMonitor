@@ -1349,6 +1349,25 @@ export function computeBoxesSeenByPit(): Map<string, string[]> {
   return out;
 }
 
+/**
+ * Every time this bird was scanned anywhere in the colony, ascending ms. Any box, including
+ * its own nest — a chick found again after its nest read empty hasn't left, whether it turned
+ * up next door or back where it started.
+ */
+export function scanTimesForPeng(pengNum: string | null | undefined): number[] {
+  const out: number[] = [];
+  if (!mem || !pengNum) return out;
+  for (const ch of (mem.chipsByPeng.get(pengNum) || [])) {
+    for (const sc of (mem.scansByPit.get(ch.pit_id) || [])) {
+      const obs = mem.obsById.get(sc.observation_id);
+      if (!obs || obs.is_deleted) continue;
+      const t = new Date(obs.observation_time_utc).getTime();
+      if (!isNaN(t)) out.push(t);
+    }
+  }
+  return out.sort((a, b) => a - b);
+}
+
 export function observedSexGuess(pengNum: string | null | undefined): { m: number; f: number } {
   const out = { m: 0, f: 0 };
   if (!mem || !pengNum) return out;
