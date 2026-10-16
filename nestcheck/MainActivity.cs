@@ -196,6 +196,7 @@ namespace PenguinMonitor
         private HorizontalScrollView? _chipTabStripScroll;
         private LinearLayout? _chipTabStrip;
         private FrameLayout? _chipTabBody;
+        private TextView? _chipTitleView;   // own title, so it can go when the tabs take over
 
         // ===== Pending chip workflow persistence (survives Android killing the app) =====
         private const string PENDING_CHIP_FILENAME = DataStorageService.PENDING_CHIP_FILENAME;
@@ -7434,7 +7435,7 @@ namespace PenguinMonitor
             void SetTitle(string t)
             {
                 tab.Title = t;
-                if (_activeChipTab == tab) _chipDialog?.SetTitle(t);
+                if (_activeChipTab == tab && _chipTitleView != null) _chipTitleView.Text = t;
             }
             void SetSaveButton(string text, bool enabled = true)
             {
@@ -8047,6 +8048,12 @@ namespace PenguinMonitor
             if (_chipDialog != null) return;
             SetDialogActive(true);
             var root = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
+            // The dialog's own title can't be hidden once built, so the title is a view of ours: shown
+            // for a single bird, dropped when there are several — the tabs name each bird then.
+            _chipTitleView = new TextView(this) { TextSize = 22 };
+            _chipTitleView.SetTextColor(Color.White);
+            _chipTitleView.SetPadding(24, 20, 24, 12);
+            root.AddView(_chipTitleView);
             _chipTabStripScroll = new HorizontalScrollView(this) { HorizontalScrollBarEnabled = false, Visibility = ViewStates.Gone };
             _chipTabStrip = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             _chipTabStrip.SetPadding(16, 8, 16, 0);
@@ -8056,7 +8063,6 @@ namespace PenguinMonitor
             root.AddView(_chipTabBody, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
             var dialog = new AlertDialog.Builder(this)
-                .SetTitle("New bird")
                 .SetView(root)
                 .SetPositiveButton("Save chip", (EventHandler<DialogClickEventArgs>)null!)
                 .SetNegativeButton("Cancel", (EventHandler<DialogClickEventArgs>)null!)
@@ -8087,6 +8093,9 @@ namespace PenguinMonitor
             // AlertDialog blocks the soft keyboard when its view has no text field at creation —
             // and the tabs' forms are only added after it's built. Unblock it.
             dialog.Window?.ClearFlags(WindowManagerFlags.AltFocusableIm | WindowManagerFlags.NotFocusable);
+            // Shrink above the keyboard so the form scrolls and the bottom fields (Weight, Notes)
+            // can be reached while typing, instead of sitting under the keyboard.
+            dialog.Window?.SetSoftInputMode(SoftInput.AdjustResize);
             dialog.GetButton((int)DialogButtonType.Positive)!.Click += (s, e) => _activeChipTab?.Save();
             dialog.GetButton((int)DialogButtonType.Negative)!.Click += (s, e) => CancelActiveChipTab();
             _chipDialog = dialog;
@@ -8118,7 +8127,7 @@ namespace PenguinMonitor
             _activeChipTab = tab;
             _chipTabBody.RemoveAllViews();
             _chipTabBody.AddView(tab.Content, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
-            _chipDialog.SetTitle(tab.Title);
+            if (_chipTitleView != null) _chipTitleView.Text = tab.Title;
             var b = _chipDialog.GetButton((int)DialogButtonType.Positive);
             if (b != null) { b.Text = tab.SaveText; b.Enabled = tab.SaveEnabled; }
             tab.RefreshScanTimes?.Invoke();
@@ -8178,6 +8187,7 @@ namespace PenguinMonitor
             _chipTabStrip.RemoveAllViews();
             // A single bird looks exactly like the old one-bird form
             _chipTabStripScroll.Visibility = _chipTabs.Count > 1 ? ViewStates.Visible : ViewStates.Gone;
+            if (_chipTitleView != null) _chipTitleView.Visibility = _chipTabs.Count > 1 ? ViewStates.Gone : ViewStates.Visible;
             if (_chipTabs.Count < 2) return;
             foreach (var t in _chipTabs)
             {
