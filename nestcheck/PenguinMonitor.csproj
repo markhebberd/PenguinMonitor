@@ -4,7 +4,7 @@
     <!-- Pinned to API 36: Play refuses uploads targeting less as of Sep 2026, and an
          unpinned net9.0-android silently follows whichever platform is installed. -->
     <TargetFramework>net9.0-android36.0</TargetFramework>
-    <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion>21</TargetPlatformMinVersion>
 	<NoWarn>$(NoWarn);CA1422</NoWarn>
 	  <Platforms>ARM64</Platforms>
@@ -17,8 +17,8 @@
 	  
     <ApplicationId>nz.co.wildwatch.nestcheck</ApplicationId>
     <ApplicationTitle>Nestcheck</ApplicationTitle>
-    <ApplicationVersion>3970</ApplicationVersion>
-    <ApplicationDisplayVersion>39.70</ApplicationDisplayVersion>
+    <ApplicationVersion>3971</ApplicationVersion>
+    <ApplicationDisplayVersion>39.71</ApplicationDisplayVersion>
 
     <!-- BoxTags API defaults (can be overridden in secrets.props) -->
     <BoxTagsApiUrl Condition="'$(BoxTagsApiUrl)' == ''"></BoxTagsApiUrl>
