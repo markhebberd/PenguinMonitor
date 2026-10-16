@@ -17,8 +17,8 @@
 	  
     <ApplicationId>nz.co.wildwatch.nestcheck</ApplicationId>
     <ApplicationTitle>Nestcheck</ApplicationTitle>
-    <ApplicationVersion>3979</ApplicationVersion>
-    <ApplicationDisplayVersion>39.79</ApplicationDisplayVersion>
+    <ApplicationVersion>3980</ApplicationVersion>
+    <ApplicationDisplayVersion>39.80</ApplicationDisplayVersion>
 
     <!-- BoxTags API defaults (can be overridden in secrets.props) -->
     <BoxTagsApiUrl Condition="'$(BoxTagsApiUrl)' == ''"></BoxTagsApiUrl>
