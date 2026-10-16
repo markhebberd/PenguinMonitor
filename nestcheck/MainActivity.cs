@@ -187,6 +187,8 @@ namespace PenguinMonitor
             public Action Save = null!;           // validate, confirm, save
             public Action Cancel = null!;         // undo this tab's provisional box scan
             public Action<string>? PlaceholderScan;
+            public Action? Rescanned;             // chip scanned again: log it and flash the summary
+            public Action? RefreshScanTimes;      // redraw the "time since scanned" text
         }
         private AlertDialog? _chipDialog;
         private readonly List<ChipTab> _chipTabs = new();
@@ -7094,6 +7096,19 @@ namespace PenguinMonitor
             pitInfo.SetPadding(0, 0, 0, 12);
             card.AddView(pitInfo);
 
+            // Every time this chip has been scanned. A chip is often scanned again while its tab
+            // is open; this line (and the full list at the bottom) is the visible record of that,
+            // rather than a toast that's gone in two seconds.
+            var scanTimes = restore != null ? (restore.ScanTimesUtc ?? new List<DateTime>()).ToList()
+                                            : new List<DateTime> { DateTime.UtcNow };
+            var scanSummary = new TextView(this) { TextSize = 13 };
+            scanSummary.SetTextColor(UIFactory.TEXT_PRIMARY);
+            scanSummary.SetPadding(8, 4, 8, 4);
+            var scanSummaryLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+            scanSummaryLp.SetMargins(0, 0, 0, 12);
+            scanSummary.LayoutParameters = scanSummaryLp;
+            card.AddView(scanSummary);
+
             // New penguin / Rechip mode — a rechip attaches this PIT as a NEW chip on an
             // existing bird and retires the bird's old chip (mirrors the wildwatch flow).
             PenguinData? rechipTarget = null;
@@ -7183,11 +7198,14 @@ namespace PenguinMonitor
             // assistant can be anyone. Needs sync.php to send falcon_id — until it does, this list
             // is empty and the chipper picker has only the blank option.
             var chipperUsers = chipUsers.Where(u => !string.IsNullOrWhiteSpace(u.falcon_id)).ToList();
-            Spinner MakeChipPersonSpinner(List<DataStorageService.SyncUser> src, int selectedId)
+            const string OtherChipperLabel = "Other — type a name";
+            Spinner MakeChipPersonSpinner(List<DataStorageService.SyncUser> src, int selectedId, bool allowOther = false)
             {
-                // Index 0 is the unset option — blank; empty reads as "not set".
+                // Index 0 is the unset option — blank; empty reads as "not set". allowOther adds a
+                // last entry for a person who isn't in the user list, typed in by name.
                 var labels = new List<string> { "" };
                 labels.AddRange(src.Select(u => u.name ?? ""));
+                if (allowOther) labels.Add(OtherChipperLabel);
                 var sp = _uiFactory.CreateDropdownSpinner();
                 // SimpleSpinnerItem closed view (no radio); dropdown list uses the checked item.
                 var ad = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem, labels);
@@ -7294,10 +7312,23 @@ namespace PenguinMonitor
             chipperCol.AddView(chipperLabel);
             // Starts unset — the chipper is chosen explicitly, not assumed to be whoever is logged in.
             // Only chippers (users with a falcon id) appear here.
-            var chipperSpinner = MakeChipPersonSpinner(chipperUsers, 0);
-            // Picking a chipper clears the red "required" highlight raised by a failed save.
-            chipperSpinner.ItemSelected += (s, e) => { if (e.Position > 0) chipperLabel.SetTextColor(UIFactory.TEXT_PRIMARY); };
+            var chipperSpinner = MakeChipPersonSpinner(chipperUsers, 0, allowOther: true);
             chipperCol.AddView(chipperSpinner);
+            // Someone not in the list (no user account, or no permit id synced): typed as text and
+            // saved as penguin_chips.chipper_name in place of a chipper id.
+            var chipperNameInput = createInput("Chipper's name", Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextFlagCapWords);
+            chipperNameInput.Visibility = ViewStates.Gone;
+            chipperCol.AddView(chipperNameInput);
+            bool ChipperIsOther() => chipperSpinner.SelectedItemPosition == chipperUsers.Count + 1;
+            string ChipperNameValue() => ChipperIsOther() ? (chipperNameInput.Text ?? "").Trim() : "";
+            chipperSpinner.ItemSelected += (s, e) =>
+            {
+                // Picking a chipper clears the red "required" highlight raised by a failed save.
+                if (e.Position > 0 && !ChipperIsOther()) chipperLabel.SetTextColor(UIFactory.TEXT_PRIMARY);
+                chipperNameInput.Visibility = ChipperIsOther() ? ViewStates.Visible : ViewStates.Gone;
+                if (ChipperIsOther()) chipperNameInput.RequestFocus();
+            };
+            chipperNameInput.TextChanged += (s, e) => { if (ChipperNameValue().Length > 0) chipperLabel.SetTextColor(UIFactory.TEXT_PRIMARY); };
             if (chipperUsers.Count == 0)
             {
                 var noChippers = new TextView(this) { Text = "No chippers synced", TextSize = 12 };
@@ -7349,6 +7380,38 @@ namespace PenguinMonitor
                 Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextFlagMultiLine | Android.Text.InputTypes.TextFlagCapSentences);
             card.AddView(notesInput);
 
+            var scanListHeader = createLabel("Scans of this chip");
+            scanListHeader.SetPadding(0, 16, 0, 4);
+            card.AddView(scanListHeader);
+            var scanList = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
+            card.AddView(scanList);
+
+            static string Ago(TimeSpan t) =>
+                t.TotalSeconds < 60 ? $"{Math.Max(0, (int)t.TotalSeconds)} s ago"
+                : t.TotalMinutes < 60 ? $"{(int)t.TotalMinutes} min ago"
+                : $"{(int)t.TotalHours} h {t.Minutes} min ago";
+            void RenderScanTimes()
+            {
+                var now = DateTime.UtcNow;
+                scanSummary.Visibility = scanTimes.Count > 0 ? ViewStates.Visible : ViewStates.Gone;
+                scanListHeader.Visibility = scanSummary.Visibility;
+                scanList.RemoveAllViews();
+                if (scanTimes.Count == 0) return;
+                var last = scanTimes[^1];
+                scanSummary.Text = scanTimes.Count == 1
+                    ? $"Scanned {ToNzTime(last):HH:mm:ss} ({Ago(now - last)})"
+                    : $"Scanned {scanTimes.Count}× — last {ToNzTime(last):HH:mm:ss} ({Ago(now - last)})";
+                // Newest first, numbered in scan order
+                for (int i = scanTimes.Count - 1; i >= 0; i--)
+                {
+                    var row = new TextView(this) { Text = $"{i + 1}.  {ToNzTime(scanTimes[i]):HH:mm:ss}  —  {Ago(now - scanTimes[i])}", TextSize = 13 };
+                    row.SetTextColor(i == scanTimes.Count - 1 ? UIFactory.TEXT_PRIMARY : UIFactory.TEXT_SECONDARY);
+                    row.SetPadding(0, 2, 0, 2);
+                    scanList.AddView(row);
+                }
+            }
+            RenderScanTimes();
+
             // This bird's tab in the shared chip dialog. Title and Save button belong to the
             // tab; the dialog shows whichever tab is active.
             var tab = new ChipTab
@@ -7358,6 +7421,15 @@ namespace PenguinMonitor
                 ReservedPengNum = nextPengNum,
                 Title = string.IsNullOrEmpty(nextPengLabel) ? $"New bird: {shortId}" : $"New bird {nextPengLabel}",
                 Cancel = () => onCancel?.Invoke(),
+                RefreshScanTimes = RenderScanTimes,
+            };
+            tab.Rescanned = () =>
+            {
+                scanTimes.Add(DateTime.UtcNow);
+                RenderScanTimes();
+                // Brief highlight so the scribe sees which bird the rescan landed on
+                scanSummary.SetBackgroundColor(Color.ParseColor("#FFF59D"));
+                scanSummary.PostDelayed(() => scanSummary.SetBackgroundColor(Color.Transparent), 1500);
             };
             void SetTitle(string t)
             {
@@ -7388,6 +7460,7 @@ namespace PenguinMonitor
                 fullPitId = scanKey;
                 shortId = scanShort;
                 tab.FullPitId = scanKey;
+                scanTimes.Clear(); scanTimes.Add(DateTime.UtcNow); RenderScanTimes();
                 pitInfo.Text = $"PIT ID: {fullPitId}";
                 if (!modeRechip.Checked && string.IsNullOrEmpty(nextPengLabel))
                     SetTitle($"New bird: {shortId}");
@@ -7530,6 +7603,7 @@ namespace PenguinMonitor
                     SexCode = ObservedSexOptions.FirstOrDefault(o => o.label == (sexSpinner.SelectedItem?.ToString() ?? "")).code ?? "",
                     ChipBox = ChipBoxValue(),
                     ChipperId = SelectedChipUserId(chipperSpinner, chipperUsers),
+                    ChipperName = ChipperNameValue(),
                     AssistantId = SelectedChipUserId(assistantSpinner, chipUsers),
                     Weight = weightInput.Text ?? "",
                     Flipper = flipperInput.Text ?? "",
@@ -7539,6 +7613,7 @@ namespace PenguinMonitor
                     ScanCleanupBox = scanCleanup?.box ?? "",
                     ScanCleanupDecrement = scanCleanup?.decrementAdult ?? false,
                     RequestedPengNum = nextPengNum,
+                    ScanTimesUtc = scanTimes.ToList(),
                 };
             }
             tab.Capture = CaptureChipState;
@@ -7549,6 +7624,12 @@ namespace PenguinMonitor
                 if (nestNames.Count == 0) nestSearchInput.Text = restore.ChipBox;
                 else { var rk = nestNames.FirstOrDefault(k => string.Equals(k, restore.ChipBox?.Trim(), StringComparison.OrdinalIgnoreCase)); if (rk != null) SelectNest(rk); }
                 if (restore.ChipperId > 0) { var ci = chipperUsers.FindIndex(u => u.id == restore.ChipperId); if (ci >= 0) chipperSpinner.SetSelection(ci + 1); }
+                else if (!string.IsNullOrEmpty(restore.ChipperName))
+                {
+                    chipperSpinner.SetSelection(chipperUsers.Count + 1);
+                    chipperNameInput.Text = restore.ChipperName;
+                    chipperNameInput.Visibility = ViewStates.Visible;
+                }
                 if (restore.AssistantId > 0) { var ai = chipUsers.FindIndex(u => u.id == restore.AssistantId); if (ai >= 0) assistantSpinner.SetSelection(ai + 1); }
                 weightInput.Text = restore.Weight;
                 flipperInput.Text = restore.Flipper;
@@ -7589,6 +7670,7 @@ namespace PenguinMonitor
                     SexCode = qSex,
                     ChipBox = ChipBoxValue(),
                     ChipperId = SelectedChipUserId(chipperSpinner, chipperUsers),
+                    ChipperName = ChipperNameValue(),
                     AssistantId = SelectedChipUserId(assistantSpinner, chipUsers),
                     Weight = weightInput.Text ?? "",
                     Flipper = flipperInput.Text ?? "",
@@ -7652,6 +7734,7 @@ namespace PenguinMonitor
                 }
                 // Read the person spinners here on the UI thread — the network POST below runs off it.
                 var chipperId = SelectedChipUserId(chipperSpinner, chipperUsers);
+                var chipperName = ChipperNameValue();
                 var assistantId = SelectedChipUserId(assistantSpinner, chipUsers);
                 var chipBoxVal = ChipBoxValue();
 
@@ -7714,6 +7797,7 @@ namespace PenguinMonitor
                             // it hands back a different number only if this one is genuinely taken.
                             if (!string.IsNullOrEmpty(nextPengNum)) birdFields["requested_peng_num"] = nextPengNum;
                             if (chipperId > 0) birdFields["chipper_id"] = chipperId;
+                            else if (chipperName.Length > 0) birdFields["chipper_name"] = chipperName;
                             if (assistantId > 0) birdFields["assistant_id"] = assistantId;
                             if (!string.IsNullOrEmpty(chickSize)) birdFields["chick_size_code"] = chickSize;
                             if (!string.IsNullOrEmpty(weightInput.Text)) birdFields["weight"] = weightInput.Text;
@@ -7770,6 +7854,7 @@ namespace PenguinMonitor
                                 ["chip_box"] = chipBoxVal,
                             };
                             if (chipperId > 0) chipFields["chipper_id"] = chipperId;
+                            else if (chipperName.Length > 0) chipFields["chipper_name"] = chipperName;
                             if (assistantId > 0) chipFields["assistant_id"] = assistantId;
                             var chipReq = new HttpRequestMessage(HttpMethod.Post,
                                 $"{DataStorageService.WILDWATCH_BASE_URL}/crud.php?action=create&table=penguin_chips&colony_id={colonyId}");
@@ -7908,10 +7993,10 @@ namespace PenguinMonitor
                 }
                 // A chip must be attributed to a chipper — no save without one selected. Flag the
                 // Chipper label red so it's obvious what's missing.
-                if (SelectedChipUserId(chipperSpinner, chipperUsers) == 0)
+                if (SelectedChipUserId(chipperSpinner, chipperUsers) == 0 && ChipperNameValue().Length == 0)
                 {
                     chipperLabel.SetTextColor(UIFactory.DANGER_RED);
-                    Toast.MakeText(this, chipperUsers.Count == 0 ? "No chippers — Sync to load them" : "Select chipper", ToastLength.Short)?.Show();
+                    Toast.MakeText(this, ChipperIsOther() ? "Type the chipper's name" : "Select chipper, or Other to type a name", ToastLength.Short)?.Show();
                     return;
                 }
                 // Confirmation screen listing everything that will be saved, worded the way
@@ -7937,7 +8022,7 @@ namespace PenguinMonitor
                     }
                 }
                 summary.Add($"Chip box: {ChipBoxValue()}");
-                summary.Add($"Chipper: {(chipperSpinner.SelectedItemPosition > 0 ? chipperSpinner.SelectedItem?.ToString() : "Not recorded")}");
+                summary.Add($"Chipper: {(ChipperIsOther() ? ChipperNameValue() : chipperSpinner.SelectedItemPosition > 0 ? chipperSpinner.SelectedItem?.ToString() : "Not recorded")}");
                 if (assistantSpinner.SelectedItemPosition > 0)
                     summary.Add($"Assistant: {assistantSpinner.SelectedItem?.ToString()}");
                 if (!string.IsNullOrWhiteSpace(weightInput.Text)) summary.Add($"Weight: {weightInput.Text} g");
@@ -8005,6 +8090,14 @@ namespace PenguinMonitor
             dialog.GetButton((int)DialogButtonType.Positive)!.Click += (s, e) => _activeChipTab?.Save();
             dialog.GetButton((int)DialogButtonType.Negative)!.Click += (s, e) => CancelActiveChipTab();
             _chipDialog = dialog;
+            // Keep "N min ago" current on the tab showing
+            void Tick()
+            {
+                if (_chipDialog != dialog) return;
+                _activeChipTab?.RefreshScanTimes?.Invoke();
+                _chipTabBody?.PostDelayed(Tick, 10000);
+            }
+            _chipTabBody?.PostDelayed(Tick, 10000);
             _newBirdScanCapture = HandleScanWhileChipping;
             _pendingChipCapture = PersistChipTabs;
         }
@@ -8028,6 +8121,7 @@ namespace PenguinMonitor
             _chipDialog.SetTitle(tab.Title);
             var b = _chipDialog.GetButton((int)DialogButtonType.Positive);
             if (b != null) { b.Text = tab.SaveText; b.Enabled = tab.SaveEnabled; }
+            tab.RefreshScanTimes?.Invoke();
             var imm = (InputMethodManager?)GetSystemService(InputMethodService);
             imm?.HideSoftInputFromWindow(_chipTabBody.WindowToken, 0);
             RefreshChipTabStrip();
@@ -8129,7 +8223,8 @@ namespace PenguinMonitor
             if (open != null)
             {
                 ActivateChipTab(open);
-                Toast.MakeText(this, $"Chip {shortKey} is already open", ToastLength.Short)?.Show();
+                open.Rescanned?.Invoke();
+                PersistChipTabs();
                 return true;
             }
             if (_remotePenguinData != null &&
@@ -9672,7 +9767,7 @@ namespace PenguinMonitor
                         chip_date = ToNzTime(q.CreatedUtc).ToString("yyyy-MM-dd"),
                         chipped_as_adult = q.IsChick ? 0 : 1, chick_size_code = q.ChickSizeCode,
                         is_rechip = q.IsRechip, rechip_peng_num = q.RechipPengNum,
-                        chipper_id = q.ChipperId, chipper = UserName(q.ChipperId),
+                        chipper_id = q.ChipperId, chipper = q.ChipperId > 0 ? UserName(q.ChipperId) : q.ChipperName,
                         assistant_id = q.AssistantId, assistant = UserName(q.AssistantId),
                         weight = q.Weight, flipper_length = q.Flipper, observed_sex = q.SexCode, notes = q.Notes,
                     }).ToList(),

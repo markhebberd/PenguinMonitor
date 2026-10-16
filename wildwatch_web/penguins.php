@@ -37,7 +37,7 @@ if (isset($_GET['all'])) {
     // rechipped bird has worn (chip-date order), each flagged active/inactive. "Chipped by" is the
     // chipper's acronym, resolved from chipper_id (the FK — every chip has one).
     foreach ($pdo->query("SELECT pc.peng_num, pc.pit_id, pc.chip_date, pc.chip_box, pc.is_active,
-                                 u.chip_acronym AS chip_by
+                                 COALESCE(u.chip_acronym, pc.chipper_name) AS chip_by
                           FROM penguin_chips pc LEFT JOIN users u ON u.id = pc.chipper_id
                           ORDER BY pc.chip_date, pc.pit_id") as $ch) {
         if (!isset($birds[$ch['peng_num']])) continue;

@@ -171,6 +171,9 @@ if ($action === 'create_chipped_bird' && $_SERVER['REQUEST_METHOD'] === 'POST') 
             $byAcr->execute([trim($in['chip_by'])]);
             $chip['chipper_id'] = ($hit = $byAcr->fetchColumn()) ? (int)$hit : null;
         }
+        // A chipper who isn't a user is typed by name on the phone; kept only when no id landed.
+        $typed = mb_substr(trim((string)($in['chipper_name'] ?? '')), 0, 80);
+        if ($chip['chipper_id'] === null && $typed !== '') $chip['chipper_name'] = $typed;
         $chip['assistant_id'] = $asChipUser($in['assistant_id'] ?? null);
         wwAuditedInsert($pdo, 'penguin_chips', $chip, $obsId, $reason);
 
@@ -764,6 +767,12 @@ function handleCreate($pdo, $table, $pk, $observer) {
             $byAcr = $pdo->prepare("SELECT id FROM users WHERE chip_acronym = ?");
             $byAcr->execute([trim((string)$incomingChipBy)]);
             if ($hit = $byAcr->fetchColumn()) $input['chipper_id'] = (int)$hit;
+        }
+        // A typed chipper name (someone not in users) only stands in when there's no chipper id.
+        if ($table === 'penguin_chips' && array_key_exists('chipper_name', $input)) {
+            $typed = mb_substr(trim((string)$input['chipper_name']), 0, 80);
+            if (!empty($input['chipper_id']) || $typed === '') unset($input['chipper_name']);
+            else $input['chipper_name'] = $typed;
         }
 
         // Auto-generate peng_num for new penguins (next number in the requested colony, or the

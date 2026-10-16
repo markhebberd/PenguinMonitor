@@ -33,7 +33,7 @@ $pid = $penguin['peng_num'];
 
 // Chips
 $chipsStmt = $pdo->prepare("SELECT pc.pit_id, pc.chip_date, pc.is_active, pc.chip_box, pc.solo,
-        u.chip_acronym AS chip_by
+        COALESCE(u.chip_acronym, pc.chipper_name) AS chip_by
     FROM penguin_chips pc LEFT JOIN users u ON u.id = pc.chipper_id
     WHERE pc.peng_num = ? ORDER BY pc.chip_date");
 $chipsStmt->execute([$pid]);

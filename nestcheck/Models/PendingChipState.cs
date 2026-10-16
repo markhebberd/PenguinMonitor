@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace PenguinMonitor.Models
 {
@@ -22,6 +23,8 @@ namespace PenguinMonitor.Models
         public int ChipperId { get; set; }
         public int AssistantId { get; set; }
         public string ChipBy { get; set; } = "";
+        // A chipper not in the user list, typed by name (used only when ChipperId is 0).
+        public string ChipperName { get; set; } = "";
         public string Weight { get; set; } = "";
         public string Flipper { get; set; } = "";
         public string Notes { get; set; } = "";
@@ -29,6 +32,8 @@ namespace PenguinMonitor.Models
         /// <summary>Number predicted on-device when queued offline. The server honours it if
         /// still free, else assigns +100 (renamable later) — so field notes stay meaningful.</summary>
         public string RequestedPengNum { get; set; } = "";
+        /// <summary>Every time this chip was scanned while its form was open (UTC), first one first.</summary>
+        public List<DateTime> ScanTimesUtc { get; set; } = new();
 
         // Scan-cleanup intent — so cancelling a restored (post-kill) scan-triggered form
         // still removes the provisional scan from the box, exactly like a normal cancel.

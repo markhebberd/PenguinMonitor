@@ -32,10 +32,11 @@ const SNAP_COLS_PENG = 'peng_num, chipped_as_adult, sex, is_dead, death_date, ch
       WHERE b.peng_num = penguins.peng_num AND (b.is_deleted = FALSE OR b.is_deleted IS NULL)) AS sex_guess_f';
 // chip_by is no longer a stored column — it's derived from chipper_id (the FK) so the client keeps
 // receiving the chipper's acronym without depending on a denormalised field. A correlated subquery
-// (like sex_guess on penguins) means every caller resolves it with no extra join.
-const SNAP_COLS_CHIP = 'pit_id, peng_num, chip_date, is_active, chip_box, location_id, chipper_id, assistant_id, solo, (SELECT chip_acronym FROM users WHERE id = chipper_id) AS chip_by';
+// (like sex_guess on penguins) means every caller resolves it with no extra join. A chipper who
+// isn't a user has no acronym — their typed chipper_name stands in.
+const SNAP_COLS_CHIP = 'pit_id, peng_num, chip_date, is_active, chip_box, location_id, chipper_id, assistant_id, solo, COALESCE((SELECT chip_acronym FROM users WHERE id = chipper_id), chipper_name) AS chip_by';
 // Same list, aliased — the incremental query joins and needs the pc. prefix.
-const SNAP_COLS_CHIP_P = 'pc.pit_id, pc.peng_num, pc.chip_date, pc.is_active, pc.chip_box, pc.location_id, pc.chipper_id, pc.assistant_id, pc.solo, (SELECT chip_acronym FROM users WHERE id = pc.chipper_id) AS chip_by';
+const SNAP_COLS_CHIP_P = 'pc.pit_id, pc.peng_num, pc.chip_date, pc.is_active, pc.chip_box, pc.location_id, pc.chipper_id, pc.assistant_id, pc.solo, COALESCE((SELECT chip_acronym FROM users WHERE id = pc.chipper_id), pc.chipper_name) AS chip_by';
 // pit_id / latitude / longitude / accuracy / scan_time_utc ARE the box tag: nestcheck builds its
 // box_tags store straight off these rows rather than calling boxtags.php, so a tag, a moved fix or a
 // cleared tag reaches the phone on the one feed. boxtags.php still takes the writes.

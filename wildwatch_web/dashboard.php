@@ -97,7 +97,7 @@ function handleBox($pdo, $colonyId, $boxName) {
     }
     // Add birds chipped in this box
     $chipStmt = $pdo->prepare("SELECT pc.peng_num, pc.pit_id, pc.chip_date, p.sex, p.is_dead, p.chipped_as_adult, p.chick_size_code,
-            u.chip_acronym AS chip_by
+            COALESCE(u.chip_acronym, pc.chipper_name) AS chip_by
         FROM penguin_chips pc JOIN penguins p ON pc.peng_num = p.peng_num
         LEFT JOIN users u ON u.id = pc.chipper_id WHERE pc.chip_box = ?");
     $chipStmt->execute([$boxName]);

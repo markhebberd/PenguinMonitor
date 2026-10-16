@@ -1554,6 +1554,7 @@ namespace PenguinMonitor.Services
                         ["chip_box"] = q.ChipBox,
                     };
                     if (q.ChipperId > 0) fields["chipper_id"] = q.ChipperId;
+                    else if (!string.IsNullOrEmpty(q.ChipperName)) fields["chipper_name"] = q.ChipperName;
                     else if (!string.IsNullOrEmpty(q.ChipBy)) fields["chip_by"] = q.ChipBy;   // legacy queued item (pre-dropdown)
                     if (q.AssistantId > 0) fields["assistant_id"] = q.AssistantId;
                     if (!string.IsNullOrEmpty(q.ChickSizeCode)) fields["chick_size_code"] = q.ChickSizeCode;
