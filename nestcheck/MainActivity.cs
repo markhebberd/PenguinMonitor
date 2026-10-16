@@ -8077,7 +8077,7 @@ namespace PenguinMonitor
             _chipTitleView.SetTextColor(Color.White);
             _chipTitleView.SetPadding(24, 20, 24, 12);
             root.AddView(_chipTitleView);
-            _chipTabStripScroll = new HorizontalScrollView(this) { HorizontalScrollBarEnabled = false, Visibility = ViewStates.Gone };
+            _chipTabStripScroll = new HorizontalScrollView(this) { HorizontalScrollBarEnabled = false, Visibility = ViewStates.Gone, FillViewport = true };
             _chipTabStrip = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             _chipTabStrip.SetPadding(16, 8, 16, 0);
             _chipTabStripScroll.AddView(_chipTabStrip);
@@ -8204,6 +8204,8 @@ namespace PenguinMonitor
             if (_chipTabs.Count > 0) SavePendingChips(_chipTabs.Select(t => t.Capture()).ToList());
         }
 
+        private int Dp(int dp) => (int)(dp * (Resources?.DisplayMetrics?.Density ?? 2.75f) + 0.5f);
+
         private void RefreshChipTabStrip()
         {
             if (_chipTabStrip == null || _chipTabStripScroll == null) return;
@@ -8212,25 +8214,43 @@ namespace PenguinMonitor
             _chipTabStripScroll.Visibility = _chipTabs.Count > 1 ? ViewStates.Visible : ViewStates.Gone;
             if (_chipTitleView != null) _chipTitleView.Visibility = _chipTabs.Count > 1 ? ViewStates.Gone : ViewStates.Visible;
             if (_chipTabs.Count < 2) return;
+            View? activeChip = null;
             foreach (var t in _chipTabs)
             {
                 var pit = t.FullPitId ?? "";
                 var tail = pit.Length > 4 ? pit.Substring(pit.Length - 4) : pit;
                 var head = t.IsRechip ? "Rechip" : string.IsNullOrEmpty(t.ReservedPengNum) ? "New" : DisplayPengNum(t.ReservedPengNum);
                 bool active = t == _activeChipTab;
-                var chip = new TextView(this) { Text = $"{head}\n…{tail}", TextSize = 13, Gravity = GravityFlags.Center };
-                chip.SetTypeface(Android.Graphics.Typeface.DefaultBold, active ? Android.Graphics.TypefaceStyle.Bold : Android.Graphics.TypefaceStyle.Normal);
+                // Bird number large and bold, chip tail smaller underneath — readable at a glance
+                // in the field. Tabs share the width (weight 1) and only scroll once they no longer fit.
+                var label = new Android.Text.SpannableString($"{head}\n…{tail}");
+                label.SetSpan(new Android.Text.Style.AbsoluteSizeSpan(15, true), head.Length + 1, label.Length(), Android.Text.SpanTypes.ExclusiveExclusive);
+                var chip = new TextView(this) { TextSize = 20, Gravity = GravityFlags.Center };
+                chip.SetText(label, TextView.BufferType.Spannable);
+                chip.SetTypeface(Android.Graphics.Typeface.DefaultBold, Android.Graphics.TypefaceStyle.Bold);
                 chip.SetTextColor(active ? Color.White : UIFactory.TEXT_PRIMARY);
-                chip.Background = _uiFactory.CreateRoundedBackground(active ? UIFactory.DANGER_RED : UIFactory.LIGHTER_GRAY, 8);
-                chip.SetPadding(24, 8, 24, 8);
-                var lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
-                lp.SetMargins(0, 0, 12, 0);
+                chip.Background = _uiFactory.CreateRoundedBackground(active ? UIFactory.DANGER_RED : UIFactory.LIGHTER_GRAY, 10);
+                chip.SetPadding(Dp(14), Dp(8), Dp(14), Dp(8));
+                chip.SetMinimumWidth(Dp(112));
+                var lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f);
+                lp.SetMargins(0, 0, Dp(8), 0);
                 chip.LayoutParameters = lp;
                 chip.Clickable = true;
                 var target = t;
                 chip.Click += (s, e) => { if (target != _activeChipTab) ActivateChipTab(target); };
                 _chipTabStrip.AddView(chip);
+                if (active) activeChip = chip;
             }
+            // With more tabs than fit, keep the bird being worked on in view (e.g. after a scan
+            // switches to a tab that's scrolled off the edge).
+            var scroll = _chipTabStripScroll;
+            if (activeChip != null)
+                scroll.Post(() =>
+                {
+                    int left = activeChip.Left, right = activeChip.Right;
+                    if (left < scroll.ScrollX) scroll.SmoothScrollTo(Math.Max(0, left - Dp(8)), 0);
+                    else if (right > scroll.ScrollX + scroll.Width) scroll.SmoothScrollTo(right - scroll.Width + Dp(16), 0);
+                });
         }
 
         // Every scan reaches here first while the chip dialog is open, and none of them touch
