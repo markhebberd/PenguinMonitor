@@ -8064,6 +8064,9 @@ namespace PenguinMonitor
             dialog.Show();
             // Slightly wider than the default dialog — the two-column rows need the space
             dialog.Window?.SetLayout((int)((Resources?.DisplayMetrics?.WidthPixels ?? 1080) * 0.98), ViewGroup.LayoutParams.WrapContent);
+            // AlertDialog blocks the soft keyboard when its view has no text field at creation —
+            // and the tabs' forms are only added after it's built. Unblock it.
+            dialog.Window?.ClearFlags(WindowManagerFlags.AltFocusableIm | WindowManagerFlags.NotFocusable);
             dialog.GetButton((int)DialogButtonType.Positive)!.Click += (s, e) => _activeChipTab?.Save();
             dialog.GetButton((int)DialogButtonType.Negative)!.Click += (s, e) => CancelActiveChipTab();
             _chipDialog = dialog;
