@@ -1005,7 +1005,9 @@ button.verify-danger { background:#c0453a; }
   .detail-split { flex-direction:column; min-height:0; overflow:visible; }
   .detail-obs { overflow:visible; }
   .obs-columns { flex-direction:column; height:auto; overflow:visible; }
-  .obs-col { overflow:visible; }
+  /* flex:none undoes the container query's flex:1 1 0 — in a stacked, auto-height column a
+     zero basis (with min-height:0) shrinks both columns to nothing and they draw over each other. */
+  .obs-col { overflow:visible; flex:none; }
   .detail-bird { display:none; }
   .detail-full { padding:8px; }
   .entry-split { flex-direction:column; }
