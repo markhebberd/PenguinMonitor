@@ -733,7 +733,6 @@ namespace PenguinMonitor
         {
             var log = BluetoothManager.ReadLog();
             var tv = new TextView(this) { Text = string.IsNullOrEmpty(log) ? "Nothing logged yet" : log, TextSize = 12 };
-            tv.SetTextColor(Color.Black);
             tv.SetTextIsSelectable(true);
             tv.SetPadding(Dp(16), Dp(8), Dp(16), Dp(8));
             var scroll = new ScrollView(this);
