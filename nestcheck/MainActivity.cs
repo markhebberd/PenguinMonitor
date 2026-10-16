@@ -727,6 +727,25 @@ namespace PenguinMonitor
                 .SetNegativeButton("Cancel", (s, e) => { })
                 .Show();
         }
+        // Recent scanner connection history (newest at the bottom), for diagnosing a reader
+        // that won't stay connected.
+        private void ShowBluetoothLog()
+        {
+            var log = BluetoothManager.ReadLog();
+            var tv = new TextView(this) { Text = string.IsNullOrEmpty(log) ? "Nothing logged yet" : log, TextSize = 12 };
+            tv.SetTextColor(Color.Black);
+            tv.SetTextIsSelectable(true);
+            tv.SetPadding(Dp(16), Dp(8), Dp(16), Dp(8));
+            var scroll = new ScrollView(this);
+            scroll.AddView(tv);
+            scroll.Post(() => scroll.FullScroll(FocusSearchDirection.Down));
+            new AlertDialog.Builder(this)
+                .SetTitle("Bluetooth log")
+                .SetView(scroll)
+                .SetPositiveButton("Close", (s, e) => { })
+                .SetNeutralButton("Clear", (s, e) => BluetoothManager.ClearLog())
+                .Show();
+        }
         private void OnBluetoothStatusChanged(string status)
         {
             RunOnUiThread(() => UpdateStatusText(status));
@@ -3774,6 +3793,12 @@ namespace PenguinMonitor
             scanBtnParams.SetMargins(8, 0, 0, 0);
             scanButton.LayoutParameters = scanBtnParams;
             btRow.AddView(scanButton);
+            var btLogButton = _uiFactory.CreateStyledButton("BT log", UIFactory.PRIMARY_BLUE);
+            var btLogParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
+            btLogParams.SetMargins(8, 0, 0, 0);
+            btLogButton.LayoutParameters = btLogParams;
+            btLogButton.Click += (s, e) => ShowBluetoothLog();
+            btRow.AddView(btLogButton);
             _settingsCard.AddView(btRow);
 
             scannerSection.AddView(rememberedContainer);

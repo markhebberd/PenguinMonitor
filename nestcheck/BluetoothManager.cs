@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Android.Bluetooth;
 using Android.Content;
+using Android.Runtime;
 using Java.Util;
 
 namespace PenguinMonitor
@@ -26,8 +27,62 @@ namespace PenguinMonitor
         private const int InitialRetryMs = 2000;
         private const int MaxRetryMs = 30000;
 
+        // A link that dies this soon after connecting, with nothing read, is a "quick drop":
+        // the reader accepted us and the stack threw it away (stale RFCOMM state on the phone,
+        // or the reader still bound to someone else). Retrying the same way just repeats it.
+        private const int QuickDropMs = 10000;
+        private const int QuickDropsBeforeWarning = 3;
+        private const int QuickDropBackoffMs = 30000;
+        private int _quickDrops;
+        private DateTime _connectedAtUtc;
+        private bool _gotDataThisLink;
+
+        // Ways of opening the socket, rotated on each quick drop: the standard secure SPP
+        // socket, the insecure (unauthenticated) one, and the hidden channel-1 socket — the
+        // usual workarounds when one of them gets wedged on a particular phone.
+        private static readonly string[] SocketModes = { "secure", "insecure", "channel 1" };
+        private int _socketMode;
+
+        // Recent connection history, kept in a small file so it survives the restart
+        // that usually follows a misbehaving scanner.
+        private const int LogMaxLines = 200;
+        private static readonly object LogLock = new();
+        private static string LogPath => Path.Combine(Android.App.Application.Context.FilesDir!.AbsolutePath, "bt-log.txt");
+
         public event Action<string>? StatusChanged;
         public event Action<string>? EidDataReceived;
+
+        public static void Log(string message)
+        {
+            try
+            {
+                lock (LogLock)
+                {
+                    var lines = File.Exists(LogPath) ? File.ReadAllLines(LogPath).ToList() : new List<string>();
+                    lines.Add($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {message}");
+                    if (lines.Count > LogMaxLines) lines = lines.Skip(lines.Count - LogMaxLines).ToList();
+                    File.WriteAllLines(LogPath, lines);
+                }
+            }
+            catch { }
+        }
+
+        public static string ReadLog()
+        {
+            try { lock (LogLock) return File.Exists(LogPath) ? File.ReadAllText(LogPath) : ""; }
+            catch { return ""; }
+        }
+
+        public static void ClearLog()
+        {
+            try { lock (LogLock) if (File.Exists(LogPath)) File.Delete(LogPath); } catch { }
+        }
+
+        private void Status(string message)
+        {
+            Log(message);
+            StatusChanged?.Invoke(message);
+        }
 
         public bool IsConnected => _isConnected;
         public bool IsConnecting { get; private set; }
@@ -158,7 +213,7 @@ namespace PenguinMonitor
 
             _deviceAddresses = (deviceAddresses ?? new List<string>())
                 .Where(a => !string.IsNullOrEmpty(a)).Distinct().ToList();
-            if (_deviceAddresses.Count == 0) { StatusChanged?.Invoke("No scanner selected"); return; }
+            if (_deviceAddresses.Count == 0) { Status("No scanner selected"); return; }
 
             _shouldReconnect = true;
             _cts = new CancellationTokenSource();
@@ -176,7 +231,7 @@ namespace PenguinMonitor
                 var adapter = BluetoothAdapter.DefaultAdapter;
                 if (adapter?.IsEnabled != true)
                 {
-                    StatusChanged?.Invoke("Bluetooth is off");
+                    Status("Bluetooth is off");
                     return;
                 }
 
@@ -185,7 +240,7 @@ namespace PenguinMonitor
                     pass++;
                     if (pass > 1)
                     {
-                        StatusChanged?.Invoke($"No scanner found — retry in {retryMs / 1000}s...");
+                        Status($"No scanner found — retry in {retryMs / 1000}s...");
                         try { await Task.Delay(retryMs, _cts!.Token); } catch (OperationCanceledException) { break; }
                     }
 
@@ -200,12 +255,12 @@ namespace PenguinMonitor
 
                             ConnectedDeviceName = device.Name ?? addr;
                             ConnectedDeviceAddress = addr;
-                            StatusChanged?.Invoke($"Connecting to {ConnectedDeviceName}...");
+                            Status($"Connecting to {ConnectedDeviceName}...");
 
                             adapter.CancelDiscovery();
                             CleanupSocket();
 
-                            _socket = device.CreateRfcommSocketToServiceRecord(SppUuid);
+                            _socket = CreateSocket(device);
                             if (_socket == null) continue;
 
                             var connectTask = Task.Run(() => _socket.Connect(), _cts!.Token);
@@ -217,8 +272,10 @@ namespace PenguinMonitor
 
                             _inputStream = _socket.InputStream;
                             _isConnected = true;
+                            _connectedAtUtc = DateTime.UtcNow;
+                            _gotDataThisLink = false;
                             retryMs = InitialRetryMs;
-                            StatusChanged?.Invoke($"{ConnectedDeviceName} connected");
+                            Status($"{ConnectedDeviceName} connected" + (_socketMode == 0 ? "" : $" ({SocketModes[_socketMode]})"));
 
                             _ = Task.Run(ListenLoop, _cts.Token);
                             return;
@@ -226,7 +283,7 @@ namespace PenguinMonitor
                         catch (OperationCanceledException) { break; }
                         catch (Exception ex)
                         {
-                            StatusChanged?.Invoke($"{ConnectedDeviceName ?? addr}: {ex.Message}");
+                            Status($"{ConnectedDeviceName ?? addr}: {ex.Message}");
                             CleanupSocket();
                             // fall through to the next scanner in the list
                         }
@@ -239,6 +296,26 @@ namespace PenguinMonitor
             }
             catch (OperationCanceledException) { }
             finally { IsConnecting = false; }
+        }
+
+        private BluetoothSocket? CreateSocket(BluetoothDevice device)
+        {
+            try
+            {
+                switch (_socketMode)
+                {
+                    case 1:
+                        return device.CreateInsecureRfcommSocketToServiceRecord(SppUuid);
+                    case 2:
+                        var method = device.Class.GetMethod("createRfcommSocket", Java.Lang.Integer.Type);
+                        return method?.Invoke(device, Java.Lang.Integer.ValueOf(1))?.JavaCast<BluetoothSocket>();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"{SocketModes[_socketMode]} socket unavailable: {ex.Message}");
+            }
+            return device.CreateRfcommSocketToServiceRecord(SppUuid);
         }
 
         /// <summary>
@@ -289,14 +366,17 @@ namespace PenguinMonitor
                        && _cts?.Token.IsCancellationRequested != true)
                 {
                     var n = await _inputStream.ReadAsync(buffer, 0, buffer.Length, _cts?.Token ?? CancellationToken.None);
-                    if (n <= 0) continue;
+                    // 0 is end-of-stream: the reader closed the link. Android's IsConnected
+                    // stays true regardless, so carrying on would spin here forever.
+                    if (n <= 0) { Status("Scanner closed the connection"); break; }
+                    _gotDataThisLink = true;
 
                     // A fragment that has sat unterminated through >1.5s of silence is a
                     // broken transmission (e.g. the scanner slept mid-send). Drop it rather
                     // than glue it onto the front of the next scan.
                     if (sb.Length > 0 && (DateTime.UtcNow - lastDataUtc).TotalMilliseconds > 1500)
                     {
-                        StatusChanged?.Invoke("Ignored partial scan — please scan again");
+                        Status("Ignored partial scan — please scan again");
                         sb.Clear();
                     }
                     lastDataUtc = DateTime.UtcNow;
@@ -317,7 +397,7 @@ namespace PenguinMonitor
                         if (IsCompleteEid(clean))
                             EidDataReceived?.Invoke(BareEid(clean));
                         else
-                            StatusChanged?.Invoke($"Ignored partial scan ({clean.Length} chars) — please scan again");
+                            Status($"Ignored partial scan ({clean.Length} chars) — please scan again");
                     }
                     sb.Clear();
                     sb.Append(text);
@@ -343,15 +423,31 @@ namespace PenguinMonitor
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                StatusChanged?.Invoke($"Read error: {ex.Message}");
+                Status($"Read error: {ex.Message}");
             }
 
             // Auto-reconnect on disconnect
             _isConnected = false;
             if (_shouldReconnect && _cts?.Token.IsCancellationRequested != true && _deviceAddresses.Count > 0)
             {
-                StatusChanged?.Invoke($"{ConnectedDeviceName ?? "Scanner"} disconnected — reconnecting...");
-                try { await Task.Delay(3000, _cts?.Token ?? CancellationToken.None); } catch (OperationCanceledException) { return; }
+                var delayMs = 3000;
+                var lived = DateTime.UtcNow - _connectedAtUtc;
+                if (!_gotDataThisLink && lived.TotalMilliseconds < QuickDropMs)
+                {
+                    _quickDrops++;
+                    _socketMode = (_socketMode + 1) % SocketModes.Length;
+                    Log($"Quick drop #{_quickDrops} after {lived.TotalSeconds:0.0}s — next try {SocketModes[_socketMode]} socket");
+                }
+                else _quickDrops = 0;
+
+                if (_quickDrops >= QuickDropsBeforeWarning && _quickDrops % QuickDropsBeforeWarning == 0)
+                {
+                    Status("Scanner keeps dropping — turn Bluetooth off and on, or restart the reader");
+                    delayMs = QuickDropBackoffMs;
+                }
+                else
+                    Status($"{ConnectedDeviceName ?? "Scanner"} disconnected — reconnecting...");
+                try { await Task.Delay(delayMs, _cts?.Token ?? CancellationToken.None); } catch (OperationCanceledException) { return; }
                 if (_shouldReconnect && _cts?.Token.IsCancellationRequested != true)
                     await ConnectLoop();
             }
@@ -369,6 +465,7 @@ namespace PenguinMonitor
 
         public void Disconnect()
         {
+            if (_shouldReconnect && (_isConnected || IsConnecting)) Log("Scanner connection stopped");
             _shouldReconnect = false;
             _cts?.Cancel();
             CleanupSocket();
