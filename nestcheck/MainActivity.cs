@@ -727,17 +727,17 @@ namespace PenguinMonitor
                 .SetNegativeButton("Cancel", (s, e) => { })
                 .Show();
         }
-        // Recent scanner connection history (newest at the bottom), for diagnosing a reader
+        // Recent scanner connection history (newest on top), for diagnosing a reader
         // that won't stay connected.
         private void ShowBluetoothLog()
         {
-            var log = BluetoothManager.ReadLog();
+            var log = string.Join("\n", BluetoothManager.ReadLog()
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries).Reverse());
             var tv = new TextView(this) { Text = string.IsNullOrEmpty(log) ? "Nothing logged yet" : log, TextSize = 12 };
             tv.SetTextIsSelectable(true);
             tv.SetPadding(Dp(16), Dp(8), Dp(16), Dp(8));
             var scroll = new ScrollView(this);
             scroll.AddView(tv);
-            scroll.Post(() => scroll.FullScroll(FocusSearchDirection.Down));
             new AlertDialog.Builder(this)
                 .SetTitle("Bluetooth log")
                 .SetView(scroll)
