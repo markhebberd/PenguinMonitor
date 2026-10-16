@@ -7013,7 +7013,7 @@ namespace PenguinMonitor
         private void ShowNewBirdDialog(string shortId, string fullPitId, (string box, bool decrementAdult)? scanCleanup = null, PendingChipState? restore = null)
         {
             // A form is already open: this bird becomes another tab, starting with the open
-            // tab's assistant and chip box (never its chipper — that's chosen per bird).
+            // tab's chip box (never its chipper or assistant — those are chosen per bird).
             var seedFrom = _chipDialog != null && restore == null ? _activeChipTab?.Capture() : null;
             Action? onCancel = scanCleanup.HasValue
                 ? () => RemoveUnsavedScanFromBox(scanCleanup.Value.box, fullPitId, scanCleanup.Value.decrementAdult)
@@ -7573,7 +7573,6 @@ namespace PenguinMonitor
             {
                 if (nestNames.Count == 0) nestSearchInput.Text = seedFrom.ChipBox;
                 else { var sk = nestNames.FirstOrDefault(k => string.Equals(k, seedFrom.ChipBox?.Trim(), StringComparison.OrdinalIgnoreCase)); if (sk != null) SelectNest(sk); }
-                if (seedFrom.AssistantId > 0) { var ai = chipUsers.FindIndex(u => u.id == seedFrom.AssistantId); if (ai >= 0) assistantSpinner.SetSelection(ai + 1); }
             }
 
             // Offline path: bank the bird locally; the next sync creates it server-side
@@ -7618,14 +7617,11 @@ namespace PenguinMonitor
                     _remotePenguinData[shortId] = pd;
                 }
 
-                // The bird is physically present — record its scan and count it now
-                RecordChippedScanInBox(fullPitId);
-                if (qIsChick) BumpCount(_chicksEditText, 1);
-                else BumpCount(_adultsEditText, 1);
-                SaveCurrentBoxData();
-                CloseChipTab(tab, cancelled: false); // queued = the scanned tag stays in the box
-                DrawPageLayouts();
-                Toast.MakeText(this, $"Queued — will sync as {nextPengLabel} (next free number if taken)", ToastLength.Long)?.Show();
+                // The bird is physically present — its tag goes in the box now (counts unchanged)
+                bool qReplaced = PlaceChippedBirdInBox(fullPitId, qIsChick);
+                CloseChipTab(tab, cancelled: false);
+                Toast.MakeText(this, $"Queued — will sync as {nextPengLabel} (next free number if taken)"
+                    + (qReplaced ? " — replaced the no-scan" : ""), ToastLength.Long)?.Show();
             }
 
             void DoAdd()
@@ -7865,72 +7861,11 @@ namespace PenguinMonitor
                         RunOnUiThread(() =>
                         {
                             var verb = isRechip ? "rechipped" : "added";
-                            CloseChipTab(tab, cancelled: false); // the tag may now stay in the box
-
-                            // A "No scan" in this box is an adult already counted but unidentified —
-                            // very often the bird just chipped. Decide swap-or-add BEFORE touching the
-                            // counts so the adult total only ever moves once, to its final value.
-                            var replaceBox = _colonyState.GetTodayForBox(_currentBoxName);
-                            var noScanEntry = isChick
-                                ? null : replaceBox?.ScannedIds.FirstOrDefault(s2 => s2.BirdId.StartsWith("NOSCAN_"));
-
-                            // The held-scans flush pre-counts each flushed bird as an adult before the
-                            // new-bird form opens; scanCleanup.decrementAdult marks that this bird is
-                            // ALREADY in the adult count. Completion must not add it a second time (and,
-                            // if it turns out to be a chick, must move it out of Adults into Chicks).
-                            bool preCountedAsAdult = scanCleanup?.decrementAdult == true;
-
-                            void AddAsNewBird()
-                            {
-                                RecordChippedScanInBox(fullPitId);
-                                if (isChick)
-                                {
-                                    BumpCount(_chicksEditText, 1);
-                                    if (preCountedAsAdult) BumpCount(_adultsEditText, -1);
-                                }
-                                else if (!preCountedAsAdult)
-                                {
-                                    BumpCount(_adultsEditText, 1);
-                                }
-                                SaveCurrentBoxData();
-                                DrawPageLayouts();
-                                Toast.MakeText(this, $"#{DisplayPengNum(pengNum)} {verb} ({(isChick ? "+1 Chick" : "+1 Adult")})", ToastLength.Short)?.Show();
-                            }
-
-                            if (noScanEntry != null)
-                            {
-                                new AlertDialog.Builder(this)
-                                    .SetTitle("Replace no-scan?")
-                                    .SetMessage($"#{DisplayPengNum(pengNum)} was {verb}. Is this the no-scan adult already recorded in box {_currentBoxName}?\n\nReplace it — the adult count stays as it is.")
-                                    .SetPositiveButton("Yes, replace", (s3, e3) =>
-                                    {
-                                        // Swap, don't add: the no-scan already counted this bird as an adult.
-                                        replaceBox!.ScannedIds.Remove(noScanEntry);
-                                        RecordChippedScanInBox(fullPitId);
-                                        // If the held-scans flush ALSO counted this bird as an adult, the
-                                        // no-scan and the flushed scan are one physical bird counted twice —
-                                        // drop the duplicate so the adult total lands on its true value.
-                                        if (preCountedAsAdult)
-                                        {
-                                            replaceBox.Adults = Math.Max(0, replaceBox.Adults - 1);
-                                            if (_adultsEditText?[0] != null) _adultsEditText[0].Text = replaceBox.Adults.ToString();
-                                        }
-                                        // The counts otherwise don't move, so SaveCurrentBoxData would see
-                                        // nothing changed — persist the scan-list edit explicitly.
-                                        replaceBox.WhenDataCollectedUtc = DateTime.UtcNow;
-                                        _colonyState.SaveBoxObservation(_currentBoxName, replaceBox);
-                                        SaveToAppDataDir();
-                                        DrawPageLayouts();
-                                        Toast.MakeText(this, $"#{DisplayPengNum(pengNum)} {verb} — replaced the no-scan in box {_currentBoxName}", ToastLength.Short)?.Show();
-                                    })
-                                    .SetNegativeButton("No, another bird", (s3, e3) => AddAsNewBird())
-                                    .SetCancelable(false)   // one of the two must be applied — there is no sane default
-                                    .Show();
-                            }
-                            else
-                            {
-                                AddAsNewBird();
-                            }
+                            CloseChipTab(tab, cancelled: false);
+                            bool replaced = PlaceChippedBirdInBox(fullPitId, isChick);
+                            Toast.MakeText(this, $"#{DisplayPengNum(pengNum)} {verb}"
+                                + (replaced ? $" — replaced the no-scan in box {_currentBoxName}" : $" — added to box {_currentBoxName}"),
+                                ToastLength.Short)?.Show();
                         });
                     }
                     catch (Exception ex)
@@ -8042,7 +7977,7 @@ namespace PenguinMonitor
                 .SetNegativeButton("Cancel", (EventHandler<DialogClickEventArgs>)null!)
                 .Create();
             // A stray tap outside must not throw away birds scanned and filled in ahead of time.
-            // Back still works, but cancels only the tab showing.
+            // Back asks before discarding the tab showing (see CancelActiveChipTab).
             dialog.SetCancelable(false);
             dialog.KeyPress += (s, e) =>
             {
@@ -8107,7 +8042,18 @@ namespace PenguinMonitor
                 Toast.MakeText(this, "Still saving — wait for it to finish", ToastLength.Short)?.Show();
                 return;
             }
-            CloseChipTab(tab, cancelled: true);
+            // Never drop a scanned bird on one press — Back in particular is pressed out of habit
+            // (to hide a keyboard, to leave the app) and used to throw the showing tab away.
+            var pit = tab.FullPitId ?? "";
+            var tail = pit.Length > 4 ? pit.Substring(pit.Length - 4) : pit;
+            var name = tab.IsRechip ? "this rechip" : string.IsNullOrEmpty(tab.ReservedPengNum) ? "this bird" : DisplayPengNum(tab.ReservedPengNum);
+            new AlertDialog.Builder(this)
+                .SetTitle("Discard bird?")
+                .SetMessage($"Discard {name} (chip …{tail})? Its form will be lost."
+                    + (_chipTabs.Count == 2 ? "\n\nThe other bird stays open." : _chipTabs.Count > 2 ? $"\n\nThe other {_chipTabs.Count - 1} birds stay open." : ""))
+                .SetPositiveButton("Discard", (s, e) => CloseChipTab(tab, cancelled: true))
+                .SetNegativeButton("Keep", (s, e) => { })
+                .Show();
         }
 
         // Removes one bird's tab (saved, queued or cancelled); the dialog closes with the last.
@@ -9513,13 +9459,18 @@ namespace PenguinMonitor
                         .Show();
             });
         }
-        // Scanning a new chip writes nothing; the bird's scan joins the box only once it's saved
-        // (or queued). Locked boxes keep their scan list as it was locked.
-        private void RecordChippedScanInBox(string pitId)
+        // Scanning a new chip writes nothing; the bird joins the box only once its chip form is
+        // saved (or queued). It goes in as its own tag — the counts never move: an adult takes the
+        // place of a "No scan" (already counted as an adult, very often this very bird), a chick
+        // is simply added. A locked box takes it too and is re-flagged for upload so it reaches
+        // the server. Returns true when a no-scan was replaced.
+        private bool PlaceChippedBirdInBox(string pitId, bool isChick)
         {
-            if (_isBoxLocked || IsPlaceholderPit(pitId)) return;
+            if (IsPlaceholderPit(pitId)) return false;
             var boxData = _colonyState.GetTodayForBox(_currentBoxName) ?? new BoxObservation { BoxName = _currentBoxName };
-            if (boxData.ScannedIds.Any(s => s.BirdId == pitId)) return;
+            if (boxData.ScannedIds.Any(s => s.BirdId == pitId)) return false;
+            var noScan = isChick ? null : boxData.ScannedIds.FirstOrDefault(s => s.BirdId.StartsWith("NOSCAN_"));
+            if (noScan != null) boxData.ScannedIds.Remove(noScan);
             boxData.ScannedIds.Add(new ScanRecord
             {
                 BirdId = pitId,
@@ -9530,8 +9481,12 @@ namespace PenguinMonitor
             });
             boxData.WhenDataCollectedUtc = DateTime.UtcNow;
             boxData.ObserverName = _appSettings.ObserverName;
+            if (!_isBoxLocked && !boxData.IsPendingUpload) boxData.IsDraft = true;
             _colonyState.SaveBoxObservation(_currentBoxName, boxData);
-            _dataChangedSinceUnlock = true;
+            if (_isBoxLocked) CommitDraftForUpload();   // saves too
+            else { SaveToAppDataDir(); _dataChangedSinceUnlock = true; }
+            DrawPageLayouts();
+            return noScan != null;
         }
 
         // A scanned unknown tag goes into the box before its new-bird form opens, so the
