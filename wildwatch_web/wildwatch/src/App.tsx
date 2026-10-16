@@ -6013,19 +6013,20 @@ function TopChickParentsReport({ onOpenBird }: { onOpenBird: (num: string) => vo
     // Per detected parent, breeding outcomes summed over every clutch where they were a
     // parent (same nest-family detection the box overview / bird panel use). Eggs/chicks
     // are per-clutch peaks summed; chipped and returned chicks are DISTINCT birds.
-    // Fledged counts only what a monitor recorded as fledged. Chipping is not a fledge: a
-    // chipped chick still has days in the nest, so counting it fledged overstated every bird.
-    const byParent = new Map<string, { bird: any; eggs: number; chicksProduced: number; fledgedUnchipped: number; chicks: Set<string>; returned: Set<string> }>();
+    // Fledged counts chipped chicks that have since gone from the nest without being recorded
+    // dead (fledgedChippedChicks). Chipping alone is not a fledge: a chipped chick still has
+    // days in the nest, so counting it fledged overstated every bird.
+    const byParent = new Map<string, { bird: any; eggs: number; chicksProduced: number; fledged: number; chicks: Set<string>; returned: Set<string> }>();
     for (const { families } of allColonyBoxes()) {
       for (const sd of families) {
         for (const fam of sd.families) {
           for (const parent of fam.parents) {
             if (!parent.peng_num) continue;
             let e = byParent.get(parent.peng_num);
-            if (!e) { e = { bird: parent, eggs: 0, chicksProduced: 0, fledgedUnchipped: 0, chicks: new Set(), returned: new Set() }; byParent.set(parent.peng_num, e); }
+            if (!e) { e = { bird: parent, eggs: 0, chicksProduced: 0, fledged: 0, chicks: new Set(), returned: new Set() }; byParent.set(parent.peng_num, e); }
             e.eggs += fam.clutch.maxEggs;
             e.chicksProduced += fam.clutch.maxChicks;
-            e.fledgedUnchipped += fam.fledgedUnchipped;
+            e.fledged += fledgedChippedChicks(fam.clutch, fam.chicks.length, sd.seasonObs);
             for (const ck of fam.chicks) if (ck.peng_num) {
               e.chicks.add(ck.peng_num);
               if (ck.hasReturned) e.returned.add(ck.peng_num);
@@ -6050,7 +6051,7 @@ function TopChickParentsReport({ onOpenBird }: { onOpenBird: (num: string) => vo
     };
     return Array.from(byParent.entries()).map(([num, e]) => ({
       bird: e.bird, eggs: e.eggs, chicksProduced: e.chicksProduced,
-      chipped: e.chicks.size, fledged: e.fledgedUnchipped, returned: e.returned.size,
+      chipped: e.chicks.size, fledged: e.fledged, returned: e.returned.size,
       descendants: allReturnedDescendants(num),
     }));
   }, [v]);
@@ -6059,7 +6060,7 @@ function TopChickParentsReport({ onOpenBird }: { onOpenBird: (num: string) => vo
     { key: 'eggs', label: 'Eggs', value: r => r.eggs },
     { key: 'chicksProduced', label: 'Chicks', value: r => r.chicksProduced },
     { key: 'chipped', label: 'Chipped chicks', value: r => r.chipped },
-    { key: 'fledged', label: 'Recorded fledged', value: r => r.fledged },
+    { key: 'fledged', label: 'Fledged', value: r => r.fledged },
     { key: 'returned', label: 'Returned chicks', value: r => r.returned },
     { key: 'descendants', label: 'All returned descendants', value: r => r.descendants },
   ];
@@ -6077,7 +6078,7 @@ function TopChickParentsReport({ onOpenBird }: { onOpenBird: (num: string) => vo
   return (
     <div className="report-card">
       <h3>Most successful parents</h3>
-      <p className="muted">Breeding outcomes summed over every clutch where the bird was a detected parent. Eggs and chicks are each clutch's peak count; recorded fledged counts only chicks a monitor logged as fledged — chipping is not a fledge. Click a column to sort.</p>
+      <p className="muted">Breeding outcomes summed over every clutch where the bird was a detected parent. Eggs and chicks are each clutch's peak count; fledged counts chipped chicks that have since gone from the nest without being recorded dead. Click a column to sort.</p>
       {sorted.length === 0 ? <p className="muted">No data available</p> : (
         <div className="table-scroll">
           <table className="guess-rank-table rank-table">
@@ -9348,6 +9349,27 @@ function BreedingCalibration() {
  *  Hatch switches to the observed midpoint once chicks have actually been recorded. Dates that
  *  have already passed are dimmed a touch; the next one due is bold. Built entirely from the
  *  local cache. */
+/**
+ * Chicks taken as fledged: the clutch's chipped chicks that are no longer in the nest and were
+ * never recorded dead. Chipping by itself says nothing — a chipped chick still has days in the
+ * nest — so a chick counts only once a later check stops finding it.
+ *
+ * Chicks still counted at the clutch's last check are read as the chipped ones, so a brood
+ * where only some were chipped can never over-report. `clutchObs` is the box's season
+ * observations, chronological; only those inside the clutch are used.
+ */
+function fledgedChippedChicks(clutch: Clutch, chippedCount: number, clutchObs: any[]): number {
+  if (chippedCount <= 0) return 0;
+  const inClutch = clutchObs.filter(o => {
+    const t = parseDate(o.observation_time_utc).getTime();
+    return t >= clutch.start && t <= (clutch.end ?? Infinity);
+  });
+  const last = inClutch[inClutch.length - 1];
+  const stillInNest = last ? Number(last.chicks) || 0 : 0;
+  const recordedDead = inClutch.reduce((s, o) => s + (Number(o.dead_chicks) || 0), 0);
+  return Math.max(0, chippedCount - stillInNest - recordedDead);
+}
+
 function SeasonBreedingReport() {
   const v = useDbVersion();
   const [seasonYear, setSeasonYear] = useState<number>(() => getSeasonStart().getFullYear());
@@ -9393,21 +9415,14 @@ function SeasonBreedingReport() {
         }
         const latest = inClutch[inClutch.length - 1];
         const fam = c.startObsId != null ? famByStart.get(c.startObsId) : null;
-        // Fledging is only ever what a monitor wrote down: the fledged count on this clutch's
-        // own checks. Chipping is NOT a fledge — a chipped chick still has days in the nest,
-        // so counting it as fledged ticked clutches whose chicks were plainly still there.
-        const recordedFledged = Math.min(c.maxChicks, inClutch.reduce((s, o) =>
-          s + (Number(o.fledged_unchipped) || 0), 0));
+        const chipped = fam ? fam.chicks.length : 0;
         all.push({
           box, boxNum: parseInt(box, 10),
           attempt: i, // index within the box's whole history; renumbered per season below
           clutch: c, hatch, hatchObserved,
           twoEggs: (c.maxEggs || 2) >= 2,
-          chipped: fam ? fam.chicks.length : 0,
-          recordedFledged,
-          // Chicks that left the record with no fledge recorded for them. Only once the
-          // attempt has ended — while it runs there is nothing to say yet.
-          unrecordedFledged: c.end !== null ? Math.max(0, c.maxChicks - recordedFledged) : 0,
+          chipped,
+          fledged: fledgedChippedChicks(c, chipped, inClutch),
           status: latest ? displayStatusOrPrev(latest, box) : null,
           startObsTime: c.startObsTime,
         });
@@ -9442,20 +9457,6 @@ function SeasonBreedingReport() {
     n > 0
       ? <td title={title} style={{ whiteSpace: 'nowrap', color: '#2f8f5b', fontSize: 15, letterSpacing: 2 }}>{'✓'.repeat(n)}</td>
       : <td title={title} style={{ color: '#ccc', textAlign: 'center' }}>—</td>;
-  /** Fledge cell: a ✓ per chick recorded as fledged, an ✗ per chick that left the nest with
-   *  no fledge recorded, and a dash while the attempt is still running. */
-  const FledgeTicks = ({ ok, missing }: { ok: number; missing: number }) => {
-    if (ok === 0 && missing === 0) return <td style={{ color: '#ccc', textAlign: 'center' }}
-      title="Still in the nest — nothing recorded yet">—</td>;
-    const parts = [
-      ok > 0 ? `${ok} recorded as fledged` : '',
-      missing > 0 ? `${missing} left the nest with no fledge recorded` : '',
-    ].filter(Boolean).join('; ');
-    return <td title={parts} style={{ whiteSpace: 'nowrap', fontSize: 15, letterSpacing: 2 }}>
-      <span style={{ color: '#2f8f5b' }}>{'✓'.repeat(ok)}</span>
-      <span style={{ color: '#c0392b' }}>{'✗'.repeat(missing)}</span>
-    </td>;
-  };
 
   return (
     <div className="report-card">
@@ -9469,9 +9470,9 @@ function SeasonBreedingReport() {
         One row per breeding attempt ({rows.length}), earliest first egg first. Dates come from the estimated
         laid date (2nd egg +2d, hatch +{BREEDING_OFFSETS.hatch}d, guard ends +{BREEDING_OFFSETS.pg}d,
         chip window +{BREEDING_OFFSETS.chip}d to +{BREEDING_OFFSETS.chip + 7}d, fledge +{BREEDING_OFFSETS.fledge}d);
-        an observed hatch replaces the predicted one. Chipped shows one ✓ per chick chipped.
-        Fledged counts only fledges a monitor recorded: one ✓ each, an ✗ for a chick that left
-        the nest with no fledge recorded, and a dash while the attempt is still running.
+        an observed hatch replaces the predicted one. Chipped shows one ✓ per chick chipped;
+        Fledged one ✓ per chipped chick that has since gone from the nest without being recorded
+        dead — a dash while they are still in there.
         Past dates are dimmed, the next one due is bold.
       </p>
       <BreedingCalibration />
@@ -9482,7 +9483,7 @@ function SeasonBreedingReport() {
               <th>Clutch</th><th>Box</th><th>1st egg</th><th>2nd egg</th><th>Hatch</th><th>PG (guard ends)</th>
               <th>Chip from</th><th>Chip to</th><th>Fledge</th>
               <th title="Chicks chipped in this clutch">Chipped</th>
-              <th title="Fledges a monitor recorded (✓); ✗ = left the nest with no fledge recorded; — = attempt still running">Fledged</th>
+              <th title="Chipped chicks no longer in the nest and never recorded dead — one ✓ each; — while they are still there">Fledged</th>
             </tr>
           </thead>
           <tbody>
@@ -9521,7 +9522,7 @@ function SeasonBreedingReport() {
                   <Cell t={parts[5]} next={nextIdx === 5} est title="Chip window closes — 7 days after it opens (estimated)" />
                   <Cell t={parts[6]} next={nextIdx === 6} est />
                   <Ticks n={r.chipped} title={`${r.chipped} chick${r.chipped !== 1 ? 's' : ''} chipped`} />
-                  <FledgeTicks ok={r.recordedFledged} missing={r.unrecordedFledged} />
+                  <Ticks n={r.fledged} title={`${r.fledged} chipped chick${r.fledged !== 1 ? 's' : ''} gone from the nest, none recorded dead`} />
                 </tr>
               );
             })}
