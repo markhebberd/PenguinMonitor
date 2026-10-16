@@ -1409,7 +1409,7 @@ namespace PenguinMonitor.Services
 
         // ===== peng_num: bare → full, once, on upgrade =====
 
-        /// <summary>The in-progress chipping form, saved so a process kill doesn't lose it.</summary>
+        /// <summary>The in-progress chipping form's tabs, saved so a process kill doesn't lose them.</summary>
         internal const string PENDING_CHIP_FILENAME = "pendingChip.json";
 
         /// <summary>Convert what an older build left on the phone from bare peng numbers ("1039") to
@@ -1447,13 +1447,18 @@ namespace PenguinMonitor.Services
                 var formPath = Path.Combine(dir, PENDING_CHIP_FILENAME);
                 if (File.Exists(formPath))
                 {
-                    var form = JsonConvert.DeserializeObject<PendingChipState>(File.ReadAllText(formPath));
-                    if (form != null)
+                    // A list of open tabs; older builds saved a single form object
+                    var json = File.ReadAllText(formPath).TrimStart();
+                    var forms = json.StartsWith("[")
+                        ? JsonConvert.DeserializeObject<List<PendingChipState>>(json) ?? new List<PendingChipState>()
+                        : new List<PendingChipState?> { JsonConvert.DeserializeObject<PendingChipState>(json) }
+                            .Where(f => f != null).Select(f => f!).ToList();
+                    foreach (var form in forms)
                     {
                         form.RequestedPengNum = PengNums.Full(form.RequestedPengNum, prefix);
                         form.RechipPengNum = PengNums.Full(form.RechipPengNum, prefix);
-                        File.WriteAllText(formPath, JsonConvert.SerializeObject(form));
                     }
+                    if (forms.Count > 0) File.WriteAllText(formPath, JsonConvert.SerializeObject(forms));
                 }
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"MigratePengNums form: {ex.Message}"); }

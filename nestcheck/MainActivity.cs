@@ -167,25 +167,56 @@ namespace PenguinMonitor
         /// is a fake bird saved to the server.</summary>
         private static bool IsPlaceholderPit(string? pit) =>
             DataStorageService.PitFull(pit) == DataStorageService.PitFull(PLACEHOLDER_PIT);
-        // While the new-bird dialog is open with the placeholder, a real scan lands here
-        private Action<string>? _newBirdScanCapture;
+        // While the new-bird dialog is open, every scan is offered here first and handled there
+        // (placeholder swap, new tab, tab switch, known-bird warning); false = dialog not open.
+        private Func<string, bool>? _newBirdScanCapture;
+
+        // ===== Chip form tabs =====
+        // Several new chips can be scanned and filled in before anyone disturbs the birds: each
+        // unknown chip scanned while the form is open gets its own tab in the same dialog.
+        private sealed class ChipTab
+        {
+            public View Content = null!;
+            public string FullPitId = "";
+            public string Title = "";
+            public string SaveText = "Save chip";
+            public bool SaveEnabled = true;
+            public bool IsRechip;
+            public string ReservedPengNum = "";   // number predicted (and written down) for this bird
+            public Func<PendingChipState> Capture = null!;
+            public Action Save = null!;           // validate, confirm, save
+            public Action Cancel = null!;         // undo this tab's provisional box scan
+            public Action<string>? PlaceholderScan;
+        }
+        private AlertDialog? _chipDialog;
+        private readonly List<ChipTab> _chipTabs = new();
+        private ChipTab? _activeChipTab;
+        private HorizontalScrollView? _chipTabStripScroll;
+        private LinearLayout? _chipTabStrip;
+        private FrameLayout? _chipTabBody;
 
         // ===== Pending chip workflow persistence (survives Android killing the app) =====
         private const string PENDING_CHIP_FILENAME = DataStorageService.PENDING_CHIP_FILENAME;
-        // Set while the new-bird dialog is open; OnPause invokes it to snapshot the form
+        // Set while the new-bird dialog is open; OnPause invokes it to snapshot every tab
         private Action? _pendingChipCapture;
-        private void SavePendingChip(PendingChipState st)
+        private void SavePendingChips(List<PendingChipState> tabs)
         {
-            try { System.IO.File.WriteAllText(System.IO.Path.Combine(FilesDir!.AbsolutePath, PENDING_CHIP_FILENAME), JsonConvert.SerializeObject(st)); } catch { }
+            try { System.IO.File.WriteAllText(System.IO.Path.Combine(FilesDir!.AbsolutePath, PENDING_CHIP_FILENAME), JsonConvert.SerializeObject(tabs)); } catch { }
         }
-        private PendingChipState? LoadPendingChip()
+        private List<PendingChipState> LoadPendingChips()
         {
             try
             {
                 var p = System.IO.Path.Combine(FilesDir!.AbsolutePath, PENDING_CHIP_FILENAME);
-                return System.IO.File.Exists(p) ? JsonConvert.DeserializeObject<PendingChipState>(System.IO.File.ReadAllText(p)) : null;
+                if (!System.IO.File.Exists(p)) return new List<PendingChipState>();
+                var json = System.IO.File.ReadAllText(p).TrimStart();
+                // Older builds saved a single form object rather than a list of tabs
+                if (json.StartsWith("["))
+                    return JsonConvert.DeserializeObject<List<PendingChipState>>(json) ?? new List<PendingChipState>();
+                var one = JsonConvert.DeserializeObject<PendingChipState>(json);
+                return one == null ? new List<PendingChipState>() : new List<PendingChipState> { one };
             }
-            catch { return null; }
+            catch { return new List<PendingChipState>(); }
         }
         private void ClearPendingChip()
         {
@@ -362,8 +393,10 @@ namespace PenguinMonitor
         /// </summary>
         private void TryRestorePendingChip(int attempt)
         {
-            var pending = LoadPendingChip();
-            if (pending == null || string.IsNullOrEmpty(pending.FullPitId)) return;
+            if (_chipDialog != null) return;
+            var pendings = LoadPendingChips().Where(pc => !string.IsNullOrEmpty(pc.FullPitId)).ToList();
+            if (pendings.Count == 0) return;
+            var pending = pendings[0];
 
             bool needsJump = !string.IsNullOrEmpty(pending.BoxName) && pending.BoxName != _currentBoxName;
             bool boxKnown = _boxNamesAndIndexes != null && _boxNamesAndIndexes.ContainsKey(pending.BoxName ?? "");
@@ -384,9 +417,13 @@ namespace PenguinMonitor
                 JumpToBox(pending.BoxName);
             }
 
-            var sid = pending.FullPitId.Length >= 8 ? pending.FullPitId.Substring(pending.FullPitId.Length - 8) : pending.FullPitId;
-            (string box, bool decrementAdult)? cleanup = pending.ScanCleanup ? (pending.ScanCleanupBox, pending.ScanCleanupDecrement) : null;
-            ShowNewBirdDialog(sid, pending.FullPitId, scanCleanup: cleanup, restore: pending);
+            // One tab per bird that was open, in the same order
+            foreach (var pc in pendings)
+            {
+                var sid = pc.FullPitId.Length >= 8 ? pc.FullPitId.Substring(pc.FullPitId.Length - 8) : pc.FullPitId;
+                (string box, bool decrementAdult)? cleanup = pc.ScanCleanup ? (pc.ScanCleanupBox, pc.ScanCleanupDecrement) : null;
+                ShowNewBirdDialog(sid, pc.FullPitId, scanCleanup: cleanup, restore: pc);
+            }
         }
         protected override void OnResume()
         {
@@ -758,13 +795,10 @@ namespace PenguinMonitor
                 return;
             }
 
-            // The new-bird dialog (opened with the demo placeholder PIT) accepts a real
-            // scanned chip in its place instead of routing the scan to the box.
-            if (_newBirdScanCapture != null)
-            {
-                _newBirdScanCapture(cleanEid);
+            // The new-bird dialog sees scans first: it swaps a real chip in for the demo
+            // placeholder, opens an unknown chip as another tab, or jumps to an open one.
+            if (_newBirdScanCapture != null && _newBirdScanCapture(cleanEid))
                 return;
-            }
 
             // Box tag mode: route all scans to HandleBoxTagScan
             if (_appSettings.EditBoxTagsMode)
@@ -791,14 +825,15 @@ namespace PenguinMonitor
                 // The user scanned another box's tag before locking the current box.
                 // Record penguin scans so they can be replayed into the pending box once it's locked —
                 // unless the queue was frozen by a further box-tag scan, in which case ignore them.
+                // A new bird is never held — divert it straight to the chipping workflow. Opening
+                // the form writes nothing, so it's allowed even while the held queue is frozen.
+                if (DivertNewBirdFromHeldQueue(cleanEid)) return;
                 if (_pendingScanQueueFrozen)
                 {
                     TriggerAlert();
                     Toast.MakeText(this, $"⚠️ Scan ignored — lock Box {_currentBoxName} first", ToastLength.Short)?.Show();
                     return;
                 }
-                // A new bird is never held — divert it straight to the chipping workflow.
-                if (DivertNewBirdFromHeldQueue(cleanEid)) return;
                 if (!_heldScans.Any(s => s.BirdId == cleanEid))
                 {
                     _heldScans.Add(new ScanRecord
@@ -838,7 +873,11 @@ namespace PenguinMonitor
                 return;
             }
 
-            // Box is unlocked — normal scan flow
+            // Box is unlocked — an unknown chip goes straight to the chip form without touching
+            // the box; its scan is only recorded when the bird is saved.
+            if (DivertNewBirdFromHeldQueue(cleanEid)) return;
+
+            // Normal scan flow
             if (selectedPage != UIFactory.selectedPage.BoxDataSingle)
                 selectedPage = UIFactory.selectedPage.BoxDataSingle;
 
@@ -859,6 +898,7 @@ namespace PenguinMonitor
         // into the right box when the previous nest wasn't locked yet). Holding a new bird meant it
         // rode into the flush as an unknown scan and, past the first, was silently dropped at sync.
         // Divert it straight to the new-bird dialog and return true; false = a known bird to hold.
+        // Unlocked boxes use it too: opening the form writes nothing to the box until Save.
         // When colony data isn't loaded we can't classify, so treat it as known and hold as before.
         private bool DivertNewBirdFromHeldQueue(string cleanEid)
         {
@@ -6972,8 +7012,9 @@ namespace PenguinMonitor
         // restore repopulates the form after an Android process-kill mid-chipping.
         private void ShowNewBirdDialog(string shortId, string fullPitId, (string box, bool decrementAdult)? scanCleanup = null, PendingChipState? restore = null)
         {
-            SetDialogActive(true);
-            bool completed = false;
+            // A form is already open: this bird becomes another tab, starting with the open
+            // tab's assistant and chip box (never its chipper — that's chosen per bird).
+            var seedFrom = _chipDialog != null && restore == null ? _activeChipTab?.Capture() : null;
             Action? onCancel = scanCleanup.HasValue
                 ? () => RemoveUnsavedScanFromBox(scanCleanup.Value.box, fullPitId, scanCleanup.Value.decrementAdult)
                 : (Action?)null;
@@ -6998,8 +7039,13 @@ namespace PenguinMonitor
                 // Birds queued offline hold their predicted numbers too, so a restart can't
                 // double-book a number that's already promised to a queued bird.
                 foreach (var qc in _dataStorageService.LoadQueuedChips(this)) Consider(qc.RequestedPengNum);
+                // Birds in the other open tabs have their numbers promised too.
+                foreach (var t in _chipTabs.Where(t => !t.IsRechip)) Consider(t.ReservedPengNum);
                 if (maxNum > 0) nextPengNum = FullPengNum($"{maxPrefix}{maxNum + 1}");
             }
+            // A restored tab keeps the number it showed before the app was killed — it may
+            // already be written down in the field.
+            if (!string.IsNullOrEmpty(restore?.RequestedPengNum)) nextPengNum = restore.RequestedPengNum;
             string nextPengLabel = DisplayPengNum(nextPengNum);
             var scrollView = new ScrollView(this);
             scrollView.SetClipChildren(false);
@@ -7303,21 +7349,32 @@ namespace PenguinMonitor
                 Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextFlagMultiLine | Android.Text.InputTypes.TextFlagCapSentences);
             card.AddView(notesInput);
 
-            var dialog = new AlertDialog.Builder(this)
-                .SetTitle(string.IsNullOrEmpty(nextPengLabel) ? $"New bird: {shortId}" : $"New bird {nextPengLabel}")
-                .SetView(scrollView)
-                .SetPositiveButton("Save chip", (EventHandler<DialogClickEventArgs>)null!)
-                .SetNegativeButton("Cancel", (s, e) => { SetDialogActive(false); })
-                .Create();
+            // This bird's tab in the shared chip dialog. Title and Save button belong to the
+            // tab; the dialog shows whichever tab is active.
+            var tab = new ChipTab
+            {
+                Content = scrollView,
+                FullPitId = fullPitId,
+                ReservedPengNum = nextPengNum,
+                Title = string.IsNullOrEmpty(nextPengLabel) ? $"New bird: {shortId}" : $"New bird {nextPengLabel}",
+                Cancel = () => onCancel?.Invoke(),
+            };
+            void SetTitle(string t)
+            {
+                tab.Title = t;
+                if (_activeChipTab == tab) _chipDialog?.SetTitle(t);
+            }
+            void SetSaveButton(string text, bool enabled = true)
+            {
+                tab.SaveText = text; tab.SaveEnabled = enabled;
+                if (_activeChipTab != tab) return;
+                var b = _chipDialog?.GetButton((int)DialogButtonType.Positive);
+                if (b != null) { b.Text = text; b.Enabled = enabled; }
+            }
 
-            dialog.Show();
-            // Slightly wider than the default dialog — the two-column rows need the space
-            dialog.Window?.SetLayout((int)((Resources?.DisplayMetrics?.WidthPixels ?? 1080) * 0.98), ViewGroup.LayoutParams.WrapContent);
-            var addButton = dialog.GetButton((int)DialogButtonType.Positive);
-
-            // A real chip scanned while this dialog holds the demo placeholder replaces it,
+            // A real chip scanned while this tab holds the demo placeholder replaces it,
             // so the bird gets its true chip (and the placeholder is never sent).
-            _newBirdScanCapture = scanned =>
+            tab.PlaceholderScan = scanned =>
             {
                 if (!IsPlaceholderPit(fullPitId)) return;
                 var scanKey = scanned.ToUpper();
@@ -7330,15 +7387,13 @@ namespace PenguinMonitor
                 }
                 fullPitId = scanKey;
                 shortId = scanShort;
+                tab.FullPitId = scanKey;
                 pitInfo.Text = $"PIT ID: {fullPitId}";
                 if (!modeRechip.Checked && string.IsNullOrEmpty(nextPengLabel))
-                    dialog.SetTitle($"New bird: {shortId}");
+                    SetTitle($"New bird: {shortId}");
+                RefreshChipTabStrip();
+                PersistChipTabs();
                 Toast.MakeText(this, $"Chip {scanShort} captured ✓", ToastLength.Short)?.Show();
-            };
-            dialog.DismissEvent += (s, e) =>
-            {
-                _newBirdScanCapture = null;
-                if (!completed) onCancel?.Invoke();
             };
 
             // --- Rechip mode wiring ---
@@ -7350,7 +7405,7 @@ namespace PenguinMonitor
                 rechipSelectedRow.Visibility = ViewStates.Gone;
                 suppressRechipSearch = true; rechipSearchInput.Text = ""; suppressRechipSearch = false;
                 rechipSearchInput.Visibility = modeRechip.Checked ? ViewStates.Visible : ViewStates.Gone;
-                if (modeRechip.Checked) dialog.SetTitle("Rechip penguin");
+                if (modeRechip.Checked) SetTitle("Rechip penguin");
             }
             void SelectRechipTarget(PenguinData pd, string key)
             {
@@ -7380,19 +7435,21 @@ namespace PenguinMonitor
                 deselect.Click += (s, e) => ClearRechipTarget();
                 rechipSelectedRow.AddView(deselect);
                 rechipSelectedRow.Visibility = ViewStates.Visible;
-                dialog.SetTitle($"Rechip penguin {DisplayPengNum(pd.PengNum)}");
-                addButton.Text = "Save rechip";
+                SetTitle($"Rechip penguin {DisplayPengNum(pd.PengNum)}");
+                SetSaveButton("Save rechip");
             }
             void UpdateMode()
             {
                 bool rechip = modeRechip.Checked;
+                tab.IsRechip = rechip;
+                RefreshChipTabStrip();
                 rechipSearchInput.Visibility = rechip && rechipTarget == null ? ViewStates.Visible : ViewStates.Gone;
                 rechipSelectedRow.Visibility = rechip && rechipTarget != null ? ViewStates.Visible : ViewStates.Gone;
                 chippedSexRow.Visibility = rechip ? ViewStates.Gone : ViewStates.Visible;
                 if (rechip)
                 {
-                    dialog.SetTitle("Rechip penguin");
-                    addButton.Text = "Save rechip";
+                    SetTitle("Rechip penguin");
+                    SetSaveButton("Save rechip");
                 }
                 else
                 {
@@ -7400,8 +7457,8 @@ namespace PenguinMonitor
                     rechipSelectedRow.RemoveAllViews();
                     rechipResults.RemoveAllViews();
                     suppressRechipSearch = true; rechipSearchInput.Text = ""; suppressRechipSearch = false;
-                    dialog.SetTitle(string.IsNullOrEmpty(nextPengLabel) ? $"New bird: {shortId}" : $"New bird {nextPengLabel}");
-                    addButton.Text = "Save chip";
+                    SetTitle(string.IsNullOrEmpty(nextPengLabel) ? $"New bird: {shortId}" : $"New bird {nextPengLabel}");
+                    SetSaveButton("Save chip");
                 }
             }
             // Belt and braces: enforce mutual exclusivity manually as well as via the group
@@ -7459,10 +7516,10 @@ namespace PenguinMonitor
             // ---- Kill resilience: persist this workflow (PIT included) so an Android
             // process kill mid-bird reopens the form exactly where it was. Snapshot on
             // open and on OnPause; cleared on any intentional dismiss (save or cancel).
-            void CapturePendingChip()
+            PendingChipState CaptureChipState()
             {
                 var sizeSel0 = chickSizeSpinner.SelectedItem?.ToString() ?? "";
-                SavePendingChip(new PendingChipState
+                return new PendingChipState
                 {
                     FullPitId = fullPitId,
                     BoxName = _currentBoxName,
@@ -7481,10 +7538,10 @@ namespace PenguinMonitor
                     ScanCleanup = scanCleanup.HasValue,
                     ScanCleanupBox = scanCleanup?.box ?? "",
                     ScanCleanupDecrement = scanCleanup?.decrementAdult ?? false,
-                });
+                    RequestedPengNum = nextPengNum,
+                };
             }
-            _pendingChipCapture = CapturePendingChip;
-            dialog.DismissEvent += (s, e) => { _pendingChipCapture = null; ClearPendingChip(); };
+            tab.Capture = CaptureChipState;
 
             // Restore a form snapshot after a process kill
             if (restore != null)
@@ -7512,7 +7569,12 @@ namespace PenguinMonitor
                 }
                 Toast.MakeText(this, "Restored unfinished chipping form", ToastLength.Long)?.Show();
             }
-            CapturePendingChip(); // the scanned PIT is safe from the moment the form opens
+            if (seedFrom != null)
+            {
+                if (nestNames.Count == 0) nestSearchInput.Text = seedFrom.ChipBox;
+                else { var sk = nestNames.FirstOrDefault(k => string.Equals(k, seedFrom.ChipBox?.Trim(), StringComparison.OrdinalIgnoreCase)); if (sk != null) SelectNest(sk); }
+                if (seedFrom.AssistantId > 0) { var ai = chipUsers.FindIndex(u => u.id == seedFrom.AssistantId); if (ai >= 0) assistantSpinner.SetSelection(ai + 1); }
+            }
 
             // Offline path: bank the bird locally; the next sync creates it server-side
             // (the server honours the predicted number, or gives the next free one if taken).
@@ -7556,13 +7618,12 @@ namespace PenguinMonitor
                     _remotePenguinData[shortId] = pd;
                 }
 
-                // The bird is physically present — count it now
+                // The bird is physically present — record its scan and count it now
+                RecordChippedScanInBox(fullPitId);
                 if (qIsChick) BumpCount(_chicksEditText, 1);
                 else BumpCount(_adultsEditText, 1);
                 SaveCurrentBoxData();
-                completed = true; // queued = the scanned tag stays in the box (onCancel must not remove it)
-                dialog.Dismiss(); // also clears the pending-chip form file
-                SetDialogActive(false);
+                CloseChipTab(tab, cancelled: false); // queued = the scanned tag stays in the box
                 DrawPageLayouts();
                 Toast.MakeText(this, $"Queued — will sync as {nextPengLabel} (next free number if taken)", ToastLength.Long)?.Show();
             }
@@ -7574,21 +7635,15 @@ namespace PenguinMonitor
                 if (IsPlaceholderPit(fullPitId))
                 {
                     Toast.MakeText(this, "Test chip not saved", ToastLength.Short)?.Show();
-                    dialog.Dismiss();
-                    SetDialogActive(false);
+                    CloseChipTab(tab, cancelled: false);
                     return;
                 }
-                addButton.Enabled = false;
                 bool isRechip = rechipTarget != null;
-                addButton.Text = "Saving...";
+                SetSaveButton("Saving...", enabled: false);
                 // Any failure (offline is the common one in the field) re-arms the Save button
                 // so the user can retry from the same filled-in form; the pending-chip file
                 // keeps everything safe if they leave and come back in coverage.
-                void RestoreSaveButton() => RunOnUiThread(() =>
-                {
-                    addButton.Enabled = true;
-                    addButton.Text = isRechip ? "Save rechip" : "Save chip";
-                });
+                void RestoreSaveButton() => RunOnUiThread(() => SetSaveButton(isRechip ? "Save rechip" : "Save chip"));
                 var isChick = isRechip ? rechipTarget!.LastKnownLifeStage == LifeStage.Chick : chippedAsChick.Checked;
                 var sexLabel = sexSpinner.SelectedItem?.ToString() ?? "";
                 // Sex applies to new adults only — hidden for chicks and for rechips
@@ -7810,9 +7865,7 @@ namespace PenguinMonitor
                         RunOnUiThread(() =>
                         {
                             var verb = isRechip ? "rechipped" : "added";
-                            completed = true; // the tag may now stay in the box
-                            dialog.Dismiss();
-                            SetDialogActive(false);
+                            CloseChipTab(tab, cancelled: false); // the tag may now stay in the box
 
                             // A "No scan" in this box is an adult already counted but unidentified —
                             // very often the bird just chipped. Decide swap-or-add BEFORE touching the
@@ -7829,6 +7882,7 @@ namespace PenguinMonitor
 
                             void AddAsNewBird()
                             {
+                                RecordChippedScanInBox(fullPitId);
                                 if (isChick)
                                 {
                                     BumpCount(_chicksEditText, 1);
@@ -7852,6 +7906,7 @@ namespace PenguinMonitor
                                     {
                                         // Swap, don't add: the no-scan already counted this bird as an adult.
                                         replaceBox!.ScannedIds.Remove(noScanEntry);
+                                        RecordChippedScanInBox(fullPitId);
                                         // If the held-scans flush ALSO counted this bird as an adult, the
                                         // no-scan and the flushed scan are one physical bird counted twice —
                                         // drop the duplicate so the adult total lands on its true value.
@@ -7903,7 +7958,7 @@ namespace PenguinMonitor
                 });
             }
 
-            addButton.Click += (s, e) =>
+            tab.Save = () =>
             {
                 if (modeRechip.Checked && rechipTarget == null)
                 {
@@ -7961,6 +8016,182 @@ namespace PenguinMonitor
                     .SetNegativeButton("No", (s2, e2) => { })
                     .Show();
             };
+
+            // Opens the dialog (first bird) or adds a tab beside the others, and persists
+            // every tab — the scanned PIT is safe from the moment the form opens.
+            AddChipTab(tab, announce: restore == null);
+        }
+
+        private void EnsureChipDialog()
+        {
+            if (_chipDialog != null) return;
+            SetDialogActive(true);
+            var root = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
+            _chipTabStripScroll = new HorizontalScrollView(this) { HorizontalScrollBarEnabled = false, Visibility = ViewStates.Gone };
+            _chipTabStrip = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
+            _chipTabStrip.SetPadding(16, 8, 16, 0);
+            _chipTabStripScroll.AddView(_chipTabStrip);
+            root.AddView(_chipTabStripScroll);
+            _chipTabBody = new FrameLayout(this);
+            root.AddView(_chipTabBody, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+            var dialog = new AlertDialog.Builder(this)
+                .SetTitle("New bird")
+                .SetView(root)
+                .SetPositiveButton("Save chip", (EventHandler<DialogClickEventArgs>)null!)
+                .SetNegativeButton("Cancel", (EventHandler<DialogClickEventArgs>)null!)
+                .Create();
+            // A stray tap outside must not throw away birds scanned and filled in ahead of time.
+            // Back still works, but cancels only the tab showing.
+            dialog.SetCancelable(false);
+            dialog.KeyPress += (s, e) =>
+            {
+                e.Handled = e.KeyCode == Keycode.Back;
+                if (e.Handled && e.Event?.Action == KeyEventActions.Up) CancelActiveChipTab();
+            };
+            dialog.DismissEvent += (s, e) =>
+            {
+                // Only reached with tabs left if the dialog is torn down some other way
+                foreach (var t in _chipTabs.ToList()) t.Cancel();
+                _chipTabs.Clear();
+                _activeChipTab = null;
+                _chipDialog = null;
+                _newBirdScanCapture = null;
+                _pendingChipCapture = null;
+                ClearPendingChip();
+                SetDialogActive(false);
+            };
+            dialog.Show();
+            // Slightly wider than the default dialog — the two-column rows need the space
+            dialog.Window?.SetLayout((int)((Resources?.DisplayMetrics?.WidthPixels ?? 1080) * 0.98), ViewGroup.LayoutParams.WrapContent);
+            dialog.GetButton((int)DialogButtonType.Positive)!.Click += (s, e) => _activeChipTab?.Save();
+            dialog.GetButton((int)DialogButtonType.Negative)!.Click += (s, e) => CancelActiveChipTab();
+            _chipDialog = dialog;
+            _newBirdScanCapture = HandleScanWhileChipping;
+            _pendingChipCapture = PersistChipTabs;
+        }
+
+        private void AddChipTab(ChipTab tab, bool announce)
+        {
+            EnsureChipDialog();
+            _chipTabs.Add(tab);
+            ActivateChipTab(tab);
+            PersistChipTabs();
+            if (announce && _chipTabs.Count > 1)
+                Toast.MakeText(this, $"New chip — tab {_chipTabs.Count} of {_chipTabs.Count}", ToastLength.Short)?.Show();
+        }
+
+        private void ActivateChipTab(ChipTab tab)
+        {
+            if (_chipDialog == null || _chipTabBody == null) return;
+            _activeChipTab = tab;
+            _chipTabBody.RemoveAllViews();
+            _chipTabBody.AddView(tab.Content, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+            _chipDialog.SetTitle(tab.Title);
+            var b = _chipDialog.GetButton((int)DialogButtonType.Positive);
+            if (b != null) { b.Text = tab.SaveText; b.Enabled = tab.SaveEnabled; }
+            var imm = (InputMethodManager?)GetSystemService(InputMethodService);
+            imm?.HideSoftInputFromWindow(_chipTabBody.WindowToken, 0);
+            RefreshChipTabStrip();
+        }
+
+        private void CancelActiveChipTab()
+        {
+            var tab = _activeChipTab;
+            if (tab == null) return;
+            if (!tab.SaveEnabled)
+            {
+                Toast.MakeText(this, "Still saving — wait for it to finish", ToastLength.Short)?.Show();
+                return;
+            }
+            CloseChipTab(tab, cancelled: true);
+        }
+
+        // Removes one bird's tab (saved, queued or cancelled); the dialog closes with the last.
+        private void CloseChipTab(ChipTab tab, bool cancelled)
+        {
+            int idx = _chipTabs.IndexOf(tab);
+            if (idx < 0) return;
+            _chipTabs.RemoveAt(idx);
+            if (cancelled) tab.Cancel();
+            if (_chipTabs.Count == 0)
+            {
+                _chipDialog?.Dismiss();
+                return;
+            }
+            if (_activeChipTab == tab) ActivateChipTab(_chipTabs[Math.Min(idx, _chipTabs.Count - 1)]);
+            else RefreshChipTabStrip();
+            PersistChipTabs();
+        }
+
+        private void PersistChipTabs()
+        {
+            if (_chipTabs.Count > 0) SavePendingChips(_chipTabs.Select(t => t.Capture()).ToList());
+        }
+
+        private void RefreshChipTabStrip()
+        {
+            if (_chipTabStrip == null || _chipTabStripScroll == null) return;
+            _chipTabStrip.RemoveAllViews();
+            // A single bird looks exactly like the old one-bird form
+            _chipTabStripScroll.Visibility = _chipTabs.Count > 1 ? ViewStates.Visible : ViewStates.Gone;
+            if (_chipTabs.Count < 2) return;
+            foreach (var t in _chipTabs)
+            {
+                var pit = t.FullPitId ?? "";
+                var tail = pit.Length > 4 ? pit.Substring(pit.Length - 4) : pit;
+                var head = t.IsRechip ? "Rechip" : string.IsNullOrEmpty(t.ReservedPengNum) ? "New" : DisplayPengNum(t.ReservedPengNum);
+                bool active = t == _activeChipTab;
+                var chip = new TextView(this) { Text = $"{head}\n…{tail}", TextSize = 13, Gravity = GravityFlags.Center };
+                chip.SetTypeface(Android.Graphics.Typeface.DefaultBold, active ? Android.Graphics.TypefaceStyle.Bold : Android.Graphics.TypefaceStyle.Normal);
+                chip.SetTextColor(active ? Color.White : UIFactory.TEXT_PRIMARY);
+                chip.Background = _uiFactory.CreateRoundedBackground(active ? UIFactory.DANGER_RED : UIFactory.LIGHTER_GRAY, 8);
+                chip.SetPadding(24, 8, 24, 8);
+                var lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
+                lp.SetMargins(0, 0, 12, 0);
+                chip.LayoutParameters = lp;
+                chip.Clickable = true;
+                var target = t;
+                chip.Click += (s, e) => { if (target != _activeChipTab) ActivateChipTab(target); };
+                _chipTabStrip.AddView(chip);
+            }
+        }
+
+        // Every scan reaches here first while the chip dialog is open, and none of them touch
+        // the box or the server: an unknown chip just opens another tab, so any number of chips
+        // can be scanned in a row before the birds are handled. Nothing is recorded until Save.
+        private bool HandleScanWhileChipping(string cleanEid)
+        {
+            if (_chipDialog == null) return false;
+            var key = cleanEid.ToUpper();
+            var shortKey = key.Length >= 8 ? key.Substring(key.Length - 8) : key;
+            if (BoxTagService.IsBoxTag(key))
+            {
+                Toast.MakeText(this, "Box tag ignored — save or cancel the chip form first", ToastLength.Short)?.Show();
+                return true;
+            }
+            var tab = _activeChipTab;
+            if (tab?.PlaceholderScan != null && IsPlaceholderPit(tab.FullPitId))
+            {
+                tab.PlaceholderScan(key);
+                return true;
+            }
+            var open = _chipTabs.FirstOrDefault(t => DataStorageService.PitFull(t.FullPitId) == DataStorageService.PitFull(key));
+            if (open != null)
+            {
+                ActivateChipTab(open);
+                Toast.MakeText(this, $"Chip {shortKey} is already open", ToastLength.Short)?.Show();
+                return true;
+            }
+            if (_remotePenguinData != null &&
+                (_remotePenguinData.TryGetValue(key, out var owner) || _remotePenguinData.TryGetValue(shortKey, out owner)))
+            {
+                Toast.MakeText(this, $"Chip already on {DisplayPengNum(owner?.PengNum)} — not added", ToastLength.Long)?.Show();
+                return true;
+            }
+            TriggerAlert();
+            ShowNewBirdDialog(shortKey, key);   // no scan cleanup — nothing was written to undo
+            return true;
         }
 
         private void OnDeleteScanClick(ScanRecord scanToDelete)
@@ -9279,6 +9510,27 @@ namespace PenguinMonitor
                         .Show();
             });
         }
+        // Scanning a new chip writes nothing; the bird's scan joins the box only once it's saved
+        // (or queued). Locked boxes keep their scan list as it was locked.
+        private void RecordChippedScanInBox(string pitId)
+        {
+            if (_isBoxLocked || IsPlaceholderPit(pitId)) return;
+            var boxData = _colonyState.GetTodayForBox(_currentBoxName) ?? new BoxObservation { BoxName = _currentBoxName };
+            if (boxData.ScannedIds.Any(s => s.BirdId == pitId)) return;
+            boxData.ScannedIds.Add(new ScanRecord
+            {
+                BirdId = pitId,
+                Timestamp = DateTime.UtcNow,
+                Latitude = _currentLocation?.Latitude ?? 0,
+                Longitude = _currentLocation?.Longitude ?? 0,
+                Accuracy = _currentLocation?.Accuracy ?? -1
+            });
+            boxData.WhenDataCollectedUtc = DateTime.UtcNow;
+            boxData.ObserverName = _appSettings.ObserverName;
+            _colonyState.SaveBoxObservation(_currentBoxName, boxData);
+            _dataChangedSinceUnlock = true;
+        }
+
         // A scanned unknown tag goes into the box before its new-bird form opens, so the
         // scan is visible immediately — this takes it back out when the form is cancelled.
         // decrementAdultCount: the held-scans flush counted the unknown bird as an adult.
