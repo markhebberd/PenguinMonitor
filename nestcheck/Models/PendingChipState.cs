@@ -25,6 +25,8 @@ namespace PenguinMonitor.Models
         public string ChipBy { get; set; } = "";
         // A chipper not in the user list, typed by name (used only when ChipperId is 0).
         public string ChipperName { get; set; } = "";
+        // Likewise an assistant not in the user list (used only when AssistantId is 0).
+        public string AssistantName { get; set; } = "";
         public string Weight { get; set; } = "";
         public string Flipper { get; set; } = "";
         public string Notes { get; set; } = "";

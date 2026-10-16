@@ -189,6 +189,7 @@ CREATE TABLE IF NOT EXISTS penguin_chips (
     chipper_id int(11) DEFAULT NULL,
     chipper_name varchar(80) DEFAULT NULL,   -- typed chipper who isn't a user; only when chipper_id is NULL
     assistant_id int(11) DEFAULT NULL,
+    assistant_name varchar(80) DEFAULT NULL, -- typed assistant who isn't a user; only when assistant_id is NULL
     solo varchar(50) DEFAULT NULL,
     location_id int(11) DEFAULT NULL,
     PRIMARY KEY (pit_id),

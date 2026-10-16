@@ -2913,11 +2913,11 @@ function BirdPage({ data, onBirdClick, onBoxClick, onSightingClick, onDayClick, 
                             onSave={id => saveChipPerson(c.pit_id, 'chipper_id', id)} />
                         : (getUserName(c.chipper_id) || c.chip_by || <span className="muted">-</span>)}
                     </td></tr>
-                    {(editing || c.assistant_id) && <tr><td className="muted">Assistant</td><td>
+                    {(editing || c.assistant_id || c.assistant_name) && <tr><td className="muted">Assistant</td><td>
                       {editing
                         ? <UserPickerField userId={c.assistant_id ?? null} addLabel="+ assistant" title="Who assisted with the chipping"
                             onSave={id => saveChipPerson(c.pit_id, 'assistant_id', id)} />
-                        : (getUserName(c.assistant_id) || <span className="muted">-</span>)}
+                        : (getUserName(c.assistant_id) || c.assistant_name || <span className="muted">-</span>)}
                     </td></tr>}
                     {(() => { const bio = chipBio(c); return (<>
                       <tr><td className="muted">{prefix ? `${re}chip ` : 'Chip '}Weight</td><td><span className="chip-measure">

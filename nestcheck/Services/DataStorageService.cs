@@ -1557,6 +1557,7 @@ namespace PenguinMonitor.Services
                     else if (!string.IsNullOrEmpty(q.ChipperName)) fields["chipper_name"] = q.ChipperName;
                     else if (!string.IsNullOrEmpty(q.ChipBy)) fields["chip_by"] = q.ChipBy;   // legacy queued item (pre-dropdown)
                     if (q.AssistantId > 0) fields["assistant_id"] = q.AssistantId;
+                    else if (!string.IsNullOrEmpty(q.AssistantName)) fields["assistant_name"] = q.AssistantName;
                     if (!string.IsNullOrEmpty(q.ChickSizeCode)) fields["chick_size_code"] = q.ChickSizeCode;
                     if (!string.IsNullOrEmpty(requested)) fields["requested_peng_num"] = requested;
                     if (!string.IsNullOrEmpty(q.Weight)) fields["weight"] = q.Weight;

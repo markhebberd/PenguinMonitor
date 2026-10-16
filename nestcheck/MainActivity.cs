@@ -7340,8 +7340,19 @@ namespace PenguinMonitor
 
             var assistantCol = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             assistantCol.AddView(createLabel("Assistant"));
-            var assistantSpinner = MakeChipPersonSpinner(chipUsers, 0);
+            var assistantSpinner = MakeChipPersonSpinner(chipUsers, 0, allowOther: true);
             assistantCol.AddView(assistantSpinner);
+            // An assistant not in the list, typed by name (penguin_chips.assistant_name). Optional.
+            var assistantNameInput = createInput("Assistant's name", Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextFlagCapWords);
+            assistantNameInput.Visibility = ViewStates.Gone;
+            assistantCol.AddView(assistantNameInput);
+            bool AssistantIsOther() => assistantSpinner.SelectedItemPosition == chipUsers.Count + 1;
+            string AssistantNameValue() => AssistantIsOther() ? (assistantNameInput.Text ?? "").Trim() : "";
+            assistantSpinner.ItemSelected += (s, e) =>
+            {
+                assistantNameInput.Visibility = AssistantIsOther() ? ViewStates.Visible : ViewStates.Gone;
+                if (AssistantIsOther()) assistantNameInput.RequestFocus();
+            };
             card.AddView(assistantCol);
             if (chipUsers.Count == 0)
             {
@@ -7606,6 +7617,7 @@ namespace PenguinMonitor
                     ChipperId = SelectedChipUserId(chipperSpinner, chipperUsers),
                     ChipperName = ChipperNameValue(),
                     AssistantId = SelectedChipUserId(assistantSpinner, chipUsers),
+                    AssistantName = AssistantNameValue(),
                     Weight = weightInput.Text ?? "",
                     Flipper = flipperInput.Text ?? "",
                     Notes = notesInput.Text ?? "",
@@ -7632,6 +7644,12 @@ namespace PenguinMonitor
                     chipperNameInput.Visibility = ViewStates.Visible;
                 }
                 if (restore.AssistantId > 0) { var ai = chipUsers.FindIndex(u => u.id == restore.AssistantId); if (ai >= 0) assistantSpinner.SetSelection(ai + 1); }
+                else if (!string.IsNullOrEmpty(restore.AssistantName))
+                {
+                    assistantSpinner.SetSelection(chipUsers.Count + 1);
+                    assistantNameInput.Text = restore.AssistantName;
+                    assistantNameInput.Visibility = ViewStates.Visible;
+                }
                 weightInput.Text = restore.Weight;
                 flipperInput.Text = restore.Flipper;
                 notesInput.Text = restore.Notes;
@@ -7673,6 +7691,7 @@ namespace PenguinMonitor
                     ChipperId = SelectedChipUserId(chipperSpinner, chipperUsers),
                     ChipperName = ChipperNameValue(),
                     AssistantId = SelectedChipUserId(assistantSpinner, chipUsers),
+                    AssistantName = AssistantNameValue(),
                     Weight = weightInput.Text ?? "",
                     Flipper = flipperInput.Text ?? "",
                     Notes = notesInput.Text ?? "",
@@ -7737,6 +7756,7 @@ namespace PenguinMonitor
                 var chipperId = SelectedChipUserId(chipperSpinner, chipperUsers);
                 var chipperName = ChipperNameValue();
                 var assistantId = SelectedChipUserId(assistantSpinner, chipUsers);
+                var assistantName = AssistantNameValue();
                 var chipBoxVal = ChipBoxValue();
 
                 _ = Task.Run(async () =>
@@ -7800,6 +7820,7 @@ namespace PenguinMonitor
                             if (chipperId > 0) birdFields["chipper_id"] = chipperId;
                             else if (chipperName.Length > 0) birdFields["chipper_name"] = chipperName;
                             if (assistantId > 0) birdFields["assistant_id"] = assistantId;
+                            else if (assistantName.Length > 0) birdFields["assistant_name"] = assistantName;
                             if (!string.IsNullOrEmpty(chickSize)) birdFields["chick_size_code"] = chickSize;
                             if (!string.IsNullOrEmpty(weightInput.Text)) birdFields["weight"] = weightInput.Text;
                             if (!string.IsNullOrEmpty(flipperInput.Text)) birdFields["flipper_length"] = flipperInput.Text;
@@ -7857,6 +7878,7 @@ namespace PenguinMonitor
                             if (chipperId > 0) chipFields["chipper_id"] = chipperId;
                             else if (chipperName.Length > 0) chipFields["chipper_name"] = chipperName;
                             if (assistantId > 0) chipFields["assistant_id"] = assistantId;
+                            else if (assistantName.Length > 0) chipFields["assistant_name"] = assistantName;
                             var chipReq = new HttpRequestMessage(HttpMethod.Post,
                                 $"{DataStorageService.WILDWATCH_BASE_URL}/crud.php?action=create&table=penguin_chips&colony_id={colonyId}");
                             chipReq.Headers.Add("Authorization", $"Bearer {token}");
@@ -8024,7 +8046,8 @@ namespace PenguinMonitor
                 }
                 summary.Add($"Chip box: {ChipBoxValue()}");
                 summary.Add($"Chipper: {(ChipperIsOther() ? ChipperNameValue() : chipperSpinner.SelectedItemPosition > 0 ? chipperSpinner.SelectedItem?.ToString() : "Not recorded")}");
-                if (assistantSpinner.SelectedItemPosition > 0)
+                if (AssistantIsOther()) { if (AssistantNameValue().Length > 0) summary.Add($"Assistant: {AssistantNameValue()}"); }
+                else if (assistantSpinner.SelectedItemPosition > 0)
                     summary.Add($"Assistant: {assistantSpinner.SelectedItem?.ToString()}");
                 if (!string.IsNullOrWhiteSpace(weightInput.Text)) summary.Add($"Weight: {weightInput.Text} g");
                 if (!string.IsNullOrWhiteSpace(flipperInput.Text)) summary.Add($"Flipper: {flipperInput.Text} mm");
@@ -9778,7 +9801,7 @@ namespace PenguinMonitor
                         chipped_as_adult = q.IsChick ? 0 : 1, chick_size_code = q.ChickSizeCode,
                         is_rechip = q.IsRechip, rechip_peng_num = q.RechipPengNum,
                         chipper_id = q.ChipperId, chipper = q.ChipperId > 0 ? UserName(q.ChipperId) : q.ChipperName,
-                        assistant_id = q.AssistantId, assistant = UserName(q.AssistantId),
+                        assistant_id = q.AssistantId, assistant = q.AssistantId > 0 ? UserName(q.AssistantId) : q.AssistantName,
                         weight = q.Weight, flipper_length = q.Flipper, observed_sex = q.SexCode, notes = q.Notes,
                     }).ToList(),
                     ["box_notes"] = _boxNotes.Values

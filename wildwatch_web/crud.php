@@ -175,6 +175,9 @@ if ($action === 'create_chipped_bird' && $_SERVER['REQUEST_METHOD'] === 'POST') 
         $typed = mb_substr(trim((string)($in['chipper_name'] ?? '')), 0, 80);
         if ($chip['chipper_id'] === null && $typed !== '') $chip['chipper_name'] = $typed;
         $chip['assistant_id'] = $asChipUser($in['assistant_id'] ?? null);
+        // Same for an assistant who isn't a user.
+        $typedAsst = mb_substr(trim((string)($in['assistant_name'] ?? '')), 0, 80);
+        if ($chip['assistant_id'] === null && $typedAsst !== '') $chip['assistant_name'] = $typedAsst;
         wwAuditedInsert($pdo, 'penguin_chips', $chip, $obsId, $reason);
 
         $bio = [];
@@ -768,11 +771,14 @@ function handleCreate($pdo, $table, $pk, $observer) {
             $byAcr->execute([trim((string)$incomingChipBy)]);
             if ($hit = $byAcr->fetchColumn()) $input['chipper_id'] = (int)$hit;
         }
-        // A typed chipper name (someone not in users) only stands in when there's no chipper id.
-        if ($table === 'penguin_chips' && array_key_exists('chipper_name', $input)) {
-            $typed = mb_substr(trim((string)$input['chipper_name']), 0, 80);
-            if (!empty($input['chipper_id']) || $typed === '') unset($input['chipper_name']);
-            else $input['chipper_name'] = $typed;
+        // A typed chipper / assistant name (someone not in users) only stands in when there's no id.
+        if ($table === 'penguin_chips') {
+            foreach (['chipper_name' => 'chipper_id', 'assistant_name' => 'assistant_id'] as $nameCol => $idCol) {
+                if (!array_key_exists($nameCol, $input)) continue;
+                $typed = mb_substr(trim((string)$input[$nameCol]), 0, 80);
+                if (!empty($input[$idCol]) || $typed === '') unset($input[$nameCol]);
+                else $input[$nameCol] = $typed;
+            }
         }
 
         // Auto-generate peng_num for new penguins (next number in the requested colony, or the
